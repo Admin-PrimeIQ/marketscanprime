@@ -1,0 +1,26 @@
+# graphify: rutas excluidas del grafo de conocimiento (sintaxis .gitignore).
+# .gitignore ya se respeta; aquí solo va lo versionado que no aporta al grafo.
+
+# Skills, reglas y config de agentes (no son código del producto)
+.agents/
+.claude/
+.cursor/
+skills-lock.json
+
+# Artefactos locales / despliegue
+.temp/
+.vercel/
+graphify-out/
+
+# Assets estáticos
+public/
+
+# Lockfiles y parches de dependencias
+package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+patches/
+.migration/package-lock.json
+
+# Traducciones planas (miles de strings, sin relaciones de código)
+messages/
