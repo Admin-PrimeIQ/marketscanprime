@@ -1,0 +1,119 @@
+/**
+ * Tokens highlight.js scoped al bloque `:::code` del UI blocks renderer.
+ * Variables para modo claro (fondo claro en el cuerpo) y .dark.
+ */
+.block {
+  --ui-code-bg: #f8fafc;
+  --ui-code-fg: #0f172a;
+  --ui-code-comment: #64748b;
+  --ui-code-keyword: #6d28d9;
+  --ui-code-string: #047857;
+  --ui-code-number: #b45309;
+  --ui-code-title: #1d4ed8;
+  --ui-code-built_in: #0f766e;
+  --ui-code-variable: #be123c;
+  --ui-code-type: #a16207;
+  --ui-code-tag: #be123c;
+  --ui-code-attr: #9a3412;
+  --ui-code-meta: #be123c;
+}
+
+:global(.dark) .block {
+  --ui-code-bg: #0c0c0f;
+  --ui-code-fg: #e2e8f0;
+  --ui-code-comment: #94a3b8;
+  --ui-code-keyword: #a78bfa;
+  --ui-code-string: #4ade80;
+  --ui-code-number: #fbbf24;
+  --ui-code-title: #60a5fa;
+  --ui-code-built_in: #2dd4bf;
+  --ui-code-variable: #fb7185;
+  --ui-code-type: #fcd34d;
+  --ui-code-tag: #fb7185;
+  --ui-code-attr: #fdba74;
+  --ui-code-meta: #fb7185;
+}
+
+.block pre code.hljs {
+  color: var(--ui-code-fg);
+  background: transparent !important;
+}
+
+.block :global(.hljs-comment),
+.block :global(.hljs-quote) {
+  color: var(--ui-code-comment);
+  font-style: italic;
+}
+
+.block :global(.hljs-keyword),
+.block :global(.hljs-selector-tag),
+.block :global(.hljs-literal) {
+  color: var(--ui-code-keyword);
+}
+
+.block :global(.hljs-string),
+.block :global(.hljs-attr),
+.block :global(.hljs-selector-attr) {
+  color: var(--ui-code-string);
+}
+
+.block :global(.hljs-number),
+.block :global(.hljs-regexp) {
+  color: var(--ui-code-number);
+}
+
+.block :global(.hljs-title),
+.block :global(.hljs-title.function_),
+.block :global(.hljs-title.class_) {
+  color: var(--ui-code-title);
+  font-weight: 600;
+}
+
+.block :global(.hljs-built_in),
+.block :global(.hljs-builtin-name) {
+  color: var(--ui-code-built_in);
+}
+
+.block :global(.hljs-variable),
+.block :global(.hljs-template-variable) {
+  color: var(--ui-code-variable);
+}
+
+.block :global(.hljs-type),
+.block :global(.hljs-class) {
+  color: var(--ui-code-type);
+}
+
+.block :global(.hljs-tag) {
+  color: var(--ui-code-tag);
+}
+
+.block :global(.hljs-name) {
+  color: var(--ui-code-tag);
+}
+
+.block :global(.hljs-attribute) {
+  color: var(--ui-code-attr);
+}
+
+.block :global(.hljs-symbol),
+.block :global(.hljs-bullet) {
+  color: var(--ui-code-string);
+}
+
+.block :global(.hljs-meta),
+.block :global(.hljs-deletion) {
+  color: var(--ui-code-meta);
+}
+
+.block :global(.hljs-addition) {
+  color: var(--ui-code-string);
+}
+
+.block :global(.hljs-emphasis) {
+  font-style: italic;
+}
+
+.block :global(.hljs-strong) {
+  font-weight: 700;
+}

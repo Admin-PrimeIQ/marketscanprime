@@ -1,0 +1,20 @@
+{
+  "name": "units-migration-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "migrate": "./bin/run.js" },
+  "scripts": { "migrate": "node ./bin/run.js", "test:parity": "node ./src/formulas.parity.test.mjs" },
+  "oclif": { "bin": "migrate", "commands": "./src/commands", "topicSeparator": " " },
+  "dependencies": {
+    "@oclif/core": "^4",
+    "@inquirer/prompts": "^7",
+    "ora": "^8",
+    "cli-progress": "^3",
+    "chalk": "^5",
+    "cli-table3": "^0.6",
+    "pino": "^9",
+    "pino-pretty": "^13",
+    "dotenv": "^16"
+  }
+}

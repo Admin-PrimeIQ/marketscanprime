@@ -1,0 +1,22 @@
+diff --git a/node_modules/@n8n/chat/dist/chat.es.js b/node_modules/@n8n/chat/dist/chat.es.js
+index 2d6d162..a2b866c 100644
+--- a/node_modules/@n8n/chat/dist/chat.es.js
++++ b/node_modules/@n8n/chat/dist/chat.es.js
+@@ -9408,7 +9408,7 @@ var openInNew_default = {
+ 	props: { placeholder: { default: "inputPlaceholder" } },
+ 	emits: ["arrowKeyDown"],
+ 	setup(e, { emit: t }) {
+-		let i = e, { t: o } = useI18n(), s = t, { options: l } = useOptions(), d = useChat(), { waitingForResponse: p } = d, k = ref(null), k7 = ref(null), $ = ref(""), j7 = ref(!1), M7 = ref(null), N7 = ref(!1), P7 = computed(() => d.blockUserInput.value ? !0 : N7.value ? !1 : $.value === "" || unref(p) || l.disabled?.value === !0), F7 = computed(() => l.disabled?.value === !0), I7 = computed(() => L7.value && unref(p) && !l.disabled?.value), L7 = computed(() => unref(l.allowFileUploads) === !0), R7 = computed(() => unref(l.allowedFilesMimeTypes)), z7 = computed(() => {
++		let i = e, { t: o } = useI18n(), s = t, { options: l } = useOptions(), d = useChat(), { waitingForResponse: p } = d, k = ref(null), k7 = ref(null), $ = ref(""), j7 = ref(!1), M7 = ref(null), N7 = ref(!1), P7 = computed(() => d.blockUserInput.value ? !0 : N7.value ? !1 : $.value === "" && !(k.value?.length) || unref(p) || l.disabled?.value === !0), F7 = computed(() => l.disabled?.value === !0), I7 = computed(() => L7.value && unref(p) && !l.disabled?.value), L7 = computed(() => unref(l.allowFileUploads) === !0), R7 = computed(() => unref(l.allowedFilesMimeTypes)), z7 = computed(() => {
+ 			let e = L7.value ? 2 : 1;
+ 			return { "--controls-count": e };
+ 		}), { open: B7, reset: V7, onChange: H7 } = useFileDialog({
+@@ -37607,7 +37607,7 @@ var _hoisted_1$6 = {
+ 	__name: "Message",
+ 	props: { message: {} },
+ 	setup(e, { expose: t }) {
+-		let { message: i } = toRefs(e), { options: o } = useOptions(), s = ref(null), l = ref({}), d = computed(() => i.value.text || "&lt;Empty response&gt;"), p = computed(() => ({
++		let { message: i } = toRefs(e), { options: o } = useOptions(), s = ref(null), l = ref({}), d = computed(() => { let m = i.value, t = typeof m.text == "string" ? m.text : "", f = m.files ?? []; return t || f.length ? t : "&lt;Empty response&gt;"; }), p = computed(() => ({
+ 			"chat-message-from-user": i.value.sender === "user",
+ 			"chat-message-from-bot": i.value.sender === "bot",
+ 			"chat-message-transparent": i.value.transparent === !0
