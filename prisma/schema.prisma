@@ -1,0 +1,799 @@
+// Esquema de la app nueva (Fase 2 del ROADMAP): Postgres de Railway, base `railway`, esquema `msp_app`.
+//
+// Reemplaza al modelo de Strapi (etl/prisma/strapi/schema.prisma):
+// - Relaciones con llaves foráneas directas en lugar de tablas `_lnk`.
+// - La zona dinámica `unitType` pasa a tres tablas 1:1 (`unit_housing`, `unit_office`, `unit_industrial`).
+// - El financiamiento (4 tablas encadenadas, banco en `field`) pasa a `block_financing` + `block_bank_rate`.
+// - Las monedas del perfil (4 niveles de componentes) pasan a `exchange_rate_profile_currency`.
+//
+// `publicId` es el `document_id` de Strapi en las filas cargadas (enlaza con el warehouse) y un
+// cuid en las nuevas. Los valores de los enums son los que hoy guarda Strapi.
+//
+// Migraciones: `npm run app:diff` / `app:deploy` desde etl/. Nunca `migrate reset` ni `db push`:
+// la base `railway` también contiene `dbo_stage`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../etl/generated/app"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// T1–T4 = GAM, S1–S2 = Interior (lib/region.ts).
+enum Quarter {
+  T1
+  T2
+  T3
+  T4
+  S1
+  S2
+
+  @@map("quarter")
+}
+
+enum BlockDomain {
+  housing
+  office
+  industrial
+
+  @@map("block_domain")
+}
+
+enum Market {
+  Primary
+  Secondary
+
+  @@map("market")
+}
+
+/// Columna `uso` del universo del warehouse, 1:1.
+enum BlockUsage {
+  Venta
+  Renta
+
+  @@map("block_usage")
+}
+
+enum Availability {
+  Available
+  Not_Available @map("Not Available")
+
+  @@map("availability")
+}
+
+/// Bancos del componente `financing.financing` (lib/financing.ts → BANCOS).
+enum Bank {
+  fha
+  bi
+  gtc
+  chn
+  banrural
+  bac
+  bam
+  bantrab
+  credicorp
+  internacional
+  promerica
+  azteca
+  inmobiliario
+  inv
+  ficohsa
+  vivibanco
+  antigua
+  ownerFinancing
+
+  @@map("bank")
+}
+
+enum Currency {
+  GTQ
+  MXN
+  PAB
+  BZD
+  CRC
+  NIO
+  HNL
+
+  @@map("currency")
+}
+
+/// lib/units/unit-type-dynamic-columns.ts → UNIT_OFFICE_CLASSIFICATION_VALUES
+enum OfficeClassification {
+  Micro_1  @map("Micro 1")
+  Micro_2  @map("Micro 2")
+  Small_1  @map("Small 1")
+  Small_2  @map("Small 2")
+  Medium_1 @map("Medium 1")
+  Medium_2 @map("Medium 2")
+  Medium_3 @map("Medium 3")
+  Large_1  @map("Large 1")
+  Large_2  @map("Large 2")
+  Large_3  @map("Large 3")
+  Large_4  @map("Large 4")
+  Large_5  @map("Large 5")
+
+  @@map("office_classification")
+}
+
+enum OfficeSizeClassification {
+  Micro
+  Small
+  Medium
+  Large
+
+  @@map("office_size_classification")
+}
+
+enum EmployeeCapacityRange {
+  Range_1_To_5
+  Range_6_To_10
+  Range_11_To_15
+  Range_16_To_20
+  Range_21_To_30
+  Range_31_To_40
+  Range_41_To_50
+  Range_51_To_80
+  Range_81_To_100
+  Range_101_To_140
+  Range_141_To_170
+  Range_More_Than_171
+
+  @@map("employee_capacity_range")
+}
+
+/// Roles de up_roles (sin `public`, que no se asigna a usuarios).
+enum UserRole {
+  authenticated
+  operator
+  supervisor
+  administrator
+  super_administrator
+
+  @@map("user_role")
+}
+
+enum SyncRunStatus {
+  resolving
+  running
+  completed
+  completed_with_skips
+  failed
+  aborted
+
+  @@map("sync_run_status")
+}
+
+enum SyncOperation {
+  push
+  pull
+
+  @@map("sync_operation")
+}
+
+enum SyncBlockMode {
+  legacy
+  native
+
+  @@map("sync_block_mode")
+}
+
+enum SyncBlockOperation {
+  insert
+  update
+
+  @@map("sync_block_operation")
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+
+  @@map("audit_action")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogos (CRUD genérico en /catalogs). Borrar uno en uso falla: onDelete Restrict.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Amenity {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  category    String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects ProjectAmenity[]
+
+  @@map("amenity")
+}
+
+model Service {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  category    String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects ProjectService[]
+
+  @@map("service")
+}
+
+/// IVA, cuota y departamentos dependen de `isoCode2` (fallback `code`).
+model Country {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  isoCode     String?  @unique @map("iso_code")
+  isoCode2    String?  @unique @map("iso_code_2")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects Project[]
+
+  @@map("country")
+}
+
+model Developer {
+  id            Int      @id @default(autoincrement())
+  publicId      String   @unique @default(cuid()) @map("public_id")
+  code          String?
+  name          String
+  description   String?
+  address       String?
+  phone         String?
+  email         String?
+  website       String?
+  taxId         String?  @map("tax_id")
+  contactPerson String?  @map("contact_person")
+  contactPhone  String?  @map("contact_phone")
+  contactEmail  String?  @map("contact_email")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects Project[]
+
+  @@map("developer")
+}
+
+model Nse {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects Project[]
+
+  @@map("nse")
+}
+
+model SecurityType {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projects Project[]
+
+  @@map("security_type")
+}
+
+model BlockCategory {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blocks Block[]
+
+  @@map("block_category")
+}
+
+model BlockFocus {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blocks Block[]
+
+  @@map("block_focus")
+}
+
+model BlockStatus {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  blocks Block[]
+
+  @@map("block_status")
+}
+
+model UnitParkingType {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  units Unit[]
+
+  @@map("unit_parking_type")
+}
+
+model UnitTopography {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  units Unit[]
+
+  @@map("unit_topography")
+}
+
+/// Venta / Renta de la unidad: decide el IVA (lib/units/formulas.ts).
+model UnitUsage {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  units Unit[]
+
+  @@map("unit_usage")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Perfiles de tipo de cambio
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ExchangeRateProfile {
+  id          Int      @id @default(autoincrement())
+  publicId    String   @unique @default(cuid()) @map("public_id")
+  code        String?
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  currencies ExchangeRateProfileCurrency[]
+  projects   Project[]
+
+  @@map("exchange_rate_profile")
+}
+
+/// Unidades de moneda local por 1 USD.
+model ExchangeRateProfileCurrency {
+  profileId Int      @map("profile_id")
+  currency  Currency
+  buyRate   Decimal? @map("buy_rate") @db.Decimal(18, 8)
+  sellRate  Decimal? @map("sell_rate") @db.Decimal(18, 8)
+
+  profile ExchangeRateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, currency])
+  @@map("exchange_rate_profile_currency")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proyecto
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id                    Int      @id @default(autoincrement())
+  publicId              String   @unique @default(cuid()) @map("public_id")
+  code                  String?
+  name                  String
+  department            String?
+  municipality          String?
+  zone                  String?
+  subzone               String?
+  latitude              Decimal? @db.Decimal(10, 8)
+  longitude             Decimal? @db.Decimal(11, 8)
+  muvi                  Boolean?
+  showroom              Boolean?
+  modelHouse            Boolean? @map("model_house")
+  accessQuantity        Int?     @map("access_quantity")
+  imageUrl              String?  @map("image_url")
+  fha                   Boolean?
+  fractionalDownPayment Boolean? @map("fractional_down_payment")
+  downPaymentPercentage Decimal? @map("down_payment_percentage") @db.Decimal(10, 2)
+  countryId             Int?     @map("country_id")
+  developerId           Int?     @map("developer_id")
+  nseId                 Int?     @map("nse_id")
+  securityTypeId        Int?     @map("security_type_id")
+  exchangeRateProfileId Int?     @map("exchange_rate_profile_id")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  country             Country?             @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  developer           Developer?           @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  nse                 Nse?                 @relation(fields: [nseId], references: [id], onDelete: Restrict)
+  securityType        SecurityType?        @relation(fields: [securityTypeId], references: [id], onDelete: Restrict)
+  exchangeRateProfile ExchangeRateProfile? @relation(fields: [exchangeRateProfileId], references: [id], onDelete: Restrict)
+  amenities           ProjectAmenity[]
+  services            ProjectService[]
+  blocks              Block[]
+
+  @@index([code])
+  @@index([countryId])
+  @@index([developerId])
+  @@index([exchangeRateProfileId])
+  @@map("project")
+}
+
+model ProjectAmenity {
+  projectId Int    @map("project_id")
+  amenityId Int    @map("amenity_id")
+  sortOrder Float? @map("sort_order")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, amenityId])
+  @@index([amenityId])
+  @@map("project_amenity")
+}
+
+model ProjectService {
+  projectId Int    @map("project_id")
+  serviceId Int    @map("service_id")
+  sortOrder Float? @map("sort_order")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, serviceId])
+  @@index([serviceId])
+  @@map("project_service")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Contadores y promedios se guardan: los lee el warehouse y se recalculan al guardar unidades.
+model Block {
+  id                        Int         @id @default(autoincrement())
+  publicId                  String      @unique @default(cuid()) @map("public_id")
+  code                      String?     @unique
+  name                      String?
+  /// `cod_proyecto` del warehouse; vacío en bloques nacidos en el backoffice.
+  legacyId                  String?     @map("legacy_id")
+  projectId                 Int         @map("project_id")
+  domain                    BlockDomain
+  quarter                   Quarter?
+  market                    Market?
+  blockUsage                BlockUsage? @map("block_usage")
+  phase                     String?
+  tower                     String?
+  sector                    String?
+  year                      Int?
+  collectionDate            DateTime?   @map("collection_date") @db.Date
+  startDate                 DateTime?   @map("start_date") @db.Date
+  deliveryDate              DateTime?   @map("delivery_date") @db.Date
+  commercializationMonths   Int?        @map("commercialization_months")
+  totalUnits                Int?        @map("total_units")
+  totalM2                   Decimal?    @map("total_m2") @db.Decimal(10, 2)
+  availableUnits            Int?        @map("available_units")
+  availableM2               Decimal?    @map("available_m2") @db.Decimal(10, 2)
+  visitorParking            Int?        @map("visitor_parking")
+  assignedParking           Int?        @map("assigned_parking")
+  totalProjectParking       Int?        @map("total_project_parking")
+  parkingForSale            Int?        @map("parking_for_sale")
+  migNumber                 Int?        @map("mig_number")
+  averagePriceUsd           Decimal?    @map("average_price_usd") @db.Decimal(10, 2)
+  averageSizeM2             Decimal?    @map("average_size_m2") @db.Decimal(10, 2)
+  averagePricePerM2Usd      Decimal?    @map("average_price_per_m2_usd") @db.Decimal(10, 2)
+  averageInstallmentUsd     Decimal?    @map("average_installment_usd") @db.Decimal(10, 2)
+  averageIncomeUsd          Decimal?    @map("average_income_usd") @db.Decimal(10, 2)
+  additionalParkingPriceUsd Decimal?    @map("additional_parking_price_usd") @db.Decimal(10, 2)
+  categoryId                Int?        @map("category_id")
+  focusId                   Int?        @map("focus_id")
+  statusId                  Int?        @map("status_id")
+  createdAt                 DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  category   BlockCategory?  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  focus      BlockFocus?     @relation(fields: [focusId], references: [id], onDelete: Restrict)
+  status     BlockStatus?    @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  financing  BlockFinancing?
+  bankRates  BlockBankRate[]
+  units      Unit[]
+  syncBlocks SyncRunBlock[]
+
+  @@index([projectId])
+  @@index([legacyId])
+  @@index([domain, quarter])
+  @@map("block")
+}
+
+model BlockFinancing {
+  blockId                          Int      @id @map("block_id")
+  downPaymentPercent               Decimal? @map("down_payment_percent") @db.Decimal(10, 2)
+  fractionalDownPayment            Boolean? @map("fractional_down_payment")
+  fractionalDownPaymentFha         Decimal? @map("fractional_down_payment_fha") @db.Decimal(10, 2)
+  fractionalInstallmentsOtherBanks Decimal? @map("fractional_installments_other_banks") @db.Decimal(10, 2)
+  minDownPaymentFha                Decimal? @map("min_down_payment_fha") @db.Decimal(10, 2)
+  minDownPaymentOtherBanks         Decimal? @map("min_down_payment_other_banks") @db.Decimal(10, 2)
+  maxLoanTermYearsFha              Int?     @map("max_loan_term_years_fha")
+  maxLoanTermYearsBanks            Int?     @map("max_loan_term_years_banks")
+  maxLoanTermYearsOwner            Int?     @map("max_loan_term_years_owner")
+
+  block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@map("block_financing")
+}
+
+/// `annualRatePercent = 0` = el bloque no trabaja con ese banco.
+model BlockBankRate {
+  blockId           Int      @map("block_id")
+  bank              Bank
+  annualRatePercent Decimal? @map("annual_rate_percent") @db.Decimal(10, 2)
+
+  block Block @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@id([blockId, bank])
+  @@map("block_bank_rate")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unidad
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Los campos de fórmula se guardan (los lee el warehouse); se recalculan con lib/domain al guardar.
+model Unit {
+  id                            Int           @id @default(autoincrement())
+  publicId                      String        @unique @default(cuid()) @map("public_id")
+  code                          String?       @unique
+  name                          String?
+  legacyId                      String?       @map("legacy_id")
+  blockId                       Int           @map("block_id")
+  /// Tipo de la zona dinámica `unitType`; nulo si la unidad no tiene componente.
+  kind                          BlockDomain?
+  unitNumber                    String?       @map("unit_number")
+  model                         String?
+  availability                  Availability?
+  frontM2                       Decimal?      @map("front_m2") @db.Decimal(14, 4)
+  depthM2                       Decimal?      @map("depth_m2") @db.Decimal(14, 4)
+  landM2                        Decimal?      @map("land_m2") @db.Decimal(14, 4)
+  unitSizeM2                    Decimal?      @map("unit_size_m2") @db.Decimal(14, 4)
+  habitableConstructionM2       Decimal?      @map("habitable_construction_m2") @db.Decimal(14, 4)
+  parkingSizeM2                 Decimal?      @map("parking_size_m2") @db.Decimal(14, 4)
+  totalSizeM2                   Decimal?      @map("total_size_m2") @db.Decimal(14, 4)
+  bathrooms                     Decimal?      @db.Decimal(4, 1)
+  hasParking                    Boolean?      @map("has_parking")
+  hasMotorcycleParking          Boolean?      @map("has_motorcycle_parking")
+  parkingSpaces                 Int?          @map("parking_spaces")
+  totalPriceUsd                 Decimal?      @map("total_price_usd") @db.Decimal(15, 2)
+  priceWithoutVatUsd            Decimal?      @map("price_without_vat_usd") @db.Decimal(15, 2)
+  pricePerM2Usd                 Decimal?      @map("price_per_m2_usd") @db.Decimal(15, 2)
+  rentalPriceUsd                Decimal?      @map("rental_price_usd") @db.Decimal(15, 2)
+  rentalPriceWithoutVatUsd      Decimal?      @map("rental_price_without_vat_usd") @db.Decimal(15, 2)
+  rentalPricePerM2WithoutVatUsd Decimal?      @map("rental_price_per_m2_without_vat_usd") @db.Decimal(15, 2)
+  maintenanceTotalPriceM2Usd    Decimal?      @map("maintenance_total_price_m2_usd") @db.Decimal(15, 2)
+  maintenancePricePerM2Usd      Decimal?      @map("maintenance_price_per_m2_usd") @db.Decimal(15, 2)
+  installmentUsd                Decimal?      @map("installment_usd") @db.Decimal(15, 2)
+  incomeUsd                     Decimal?      @map("income_usd") @db.Decimal(15, 2)
+  unitAbsorption                Decimal?      @map("unit_absorption") @db.Decimal(18, 12)
+  absorptionPerM2               Decimal?      @map("absorption_per_m2") @db.Decimal(18, 12)
+  usageId                       Int?          @map("usage_id")
+  topographyId                  Int?          @map("topography_id")
+  parkingTypeId                 Int?          @map("parking_type_id")
+  createdAt                     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  block       Block            @relation(fields: [blockId], references: [id], onDelete: Restrict)
+  usage       UnitUsage?       @relation(fields: [usageId], references: [id], onDelete: Restrict)
+  topography  UnitTopography?  @relation(fields: [topographyId], references: [id], onDelete: Restrict)
+  parkingType UnitParkingType? @relation(fields: [parkingTypeId], references: [id], onDelete: Restrict)
+  housing     UnitHousing?
+  office      UnitOffice?
+  industrial  UnitIndustrial?
+
+  @@index([blockId])
+  @@index([legacyId])
+  @@map("unit")
+}
+
+model UnitHousing {
+  unitId               Int      @id @map("unit_id")
+  bedrooms             Int?
+  balconyTerraceSizeM2 Decimal? @map("balcony_terrace_size_m2") @db.Decimal(10, 2)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@map("unit_housing")
+}
+
+model UnitOffice {
+  unitId                         Int                       @id @map("unit_id")
+  employeeCapacity               Int?                      @map("employee_capacity")
+  priceWithoutParkingM2Usd       Decimal?                  @map("price_without_parking_m2_usd") @db.Decimal(10, 2)
+  propertyValueWithoutParkingUsd Decimal?                  @map("property_value_without_parking_usd") @db.Decimal(10, 2)
+  officeClassification           OfficeClassification?     @map("office_classification")
+  generalSizeClassification      OfficeSizeClassification? @map("general_size_classification")
+  employeeCapacityRange          EmployeeCapacityRange?    @map("employee_capacity_range")
+  /// Texto libre en Strapi ("10 a 50", "1,001 a 1,400", …).
+  m2Range                        String?                   @map("m2_range")
+  sizeEmployeeCapacityCombined   String?                   @map("size_employee_capacity_combined")
+  sizeM2Combined                 String?                   @map("size_m2_combined")
+  parkingForSale                 Int?                      @map("parking_for_sale")
+  balconyTerraceSizeM2           Decimal?                  @map("balcony_terrace_size_m2") @db.Decimal(10, 2)
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@map("unit_office")
+}
+
+model UnitIndustrial {
+  unitId                    Int      @id @map("unit_id")
+  warehouseStorageSizeM2    Decimal? @map("warehouse_storage_size_m2") @db.Decimal(10, 2)
+  officeSizeM2              Decimal? @map("office_size_m2") @db.Decimal(10, 2)
+  mezzanineSizeM2           Decimal? @map("mezzanine_size_m2") @db.Decimal(10, 2)
+  loadingAreaM2             Decimal? @map("loading_area_m2") @db.Decimal(10, 2)
+  width1M2                  Decimal? @map("width_1_m2") @db.Decimal(10, 2)
+  depth1M2                  Decimal? @map("depth_1_m2") @db.Decimal(10, 2)
+  depth2M2                  Decimal? @map("depth_2_m2") @db.Decimal(10, 2)
+  heightM2                  Decimal? @map("height_m2") @db.Decimal(10, 2)
+  additionalParkingPriceUsd Decimal? @map("additional_parking_price_usd") @db.Decimal(10, 2)
+  /// Texto en Strapi: A++, A+, A1–A4, B, B1, B2, C, C-.
+  qualityClassification     String?  @map("quality_classification")
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@map("unit_industrial")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usuarios
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `passwordHash` es el bcrypt de up_users, migrado tal cual (nadie cambia contraseña).
+model User {
+  id                     Int       @id @default(autoincrement())
+  publicId               String    @unique @default(cuid()) @map("public_id")
+  username               String    @unique
+  email                  String    @unique
+  provider               String    @default("local")
+  passwordHash           String?   @map("password_hash")
+  role                   UserRole  @default(authenticated)
+  confirmed              Boolean   @default(false)
+  blocked                Boolean   @default(false)
+  resetPasswordToken     String?   @unique @map("reset_password_token")
+  resetPasswordExpiresAt DateTime? @map("reset_password_expires_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auditLogs AuditLog[]
+
+  @@map("user")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Operación: sincronización con el warehouse, tipo de cambio, auditoría
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Reemplaza a sync_runs de Supabase.
+model SyncRun {
+  id           String        @id @default(uuid()) @db.Uuid
+  status       SyncRunStatus
+  operation    SyncOperation @default(push)
+  domain       BlockDomain   @default(housing)
+  requestedBy  String        @map("requested_by")
+  force        Boolean       @default(false)
+  targetsCount Int?          @map("targets_count")
+  done         Int           @default(0)
+  failed       Int           @default(0)
+  skipped      Int           @default(0)
+  s3Prefix     String?       @map("s3_prefix")
+  error        String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  finishedAt   DateTime?     @map("finished_at") @db.Timestamptz(6)
+
+  blocks SyncRunBlock[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("sync_run")
+}
+
+/// Reemplaza a sync_run_blocks de Supabase. `phase`: 1 catálogo · 2 proyecto · 3 bloque.
+model SyncRunBlock {
+  id            Int                 @id @default(autoincrement())
+  runId         String              @map("run_id") @db.Uuid
+  blockId       Int?                @map("block_id")
+  blockPublicId String              @map("block_public_id")
+  codProyecto   String?             @map("cod_proyecto")
+  mode          SyncBlockMode?
+  operation     SyncBlockOperation?
+  status        String
+  error         String?
+  phase         Int?                @db.SmallInt
+  startedAt     DateTime?           @map("started_at") @db.Timestamptz(6)
+  finishedAt    DateTime?           @map("finished_at") @db.Timestamptz(6)
+
+  run   SyncRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  block Block?  @relation(fields: [blockId], references: [id], onDelete: SetNull)
+
+  @@index([runId])
+  @@index([blockId])
+  @@map("sync_run_block")
+}
+
+/// Histórico del tipo de cambio (Banguat), reemplaza al JSON en S3.
+model ExchangeRate {
+  id            Int      @id @default(autoincrement())
+  date          DateTime @db.Date
+  currency      String
+  unit          String?
+  buy           Decimal? @db.Decimal(18, 8)
+  sell          Decimal? @db.Decimal(18, 8)
+  referenceRate Decimal? @map("reference_rate") @db.Decimal(18, 8)
+  source        String?
+  fetchedAt     DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+
+  @@unique([date, currency])
+  @@map("exchange_rate")
+}
+
+/// Quién cambió qué. `entity` = nombre de tabla; `before`/`after` = filas en JSON.
+model AuditLog {
+  id        BigInt      @id @default(autoincrement())
+  userId    Int?        @map("user_id")
+  entity    String
+  entityId  Int         @map("entity_id")
+  action    AuditAction
+  before    Json?
+  after     Json?
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_log")
+}

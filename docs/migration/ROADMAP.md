@@ -132,7 +132,7 @@ Diseñar `prisma/schema.prisma` de la app (no el de Strapi). Lineamientos:
 | Usuarios `up_users` + roles | `user`, `role` enum; hash bcrypt reutilizable. |
 | — | `sync_run`, `sync_run_block`, `exchange_rate`, `audit_log` (quién cambió qué). |
 
-- [ ] Escribir el esquema y la primera migración en una base Postgres **nueva**, en el proyecto de Railway propio o en local (nunca sobre `dbo` ni sobre el Postgres existente).
+- [x] Escribir el esquema y la primera migración. Por decisión del usuario (15 oct 2026, `README.md` §3, decisión 8) viven en el Postgres de staging de Railway, esquema `msp_app`, separado del esquema `dbo_stage` de ese servidor (solo lectura) y nunca sobre `dbo`. Esquema: [`prisma/schema.prisma`](../../prisma/schema.prisma). Migración: `prisma/migrations/20261015210000_init`.
 - [ ] Decidir qué campos calculados se **guardan** (para el warehouse y reportes) y cuáles se calculan al leer.
 
 **Hecho cuando:** el esquema migra limpio en una base vacía y un revisor puede entender el modelo sin leer Strapi.
@@ -413,7 +413,7 @@ A revisar con negocio:
 
 | Se eliminan al terminar | Se agregan |
 |---|---|
-| `NEXT_PUBLIC_STRAPI_URL`, `STRAPI_USERNAME`, `STRAPI_PASSWORD` | `DATABASE_URL` (Postgres de la app) |
+| `NEXT_PUBLIC_STRAPI_URL`, `STRAPI_USERNAME`, `STRAPI_PASSWORD` | `DATABASE_URL_APP` (Postgres de la app, esquema `msp_app`; hoy el ETL usa las credenciales de `DATABASE_URL_DBO_STAGE` si falta) |
 | `NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL` | `REDIS_URL` (cola de workers) |
 | `SYNC_API_URL`, `SYNC_API_KEY` | `AUTH_SECRET` (sesiones) |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Llave del proveedor de correo (Resend o SES) |

@@ -13,17 +13,28 @@
     "strapi:pull:print": "prisma db pull --print --config prisma.strapi.config.ts",
     "strapi:ping": "tsx src/strapi/ping.ts",
     "strapi:check": "tsx src/strapi/check.ts",
+    "app:validate": "prisma validate --config prisma.app.config.ts",
+    "app:generate": "prisma generate --config prisma.app.config.ts",
+    "app:ping": "tsx src/app/ping.ts",
+    "app:status": "tsx src/app/prisma-cli.ts migrate status",
+    "app:deploy": "tsx src/app/prisma-cli.ts migrate deploy",
+    "app:pull:print": "tsx src/app/prisma-cli.ts db pull --print",
+    "stage:cert": "tsx src/stage/fetch-cert.ts",
     "stage:ping": "tsx src/stage/ping.ts",
+    "stage:describe": "tsx src/stage/describe.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "dotenv": "^16.4.7",
-    "mariadb": "3.4.5"
+    "mariadb": "3.4.5",
+    "pg": "8.23.1"
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "prisma": "7.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5"

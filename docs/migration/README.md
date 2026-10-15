@@ -93,6 +93,7 @@ Dejar de depender de Strapi y n8n, en un proyecto propio y optimizado:
 | 5 | Primero: **cliente Prisma de Strapi** (MySQL) con todas las tablas migrables. |
 | 6 | Después: **cliente Prisma de `dbo_stage`** (MySQL) para insertar lo leído de Strapi. El usuario enviará la conexión. **Hasta el corte, `dbo_stage` solo se lee; el ETL escribe en una copia sombra** (ver `ROADMAP.md`, fase 4). |
 | 7 | La promoción `dbo_stage` → `dbo` (MySQL y Postgres) **sigue siendo manual**, como hoy. |
+| 8 | (15 oct 2026) El esquema de la app nueva vive en el **Postgres de staging de Railway** (`DATABASE_URL_DBO_STAGE`, base `railway`), en el esquema **`msp_app`**, junto al esquema `dbo_stage` de ese mismo servidor (5 tablas `sec_*`), que **solo se lee**. El usuario confirmó que nada de producción escribe en ese servidor y que no aloja el `dbo` de los otros proyectos. `msp_app` lo creó un administrador con dueño `j_stage_admin`; ese usuario no puede crear esquemas ni bases. |
 
 ### Propuestas descartadas durante la conversación (no retomar sin motivo)
 
@@ -163,6 +164,7 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 | `.env` creado | Variables del backoffice (`NEXT_PUBLIC_STRAPI_URL`, `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_URL`, `SYNC_API_KEY`) más `STRAPI_DATABASE_URL` para el ETL, vacía. Ignorado por git. |
 | Este README | `docs/migration/README.md` |
 | Cliente Prisma de Strapi | Esquema validado y cliente generado en `etl/` (sección 7). **Falta probarlo contra la base real** (requiere `STRAPI_DATABASE_URL`). |
+| Esquema de la app (Fase 2) | `prisma/schema.prisma` (29 modelos) y la migración `prisma/migrations/20261015210000_init`, aplicada en `msp_app` el 15 oct 2026. `migrate diff` contra la base: sin diferencias. Se opera desde `etl/` con `npm run app:*` (ver `etl/README.md`). |
 
 ---
 
