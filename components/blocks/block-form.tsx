@@ -194,6 +194,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
     blockFocus: initialData?.blockFocus ? { documentId: initialData.blockFocus.documentId || String(initialData.blockFocus.id) } : undefined,
     blockStatus: initialData?.blockStatus ? { documentId: initialData.blockStatus.documentId || String(initialData.blockStatus.id) } : undefined,
     market: initialData?.market,
+    blockUsage: initialData?.blockUsage ?? undefined,
     startDate: toHtmlDateInputValue(initialData?.startDate) || "",
     deliveryDate: toHtmlDateInputValue(initialData?.deliveryDate) || "",
     commercializationMonths: initialData?.commercializationMonths || undefined,
@@ -513,6 +514,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
         blockFocus: formData.blockFocus?.documentId || undefined,
         blockStatus: formData.blockStatus?.documentId || undefined,
         market: formData.market,
+        blockUsage: formData.blockUsage ?? undefined,
         // `parqueos_para_venta` existe SÓLO en `office_universe`; vivienda e
         // industrial no tienen esa columna. Mandarlo en un bloque que no es de
         // oficina guardaría un dato que ninguna corrida puede escribir de
@@ -1099,6 +1101,22 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
                 <SelectContent>
                   <SelectItem value="Primary">{tMarket('marketTypes.primary')}</SelectItem>
                   <SelectItem value="Secondary">{tMarket('marketTypes.secondary')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="blockUsage">{tForm('usageLabel')}</Label>
+              <Select
+                value={formData.blockUsage ?? ""}
+                onValueChange={(value) => setFormData({ ...formData, blockUsage: (value || undefined) as 'Venta' | 'Renta' | undefined })}
+              >
+                <SelectTrigger id="blockUsage" className="w-full">
+                  <SelectValue placeholder={tForm('usagePlaceholder')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Venta">{tForm('usageSale')}</SelectItem>
+                  <SelectItem value="Renta">{tForm('usageRent')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

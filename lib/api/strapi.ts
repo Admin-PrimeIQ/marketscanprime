@@ -518,6 +518,8 @@ export interface StrapiBlock {
     code?: string
   }
   market?: 'Primary' | 'Secondary'
+  /** Cómo se comercializa el bloque. Es la columna `uso` del universo en MySQL. */
+  blockUsage?: 'Venta' | 'Renta' | null
   startDate?: string
   deliveryDate?: string
   commercializationMonths?: number

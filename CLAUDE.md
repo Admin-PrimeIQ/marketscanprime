@@ -108,10 +108,11 @@ Behavior keys off `block.project.country.isoCode2` (fallback `code`), so blocks/
 
 A separate npm CLI toolkit (its own repo, its own `CLAUDE.md`) that syncs the **same Strapi** against Prime IQ's **legacy MySQL warehouse** (`housing_universe` / `housing_units`). Don't confuse it with `.migration/`: that one recomputes formulas *inside* Strapi, while `sync-database` is the only thing that crosses the MySQL boundary, in both directions (MySQL → Strapi export/prep/push and patch; Strapi → MySQL writeback). One row of `housing_universe` = one block here, joined by `cod_proyecto` ↔ `legacyId` (or ↔ `documentId` for blocks born in this app, which carry `legacyId` `null`/`""`).
 
-Two field-level contracts bind the two repos, and both live in its `writeback-field-mapper.js`:
+Three field-level contracts bind the two repos. Maintenance VAT and the varas factors live in its `writeback-field-mapper.js`; the block usage contract spans the pull payload builders, the writeback mappers (housing/office/industrial) and `scripts/sync/repair/lib/usage-import.js`:
 
 - **Maintenance VAT**: none in transit. Strapi is the source of truth, and the CLI copies `maintenanceTotalPriceM2USD` / `maintenancePricePerM2USD` 1:1 both ways (since 2026-09-29; it used to multiply by `1.12` on the way in and divide on the way out, which removed VAT twice from the per-m² value this app already computes net). If a maintenance field's VAT treatment changes here, the stored value itself changes. Don't compensate for it with a factor in the mapper.
 - **Varas factors differ on purpose**: the CLI writes the warehouse's historical precision (`1.1976` linear / `1.4342` area) while the grid uses `M_TO_VARAS = 1.19` / `M2_TO_VARAS_SQUARED = 1.431` ([`lib/constants.ts`](lib/constants.ts)). Don't align one to the other without deciding which side owns the number.
+- **Uso del bloque**: `blockUsage` (`Venta`/`Renta`) es la columna `uso` del universo, 1:1 y sin traducción. Sin dato nunca borra: el pull no lo manda si el `uso` no es válido, y el writeback no nombra `uso` si el bloque no lo tiene. El llenado inicial es el workflow manual `[Prime IQ] Sync Import Block Usage`.
 
 Also relevant: it calls the same `block-counter-update` n8n webhook after pushing a block's units, and an unmerged GAM purge pipeline there cascade-deletes blocks/units in Strapi selected by country + quarter kind (`T*` vs `S*`) — the same `quarter` split this app reads as GAM vs Interior in [`lib/region.ts`](lib/region.ts).
 

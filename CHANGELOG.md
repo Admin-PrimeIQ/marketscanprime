@@ -6,6 +6,14 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## El bloque tiene uso: Venta o Renta (v1.28.0)
+
+_2026-10-14_
+
+- **Campo nuevo `blockUsage`** en el bloque, editable en el [formulario](components/blocks/block-form.tsx) y visible en la [vista](app/(main)/blocks/view/[id]/page.tsx). Es la columna `uso` del universo en MySQL, con los mismos dos valores.
+- **No cambia ninguna fórmula**: el IVA y la tabla de unidades siguen usando el uso de cada unidad.
+- **Dependencia de datos**: requiere el campo `blockUsage` en Strapi. El llenado inicial lo hace el workflow manual `[Prime IQ] Sync Import Block Usage` de n8n, y el sync lo lee y lo escribe de vuelta a MySQL solo cuando tiene dato.
+
 ## Nombres sin «Fase Fase» ni el bloque repetido en las unidades (v1.27.3)
 
 El equipo reportó bloques llamados «… - Fase Fase 3» y unidades que heredaban el error y se iban alargando con cada migración.

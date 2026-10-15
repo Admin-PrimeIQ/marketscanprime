@@ -380,6 +380,12 @@ export default function BlockViewPage() {
               <p className="text-sm text-muted-foreground">{t('market')}</p>
               <p className="font-medium">{block.market ?? '-'}</p>
             </div>
+            <div>
+              <p className="text-sm text-muted-foreground">{tForm('usageLabel')}</p>
+              <p className="font-medium">
+                {block.blockUsage ? tForm(block.blockUsage === 'Venta' ? 'usageSale' : 'usageRent') : '-'}
+              </p>
+            </div>
           </CardContent>
         </Card>
 
