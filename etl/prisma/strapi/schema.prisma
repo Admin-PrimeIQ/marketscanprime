@@ -271,11 +271,11 @@ model projects {
 }
 
 model projects_amenities_lnk {
-  id          Int     @id @default(autoincrement()) @db.UnsignedInt
-  project_id  Int?    @db.UnsignedInt
-  amenity_id  Int?    @db.UnsignedInt
-  amenity_ord Float?  @db.Double
-  project_ord Float?  @db.Double
+  id          Int    @id @default(autoincrement()) @db.UnsignedInt
+  project_id  Int?   @db.UnsignedInt
+  amenity_id  Int?   @db.UnsignedInt
+  amenity_ord Float?
+  project_ord Float?
 
   project projects?  @relation(fields: [project_id], references: [id])
   amenity amenities? @relation(fields: [amenity_id], references: [id])
@@ -303,7 +303,7 @@ model projects_exchange_rate_profile_lnk {
   id                       Int    @id @default(autoincrement()) @db.UnsignedInt
   project_id               Int?   @db.UnsignedInt
   exchange_rate_profile_id Int?   @db.UnsignedInt
-  project_ord              Float? @db.Double
+  project_ord              Float?
 
   project               projects?               @relation(fields: [project_id], references: [id])
   exchange_rate_profile exchange_rate_profiles? @relation(fields: [exchange_rate_profile_id], references: [id])
@@ -332,8 +332,8 @@ model services_projects_lnk {
   id          Int    @id @default(autoincrement()) @db.UnsignedInt
   service_id  Int?   @db.UnsignedInt
   project_id  Int?   @db.UnsignedInt
-  project_ord Float? @db.Double
-  service_ord Float? @db.Double
+  project_ord Float?
+  service_ord Float?
 
   service services? @relation(fields: [service_id], references: [id])
   project projects? @relation(fields: [project_id], references: [id])
@@ -381,6 +381,7 @@ model blocks {
   market                       String?   @db.VarChar(255)
   domain                       String?   @db.VarChar(255)
   parking_for_sale             Int?
+  block_usage                  String?   @db.VarChar(255)
 
   project_lnk        blocks_project_lnk[]
   block_category_lnk blocks_block_category_lnk[]
@@ -394,7 +395,7 @@ model blocks_project_lnk {
   id         Int    @id @default(autoincrement()) @db.UnsignedInt
   block_id   Int?   @db.UnsignedInt
   project_id Int?   @db.UnsignedInt
-  block_ord  Float? @db.Double
+  block_ord  Float?
 
   block   blocks?   @relation(fields: [block_id], references: [id])
   project projects? @relation(fields: [project_id], references: [id])
@@ -435,7 +436,7 @@ model blocks_cmps {
   cmp_id         Int?    @db.UnsignedInt
   component_type String? @db.VarChar(255)
   field          String? @db.VarChar(255)
-  order          Float?  @db.Double
+  order          Float?
 
   entity blocks? @relation(fields: [entity_id], references: [id])
 }
@@ -468,7 +469,7 @@ model components_financing_financings_cmps {
   cmp_id         Int?    @db.UnsignedInt
   component_type String? @db.VarChar(255)
   field          String? @db.VarChar(255)
-  order          Float?  @db.Double
+  order          Float?
 
   entity components_financing_financings? @relation(fields: [entity_id], references: [id])
 }
@@ -506,7 +507,7 @@ model exchange_rate_profiles_cmps {
   cmp_id         Int?    @db.UnsignedInt
   component_type String? @db.VarChar(255)
   field          String? @db.VarChar(255)
-  order          Float?  @db.Double
+  order          Float?
 
   entity exchange_rate_profiles? @relation(fields: [entity_id], references: [id])
 }
@@ -525,7 +526,7 @@ model components_currencies_currencies_cmps {
   cmp_id         Int?    @db.UnsignedInt
   component_type String? @db.VarChar(255)
   field          String? @db.VarChar(255)
-  order          Float?  @db.Double
+  order          Float?
 
   entity components_currencies_currencies? @relation(fields: [entity_id], references: [id])
 }
@@ -669,7 +670,7 @@ model units_cmps {
   cmp_id         Int?    @db.UnsignedInt
   component_type String? @db.VarChar(255)
   field          String? @db.VarChar(255)
-  order          Float?  @db.Double
+  order          Float?
 
   entity units? @relation(fields: [entity_id], references: [id])
 }
@@ -755,7 +756,7 @@ model up_users_role_lnk {
   id       Int    @id @default(autoincrement()) @db.UnsignedInt
   user_id  Int?   @db.UnsignedInt
   role_id  Int?   @db.UnsignedInt
-  user_ord Float? @db.Double
+  user_ord Float?
 
   user up_users? @relation(fields: [user_id], references: [id])
   role up_roles? @relation(fields: [role_id], references: [id])

@@ -11,13 +11,16 @@
     "strapi:validate": "prisma validate --config prisma.strapi.config.ts",
     "strapi:generate": "prisma generate --config prisma.strapi.config.ts",
     "strapi:pull:print": "prisma db pull --print --config prisma.strapi.config.ts",
+    "strapi:ping": "tsx src/strapi/ping.ts",
     "strapi:check": "tsx src/strapi/check.ts",
+    "stage:ping": "tsx src/stage/ping.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "7.10.0",
     "@prisma/client": "7.10.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "mariadb": "3.4.5"
   },
   "devDependencies": {
     "@types/node": "^22",

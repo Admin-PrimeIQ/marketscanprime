@@ -1,8 +1,26 @@
 # Migración de Market Scan: de Strapi a Prisma
 
-Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
+<!-- SECCIÓN PROTEGIDA: no borrar, mover ni resumir. Solo puede cambiarla el usuario. -->
+## 0. Lectura obligatoria antes de hacer cualquier cosa
 
-> Responder siempre en **español**. Antes de explorar código, correr `graphify query "<pregunta>"` (regla `.cursor/rules/graphify.mdc`); después de modificar código, `graphify update .`.
+Si eres un agente de IA (o una persona) y te pidieron leer este documento, **antes de ejecutar cualquier acción** lee, en este orden:
+
+1. **[`.agents/skills/proteger-produccion/SKILL.md`](../../.agents/skills/proteger-produccion/SKILL.md)**: qué está en producción y no se toca, qué se puede leer y cómo construir en paralelo.
+2. **[`.agents/skills/proteger-produccion/inventario-produccion.md`](../../.agents/skills/proteger-produccion/inventario-produccion.md)**: lista de sistemas, workflows, URLs y variables de producción.
+3. **[`ROADMAP.md`](./ROADMAP.md)**: fases, inventario de módulos y orden de trabajo.
+4. Este documento, completo.
+
+Reglas que aplican siempre:
+
+- **Producción no se toca.** Strapi, n8n, Coolify, las bases `strapi` / `dbo_stage` / `dbo`, el `dbo` de Postgres en Railway, Supabase, Redis, S3 y el Vercel de `admin.primeiqlatam.com` siguen funcionando igual. Todo lo nuevo se construye **en paralelo**.
+- Si una tarea requiere escribir, configurar, reiniciar, desplegar o borrar algo en producción: **detenerse y preguntar**.
+- **No borrar, mover, resumir ni debilitar** esta sección, la sección equivalente de `ROADMAP.md`, la skill `proteger-produccion` ni la regla `.cursor/rules/proteger-produccion.mdc`. Solo el usuario puede cambiarlas. Al editar este documento, conservar esta sección intacta al inicio.
+- Responder siempre en **español**. Antes de explorar código, correr `graphify query "<pregunta>"` (regla `.cursor/rules/graphify.mdc`); después de modificar código, `graphify update .`.
+<!-- FIN DE SECCIÓN PROTEGIDA -->
+
+---
+
+Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
 ---
 
@@ -73,7 +91,7 @@ Dejar de depender de Strapi y n8n, en un proyecto propio y optimizado:
 | 3 | Infraestructura en **Railway**: Postgres (ya existe), workers y Redis. |
 | 4 | **Prisma va en este repo** como herramienta de ETL, no dentro del runtime de la app Next.js. |
 | 5 | Primero: **cliente Prisma de Strapi** (MySQL) con todas las tablas migrables. |
-| 6 | Después: **cliente Prisma de `dbo_stage`** (MySQL) para insertar lo leído de Strapi. El usuario enviará la conexión. |
+| 6 | Después: **cliente Prisma de `dbo_stage`** (MySQL) para insertar lo leído de Strapi. El usuario enviará la conexión. **Hasta el corte, `dbo_stage` solo se lee; el ETL escribe en una copia sombra** (ver `ROADMAP.md`, fase 4). |
 | 7 | La promoción `dbo_stage` → `dbo` (MySQL y Postgres) **sigue siendo manual**, como hoy. |
 
 ### Propuestas descartadas durante la conversación (no retomar sin motivo)

@@ -23,7 +23,12 @@ npm 11 bloquea los scripts de instalación hasta aprobarlos; `package.json` → 
 
 | Variable | Uso |
 |---|---|
-| `STRAPI_DATABASE_URL` | `mysql://usuario:clave@host:3306/strapi` — RDS us-east-2, usuario de solo lectura. |
+| `DATABASE_HOST_STRAPI` | Endpoint de RDS us-east-2 (`strapi.….us-east-2.rds.amazonaws.com`). |
+| `DATABASE_PORT_STRAPI` | `3306` (por defecto). |
+| `DATABASE_NAME_STRAPI` | `strapi`. |
+| `DATABASE_USER_STRAPI` / `DATABASE_PASSWORD_STRAPI` | Usuario con **solo `SELECT`**. El cliente rechaza usuarios que empiecen con `adm` (el de Strapi). Si la contraseña tiene `#`, va entre comillas dobles. |
+
+La conexión usa SSL validando el certificado con `certs/rds-global-bundle.pem` (bundle público de AWS), un pool de 2 conexiones como máximo y una extensión que bloquea toda escritura de Prisma.
 
 ## Scripts
 
@@ -32,6 +37,7 @@ npm 11 bloquea los scripts de instalación hasta aprobarlos; `package.json` → 
 | `strapi:validate` | Valida la sintaxis del esquema. | No |
 | `strapi:generate` | Genera el cliente tipado. | No |
 | `strapi:pull:print` | Imprime el esquema introspectado de la base real, sin escribir archivos. | Sí |
+| `strapi:ping` | Prueba de conexión: usuario, SSL y permisos. Se detiene si el usuario tiene algo más que `SELECT`. | Sí |
 | `strapi:check` | Conteo y lectura de una fila por modelo, comparados con el inventario del manual; `document_id` repetidos. | Sí |
 | `typecheck` | `tsc --noEmit`. | No |
 

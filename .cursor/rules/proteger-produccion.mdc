@@ -1,0 +1,16 @@
+---
+description: Producción (Strapi, n8n, bases y servicios en uso) no se toca; este repo construye soluciones paralelas
+alwaysApply: true
+---
+
+Este repo construye una migración **paralela**. La infraestructura actual (Strapi, n8n, Coolify, MySQL `strapi` / `dbo_stage` / `dbo`, el `dbo` de Postgres en Railway, Supabase, Redis, S3 y el Vercel de `admin.primeiqlatam.com`) está en producción y **no se modifica** desde aquí.
+
+Antes de conectarse a una base, llamar a una URL externa, correr la app con el `.env`, ejecutar Prisma/SQL/AWS/Vercel o hacer `git push`, lee y sigue la skill `.agents/skills/proteger-produccion/SKILL.md`.
+
+Mínimo innegociable:
+- Nada que escriba, configure, reinicie, despliegue o borre en producción. Si una tarea lo requiere, detente y pregunta.
+- Nunca usar `STRAPI_USERNAME`/`STRAPI_PASSWORD` ni `SYNC_API_KEY`; nunca llamar webhooks de n8n con `POST`.
+- Con el `.env` actual, la app local escribe en producción: no guardar nada desde la UI.
+- No hacer `git push` sin pedido explícito del usuario.
+- Al leer `docs/migration/README.md` o `docs/migration/ROADMAP.md`, cumplir primero su sección **"0. Lectura obligatoria"**.
+- No borrar, mover, resumir ni debilitar: esta regla, la skill `proteger-produccion` (y su inventario), ni la sección "0. Lectura obligatoria" de `docs/migration/README.md` y `docs/migration/ROADMAP.md` (marcada `SECCIÓN PROTEGIDA`). Solo el usuario puede cambiarlas.

@@ -1,11 +1,12 @@
-import { config } from "dotenv"
 import { defineConfig } from "prisma/config"
+import { strapiDatabaseUrl } from "./src/strapi/connection"
 
-// Las variables viven en el .env de la raíz del repo; los scripts se corren desde etl/.
-config({ path: "../.env", quiet: true })
+// Solo db pull necesita conexión; validate y generate funcionan sin ella.
+function urlIfConfigured(): string | undefined {
+  return process.env.DATABASE_HOST_STRAPI ? strapiDatabaseUrl() : undefined
+}
 
 export default defineConfig({
   schema: "prisma/strapi/schema.prisma",
-  // Solo db pull la necesita; validate y generate funcionan sin conexión.
-  datasource: { url: process.env.STRAPI_DATABASE_URL },
+  datasource: { url: urlIfConfigured() },
 })
