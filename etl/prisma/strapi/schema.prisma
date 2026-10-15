@@ -1,0 +1,762 @@
+// Base MySQL "strapi" (RDS us-east-2), solo lectura.
+//
+// Escrito a mano desde el inventario de docs/manual-del-sistema.md (líneas 1571–1662).
+// Incluye las 52 tablas migrables; se omiten admin_*, strapi_*, files*, upload_folders*,
+// i18n_locale y up_permissions*. Nombres idénticos a la base para poder comparar contra
+// `npm run strapi:pull:print`.
+//
+// NUNCA correr prisma migrate / db push / migrate reset contra esta base.
+//
+// Convenciones de Strapi v5:
+// - Relaciones en tablas <tabla>_<campo>_lnk.
+// - Componentes y zona dinámica en <tabla>_cmps: cmp_id es polimórfico según
+//   component_type, por eso no tiene relación declarada.
+// - created_by_id / updated_by_id apuntan a admin_users, que no se migra.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../generated/strapi"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogos
+// ─────────────────────────────────────────────────────────────────────────────
+
+model amenities {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  category      String?   @db.VarChar(255)
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  projects_lnk projects_amenities_lnk[]
+}
+
+model block_categories {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  blocks_lnk blocks_block_category_lnk[]
+}
+
+model block_focuses {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  blocks_lnk blocks_block_focus_lnk[]
+}
+
+model block_statuses {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  blocks_lnk blocks_block_status_lnk[]
+}
+
+model countries {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  iso_code      String?   @db.VarChar(255)
+  iso_code_2    String?   @db.VarChar(255)
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  projects_lnk projects_country_lnk[]
+}
+
+model developers {
+  id             Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id    String?   @db.VarChar(255)
+  code           String?   @db.VarChar(255)
+  name           String?   @db.VarChar(255)
+  description    String?   @db.LongText
+  address        String?   @db.LongText
+  phone          String?   @db.VarChar(255)
+  email          String?   @db.VarChar(255)
+  website        String?   @db.VarChar(255)
+  tax_id         String?   @db.VarChar(255)
+  contact_person String?   @db.VarChar(255)
+  contact_phone  String?   @db.VarChar(255)
+  contact_email  String?   @db.VarChar(255)
+  created_at     DateTime? @db.DateTime(6)
+  updated_at     DateTime? @db.DateTime(6)
+  published_at   DateTime? @db.DateTime(6)
+  created_by_id  Int?      @db.UnsignedInt
+  updated_by_id  Int?      @db.UnsignedInt
+  locale         String?   @db.VarChar(255)
+
+  projects_lnk projects_developer_lnk[]
+}
+
+model nses {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  projects_lnk projects_nse_lnk[]
+}
+
+model security_types {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  projects_lnk projects_security_type_lnk[]
+}
+
+model services {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  category      String?   @db.VarChar(255)
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  projects_lnk services_projects_lnk[]
+}
+
+model unit_parking_types {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  units_lnk units_parking_type_lnk[]
+}
+
+model unit_topographies {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  units_lnk units_topography_lnk[]
+}
+
+model unit_usages {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  units_lnk units_unit_usage_lnk[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proyecto
+// ─────────────────────────────────────────────────────────────────────────────
+
+model projects {
+  id                      Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id             String?   @db.VarChar(255)
+  code                    String?   @db.VarChar(255)
+  name                    String?   @db.VarChar(255)
+  department              String?   @db.VarChar(255)
+  municipality            String?   @db.VarChar(255)
+  zone                    String?   @db.VarChar(255)
+  subzone                 String?   @db.VarChar(255)
+  latitude                Decimal?  @db.Decimal(10, 8)
+  longitude               Decimal?  @db.Decimal(10, 8)
+  muvi                    Boolean?
+  showroom                Boolean?
+  model_house             Boolean?
+  access_quantity         Int?
+  image_url               String?   @db.VarChar(255)
+  created_at              DateTime? @db.DateTime(6)
+  updated_at              DateTime? @db.DateTime(6)
+  published_at            DateTime? @db.DateTime(6)
+  created_by_id           Int?      @db.UnsignedInt
+  updated_by_id           Int?      @db.UnsignedInt
+  locale                  String?   @db.VarChar(255)
+  fha                     Boolean?
+  fractional_down_payment Boolean?
+  down_payment_percentage Decimal?  @db.Decimal(10, 2)
+
+  amenities_lnk             projects_amenities_lnk[]
+  country_lnk               projects_country_lnk[]
+  developer_lnk             projects_developer_lnk[]
+  exchange_rate_profile_lnk projects_exchange_rate_profile_lnk[]
+  nse_lnk                   projects_nse_lnk[]
+  security_type_lnk         projects_security_type_lnk[]
+  services_lnk              services_projects_lnk[]
+  blocks_lnk                blocks_project_lnk[]
+}
+
+model projects_amenities_lnk {
+  id          Int     @id @default(autoincrement()) @db.UnsignedInt
+  project_id  Int?    @db.UnsignedInt
+  amenity_id  Int?    @db.UnsignedInt
+  amenity_ord Float?  @db.Double
+  project_ord Float?  @db.Double
+
+  project projects?  @relation(fields: [project_id], references: [id])
+  amenity amenities? @relation(fields: [amenity_id], references: [id])
+}
+
+model projects_country_lnk {
+  id         Int  @id @default(autoincrement()) @db.UnsignedInt
+  project_id Int? @db.UnsignedInt
+  country_id Int? @db.UnsignedInt
+
+  project projects?  @relation(fields: [project_id], references: [id])
+  country countries? @relation(fields: [country_id], references: [id])
+}
+
+model projects_developer_lnk {
+  id           Int  @id @default(autoincrement()) @db.UnsignedInt
+  project_id   Int? @db.UnsignedInt
+  developer_id Int? @db.UnsignedInt
+
+  project   projects?   @relation(fields: [project_id], references: [id])
+  developer developers? @relation(fields: [developer_id], references: [id])
+}
+
+model projects_exchange_rate_profile_lnk {
+  id                       Int    @id @default(autoincrement()) @db.UnsignedInt
+  project_id               Int?   @db.UnsignedInt
+  exchange_rate_profile_id Int?   @db.UnsignedInt
+  project_ord              Float? @db.Double
+
+  project               projects?               @relation(fields: [project_id], references: [id])
+  exchange_rate_profile exchange_rate_profiles? @relation(fields: [exchange_rate_profile_id], references: [id])
+}
+
+model projects_nse_lnk {
+  id         Int  @id @default(autoincrement()) @db.UnsignedInt
+  project_id Int? @db.UnsignedInt
+  nse_id     Int? @db.UnsignedInt
+
+  project projects? @relation(fields: [project_id], references: [id])
+  nse     nses?     @relation(fields: [nse_id], references: [id])
+}
+
+model projects_security_type_lnk {
+  id               Int  @id @default(autoincrement()) @db.UnsignedInt
+  project_id       Int? @db.UnsignedInt
+  security_type_id Int? @db.UnsignedInt
+
+  project       projects?       @relation(fields: [project_id], references: [id])
+  security_type security_types? @relation(fields: [security_type_id], references: [id])
+}
+
+// El servicio es el lado dueño de la relación con el proyecto.
+model services_projects_lnk {
+  id          Int    @id @default(autoincrement()) @db.UnsignedInt
+  service_id  Int?   @db.UnsignedInt
+  project_id  Int?   @db.UnsignedInt
+  project_ord Float? @db.Double
+  service_ord Float? @db.Double
+
+  service services? @relation(fields: [service_id], references: [id])
+  project projects? @relation(fields: [project_id], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque
+// ─────────────────────────────────────────────────────────────────────────────
+
+model blocks {
+  id                           Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id                  String?   @db.VarChar(255)
+  phase                        String?   @db.VarChar(255)
+  tower                        String?   @db.VarChar(255)
+  sector                       String?   @db.VarChar(255)
+  year                         Int?
+  collection_date              DateTime? @db.Date
+  start_date                   DateTime? @db.Date
+  delivery_date                DateTime? @db.Date
+  commercialization_months     Int?
+  total_units                  Int?
+  total_m_2                    Decimal?  @db.Decimal(10, 2)
+  available_units              Int?
+  available_m_2                Decimal?  @db.Decimal(10, 2)
+  visitor_parking              Int?
+  assigned_parking             Int?
+  total_project_parking        Int?
+  mig_number                   Int?
+  created_at                   DateTime? @db.DateTime(6)
+  updated_at                   DateTime? @db.DateTime(6)
+  published_at                 DateTime? @db.DateTime(6)
+  created_by_id                Int?      @db.UnsignedInt
+  updated_by_id                Int?      @db.UnsignedInt
+  locale                       String?   @db.VarChar(255)
+  legacy_id                    String?   @db.VarChar(255)
+  code                         String?   @db.VarChar(255)
+  name                         String?   @db.VarChar(255)
+  quarter                      String?   @db.VarChar(255)
+  average_price_usd            Decimal?  @db.Decimal(10, 2)
+  average_size_m_2             Decimal?  @db.Decimal(10, 2)
+  average_price_per_m_2_usd    Decimal?  @db.Decimal(10, 2)
+  average_installment_usd      Decimal?  @db.Decimal(10, 2)
+  average_income_usd           Decimal?  @db.Decimal(10, 2)
+  additional_parking_price_usd Decimal?  @db.Decimal(10, 2)
+  market                       String?   @db.VarChar(255)
+  domain                       String?   @db.VarChar(255)
+  parking_for_sale             Int?
+
+  project_lnk        blocks_project_lnk[]
+  block_category_lnk blocks_block_category_lnk[]
+  block_focus_lnk    blocks_block_focus_lnk[]
+  block_status_lnk   blocks_block_status_lnk[]
+  cmps               blocks_cmps[]
+  units_lnk          units_block_lnk[]
+}
+
+model blocks_project_lnk {
+  id         Int    @id @default(autoincrement()) @db.UnsignedInt
+  block_id   Int?   @db.UnsignedInt
+  project_id Int?   @db.UnsignedInt
+  block_ord  Float? @db.Double
+
+  block   blocks?   @relation(fields: [block_id], references: [id])
+  project projects? @relation(fields: [project_id], references: [id])
+}
+
+model blocks_block_category_lnk {
+  id                Int  @id @default(autoincrement()) @db.UnsignedInt
+  block_id          Int? @db.UnsignedInt
+  block_category_id Int? @db.UnsignedInt
+
+  block          blocks?           @relation(fields: [block_id], references: [id])
+  block_category block_categories? @relation(fields: [block_category_id], references: [id])
+}
+
+model blocks_block_focus_lnk {
+  id             Int  @id @default(autoincrement()) @db.UnsignedInt
+  block_id       Int? @db.UnsignedInt
+  block_focus_id Int? @db.UnsignedInt
+
+  block       blocks?        @relation(fields: [block_id], references: [id])
+  block_focus block_focuses? @relation(fields: [block_focus_id], references: [id])
+}
+
+model blocks_block_status_lnk {
+  id              Int  @id @default(autoincrement()) @db.UnsignedInt
+  block_id        Int? @db.UnsignedInt
+  block_status_id Int? @db.UnsignedInt
+
+  block        blocks?         @relation(fields: [block_id], references: [id])
+  block_status block_statuses? @relation(fields: [block_status_id], references: [id])
+}
+
+// Componente "financing" del bloque: component_type = 'financing.financing',
+// cmp_id → components_financing_financings.id.
+model blocks_cmps {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  entity_id      Int?    @db.UnsignedInt
+  cmp_id         Int?    @db.UnsignedInt
+  component_type String? @db.VarChar(255)
+  field          String? @db.VarChar(255)
+  order          Float?  @db.Double
+
+  entity blocks? @relation(fields: [entity_id], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Financiamiento del bloque (18 bancos)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model components_financing_financings {
+  id                                  Int      @id @default(autoincrement()) @db.UnsignedInt
+  down_payment_percent                Decimal? @db.Decimal(10, 2)
+  fractional_down_payment             Boolean?
+  fractional_down_payment_fha         Decimal? @db.Decimal(10, 2)
+  fractional_installments_other_banks Decimal? @db.Decimal(10, 2)
+  min_down_payment_fha                Decimal? @db.Decimal(10, 2)
+  min_down_payment_other_banks        Decimal? @db.Decimal(10, 2)
+  max_loan_term_years_fha             Int?
+  max_loan_term_years_banks           Int?
+  max_loan_term_years_owner           Int?
+
+  cmps components_financing_financings_cmps[]
+}
+
+// Una fila por banco: field = fha | bi | gtc | chn | banrural | bac | bam | bantrab |
+// credicorp | internacional | promerica | azteca | inmobiliario | inv | ficohsa | vivibanco |
+// antigua | ownerFinancing (lib/financing.ts → BANCOS); cmp_id → components_financing_bank_rates.id.
+model components_financing_financings_cmps {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  entity_id      Int?    @db.UnsignedInt
+  cmp_id         Int?    @db.UnsignedInt
+  component_type String? @db.VarChar(255)
+  field          String? @db.VarChar(255)
+  order          Float?  @db.Double
+
+  entity components_financing_financings? @relation(fields: [entity_id], references: [id])
+}
+
+model components_financing_bank_rates {
+  id                  Int      @id @default(autoincrement()) @db.UnsignedInt
+  annual_rate_percent Decimal? @db.Decimal(10, 2)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Perfiles de tipo de cambio y monedas
+// ─────────────────────────────────────────────────────────────────────────────
+
+model exchange_rate_profiles {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  code          String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.LongText
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  cmps         exchange_rate_profiles_cmps[]
+  projects_lnk projects_exchange_rate_profile_lnk[]
+}
+
+// cmp_id → components_currencies_currencies.id
+model exchange_rate_profiles_cmps {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  entity_id      Int?    @db.UnsignedInt
+  cmp_id         Int?    @db.UnsignedInt
+  component_type String? @db.VarChar(255)
+  field          String? @db.VarChar(255)
+  order          Float?  @db.Double
+
+  entity exchange_rate_profiles? @relation(fields: [entity_id], references: [id])
+}
+
+model components_currencies_currencies {
+  id Int @id @default(autoincrement()) @db.UnsignedInt
+
+  cmps components_currencies_currencies_cmps[]
+}
+
+// Una fila por moneda: field = gtq | mxn | hnl | crc | nio | pab | bzd;
+// cmp_id → components_currencies_currency_<moneda>.id según component_type.
+model components_currencies_currencies_cmps {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  entity_id      Int?    @db.UnsignedInt
+  cmp_id         Int?    @db.UnsignedInt
+  component_type String? @db.VarChar(255)
+  field          String? @db.VarChar(255)
+  order          Float?  @db.Double
+
+  entity components_currencies_currencies? @relation(fields: [entity_id], references: [id])
+}
+
+model components_currencies_currency_quetzals {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_peso_mexicanos {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_balboas {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_belizes {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_colon_costarricenses {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_cordobas {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+model components_currencies_currency_lempiras {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  buy_rate  Decimal? @db.Decimal(18, 8)
+  sell_rate Decimal? @db.Decimal(18, 8)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unidad
+// ─────────────────────────────────────────────────────────────────────────────
+
+model units {
+  id                                  Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id                         String?   @db.VarChar(255)
+  code                                String?   @db.VarChar(255)
+  name                                String?   @db.VarChar(255)
+  legacy_id                           String?   @db.VarChar(255)
+  unit_number                         String?   @db.VarChar(255)
+  model                               String?   @db.VarChar(255)
+  front_m_2                           Decimal?  @db.Decimal(14, 4)
+  depth_m_2                           Decimal?  @db.Decimal(14, 4)
+  land_m_2                            Decimal?  @db.Decimal(14, 4)
+  habitable_construction_m_2          Decimal?  @db.Decimal(14, 4)
+  bathrooms                           Decimal?  @db.Decimal(4, 1)
+  has_parking                         Boolean?
+  has_motorcycle_parking              Boolean?
+  parking_spaces                      Int?
+  availability                        String?   @db.VarChar(255)
+  total_price_usd                     Decimal?  @db.Decimal(15, 2)
+  price_without_vatusd                Decimal?  @db.Decimal(15, 2)
+  price_per_m_2_usd                   Decimal?  @db.Decimal(15, 2)
+  rental_price_usd                    Decimal?  @db.Decimal(15, 2)
+  rental_price_without_vatusd         Decimal?  @db.Decimal(15, 2)
+  rental_price_per_m_2_without_vatusd Decimal?  @db.Decimal(15, 2)
+  installment_usd                     Decimal?  @db.Decimal(15, 2)
+  income_usd                          Decimal?  @db.Decimal(15, 2)
+  unit_absorption                     Decimal?  @db.Decimal(18, 12)
+  absorption_per_m_2                  Decimal?  @db.Decimal(18, 12)
+  created_at                          DateTime? @db.DateTime(6)
+  updated_at                          DateTime? @db.DateTime(6)
+  published_at                        DateTime? @db.DateTime(6)
+  created_by_id                       Int?      @db.UnsignedInt
+  updated_by_id                       Int?      @db.UnsignedInt
+  locale                              String?   @db.VarChar(255)
+  unit_size_m_2                       Decimal?  @db.Decimal(14, 4)
+  total_size_m_2                      Decimal?  @db.Decimal(14, 4)
+  parking_size_m_2                    Decimal?  @db.Decimal(14, 4)
+  maintenance_total_price_m_2_usd     Decimal?  @db.Decimal(15, 2)
+  maintenance_price_per_m_2_usd       Decimal?  @db.Decimal(15, 2)
+
+  block_lnk        units_block_lnk[]
+  unit_usage_lnk   units_unit_usage_lnk[]
+  topography_lnk   units_topography_lnk[]
+  parking_type_lnk units_parking_type_lnk[]
+  cmps             units_cmps[]
+}
+
+// Declarada oneToOne en Strapi, en la práctica es muchos-a-uno (unidad → bloque).
+model units_block_lnk {
+  id       Int  @id @default(autoincrement()) @db.UnsignedInt
+  unit_id  Int? @db.UnsignedInt
+  block_id Int? @db.UnsignedInt
+
+  unit  units?  @relation(fields: [unit_id], references: [id])
+  block blocks? @relation(fields: [block_id], references: [id])
+}
+
+model units_unit_usage_lnk {
+  id            Int  @id @default(autoincrement()) @db.UnsignedInt
+  unit_id       Int? @db.UnsignedInt
+  unit_usage_id Int? @db.UnsignedInt
+
+  unit       units?       @relation(fields: [unit_id], references: [id])
+  unit_usage unit_usages? @relation(fields: [unit_usage_id], references: [id])
+}
+
+model units_topography_lnk {
+  id                 Int  @id @default(autoincrement()) @db.UnsignedInt
+  unit_id            Int? @db.UnsignedInt
+  unit_topography_id Int? @db.UnsignedInt
+
+  unit            units?             @relation(fields: [unit_id], references: [id])
+  unit_topography unit_topographies? @relation(fields: [unit_topography_id], references: [id])
+}
+
+model units_parking_type_lnk {
+  id                   Int  @id @default(autoincrement()) @db.UnsignedInt
+  unit_id              Int? @db.UnsignedInt
+  unit_parking_type_id Int? @db.UnsignedInt
+
+  unit              units?              @relation(fields: [unit_id], references: [id])
+  unit_parking_type unit_parking_types? @relation(fields: [unit_parking_type_id], references: [id])
+}
+
+// Zona dinámica unitType (field = 'unitType'). cmp_id apunta a:
+//   unit-types.housing    → components_unit_types_housings
+//   unit-types.offices    → components_unit_types_offices
+//   unit-types.industrial → components_unit_types_industrials
+model units_cmps {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  entity_id      Int?    @db.UnsignedInt
+  cmp_id         Int?    @db.UnsignedInt
+  component_type String? @db.VarChar(255)
+  field          String? @db.VarChar(255)
+  order          Float?  @db.Double
+
+  entity units? @relation(fields: [entity_id], references: [id])
+}
+
+model components_unit_types_housings {
+  id                       Int      @id @default(autoincrement()) @db.UnsignedInt
+  bedrooms                 Int?
+  balcony_terrace_size_m_2 Decimal? @db.Decimal(10, 2)
+}
+
+model components_unit_types_offices {
+  id                                 Int      @id @default(autoincrement()) @db.UnsignedInt
+  employee_capacity                  Int?
+  price_without_parking_m_2_usd      Decimal? @db.Decimal(10, 2)
+  property_value_without_parking_usd Decimal? @db.Decimal(10, 2)
+  office_classification              String?  @db.VarChar(255)
+  general_size_classification        String?  @db.VarChar(255)
+  employee_capacity_range            String?  @db.VarChar(255)
+  m_2_range                          String?  @db.VarChar(255)
+  size_employee_capacity_combined    String?  @db.VarChar(255)
+  size_m_2_combined                  String?  @db.VarChar(255)
+  parking_for_sale                   Int?
+  balcony_terrace_size_m_2           Decimal? @db.Decimal(10, 2)
+}
+
+model components_unit_types_industrials {
+  id                           Int      @id @default(autoincrement()) @db.UnsignedInt
+  warehouse_storage_size_m_2   Decimal? @db.Decimal(10, 2)
+  office_size_m_2              Decimal? @db.Decimal(10, 2)
+  mezzanine_size_m_2           Decimal? @db.Decimal(10, 2)
+  loading_area_m_2             Decimal? @db.Decimal(10, 2)
+  width_1_m_2                  Decimal? @db.Decimal(10, 2)
+  depth_1_m_2                  Decimal? @db.Decimal(10, 2)
+  depth_2_m_2                  Decimal? @db.Decimal(10, 2)
+  height_m_2                   Decimal? @db.Decimal(10, 2)
+  additional_parking_price_usd Decimal? @db.Decimal(10, 2)
+  quality_classification       String?  @db.VarChar(255)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usuarios del backoffice (plugin users-permissions)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model up_roles {
+  id            Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id   String?   @db.VarChar(255)
+  name          String?   @db.VarChar(255)
+  description   String?   @db.VarChar(255)
+  type          String?   @db.VarChar(255)
+  created_at    DateTime? @db.DateTime(6)
+  updated_at    DateTime? @db.DateTime(6)
+  published_at  DateTime? @db.DateTime(6)
+  created_by_id Int?      @db.UnsignedInt
+  updated_by_id Int?      @db.UnsignedInt
+  locale        String?   @db.VarChar(255)
+
+  users_lnk up_users_role_lnk[]
+}
+
+// password es un hash bcrypt: se puede migrar tal cual.
+model up_users {
+  id                   Int       @id @default(autoincrement()) @db.UnsignedInt
+  document_id          String?   @db.VarChar(255)
+  username             String?   @db.VarChar(255)
+  email                String?   @db.VarChar(255)
+  provider             String?   @db.VarChar(255)
+  password             String?   @db.VarChar(255)
+  reset_password_token String?   @db.VarChar(255)
+  confirmation_token   String?   @db.VarChar(255)
+  confirmed            Boolean?
+  blocked              Boolean?
+  created_at           DateTime? @db.DateTime(6)
+  updated_at           DateTime? @db.DateTime(6)
+  published_at         DateTime? @db.DateTime(6)
+  created_by_id        Int?      @db.UnsignedInt
+  updated_by_id        Int?      @db.UnsignedInt
+  locale               String?   @db.VarChar(255)
+
+  role_lnk up_users_role_lnk[]
+}
+
+model up_users_role_lnk {
+  id       Int    @id @default(autoincrement()) @db.UnsignedInt
+  user_id  Int?   @db.UnsignedInt
+  role_id  Int?   @db.UnsignedInt
+  user_ord Float? @db.Double
+
+  user up_users? @relation(fields: [user_id], references: [id])
+  role up_roles? @relation(fields: [role_id], references: [id])
+}

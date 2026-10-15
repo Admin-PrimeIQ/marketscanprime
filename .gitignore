@@ -63,3 +63,8 @@ logs
 .temp/
 
 .migration/node_modules/
+
+etl/node_modules/
+etl/generated/
+
+graphify-out/
