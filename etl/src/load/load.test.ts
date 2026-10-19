@@ -88,25 +88,61 @@ describe("draft & publish", () => {
   })
 })
 
-describe("incidencias", () => {
-  test("unidad sin bloque bloquea la carga", () => {
+describe("padres «No definido»", () => {
+  test("unidad sin bloque: advierte y va al bloque «No definido» de su tipo", () => {
     const s = fixture()
-    s.tables.units_block_lnk = s.tables.units_block_lnk.filter((l) => l.unit_id !== 41)
+    s.tables.units_block_lnk = []
+    s.tables.units_cmps[0].component_type = "unit-types.offices"
+    s.tables.components_unit_types_offices = [{ id: 1, employee_capacity: 10 }]
+    s.tables.blocks[0].domain = "office"
     const result = validate(s)
-    assert.deepEqual(result.blocking.map((i) => [i.category, i.documentId]), [["unidad-sin-bloque", "unit-2"]])
+    assert.deepEqual(result.blocking, [])
+    assert.deepEqual(result.issues.map((i) => [i.category, i.severity, i.documentId]), [
+      ["unidad-sin-bloque", "warning", "unit-1"],
+      ["unidad-sin-bloque", "warning", "unit-2"],
+    ])
+    const data = transform(result.resolved)
+    assert.deepEqual(data.unit.map((u) => u.block_id), ["etl-no-definido-office", "etl-no-definido-housing"])
+    const placeholders = data.block.filter((b) => b.public_id!.startsWith("etl-"))
+    assert.deepEqual(placeholders.map((b) => [b.public_id, b.name, b.domain, b.project_id, b.code]), [
+      ["etl-no-definido-housing", "No definido", "housing", "etl-no-definido", null],
+      ["etl-no-definido-office", "No definido", "office", "etl-no-definido", null],
+    ])
+    const project = data.project.find((p) => p.public_id === "etl-no-definido")!
+    assert.equal(project.name, "No definido")
+    assert.equal(project.country_id, null)
   })
+  test("bloque sin proyecto: advierte y va al proyecto «No definido» con sus unidades", () => {
+    const s = fixture()
+    s.tables.blocks_project_lnk = []
+    const result = validate(s)
+    assert.deepEqual(result.issues.map((i) => [i.category, i.severity]), [["bloque-sin-proyecto", "warning"]])
+    const data = transform(result.resolved)
+    assert.equal(data.block[0].project_id, "etl-no-definido")
+    assert.equal(data.unit.length, 2)
+    assert.deepEqual(data.project.map((p) => p.public_id), ["project-1", "etl-no-definido"])
+  })
+  test("sin huérfanos no se crean padres «No definido»", () => {
+    const data = transform(validate(fixture()).resolved)
+    assert.ok(!data.block.some((b) => b.public_id!.startsWith("etl-")))
+    assert.ok(!data.project.some((p) => p.public_id!.startsWith("etl-")))
+  })
+})
+
+describe("incidencias", () => {
   test("--allow excluye solo la fila afectada", () => {
     const s = fixture()
-    s.tables.units_block_lnk = s.tables.units_block_lnk.filter((l) => l.unit_id !== 41)
-    const result = validate(s, new Set(["unidad-sin-bloque"]))
+    s.tables.units_unit_usage_lnk = [{ id: 1, unit_id: 41, unit_usage_id: 999 }]
+    assert.deepEqual(validate(s).blocking.map((i) => [i.category, i.documentId]), [["relacion-rota", "unit-2"]])
+    const result = validate(s, new Set(["relacion-rota"]))
     assert.deepEqual(result.blocking, [])
     assert.deepEqual(result.exclusions.map((e) => e.documentId), ["unit-2"])
     assert.deepEqual(transform(result.resolved).unit.map((u) => u.public_id), ["unit-1"])
   })
-  test("--allow excluye en cascada: bloque sin proyecto se lleva sus unidades", () => {
+  test("--allow excluye en cascada: un bloque excluido se lleva sus unidades", () => {
     const s = fixture()
-    s.tables.blocks_project_lnk = []
-    const result = validate(s, new Set(["bloque-sin-proyecto"]))
+    s.tables.blocks_block_category_lnk = [{ id: 1, block_id: 30, block_category_id: 999 }]
+    const result = validate(s, new Set(["relacion-rota"]))
     assert.deepEqual(result.exclusions.map((e) => [e.table, e.documentId]).sort(), [
       ["blocks", "block-1"],
       ["units", "unit-1"],
@@ -143,10 +179,23 @@ describe("incidencias", () => {
     s.tables.units_block_lnk.push({ id: 3, unit_id: 40, block_id: 30 })
     assert.deepEqual(categories(s), [])
   })
-  test("code duplicado", () => {
+  test("code duplicado: advierte y todas las copias se cargan con code vacío", () => {
     const s = fixture()
     s.tables.units[1].code = "U-001"
-    assert.deepEqual(categories(s), ["codigo-duplicado", "codigo-duplicado"])
+    const result = validate(s)
+    assert.deepEqual(result.issues.map((i) => [i.category, i.severity]), [
+      ["codigo-duplicado", "warning"],
+      ["codigo-duplicado", "warning"],
+    ])
+    assert.deepEqual(transform(result.resolved).unit.map((u) => u.code), [null, null])
+  })
+  test("code de bloque duplicado", () => {
+    const s = fixture()
+    s.tables.blocks.push(published(32, "block-2", { code: "B-001", name: "Torre B", domain: "housing" }))
+    s.tables.blocks_project_lnk.push({ id: 3, block_id: 32, project_id: 10 })
+    const data = transform(validate(s).resolved)
+    assert.deepEqual(data.block.map((b) => b.code), [null, null])
+    assert.deepEqual(data.unit.map((u) => u.code), ["U-001", "U-002"])
   })
   test("enum desconocido", () => {
     const s = fixture()

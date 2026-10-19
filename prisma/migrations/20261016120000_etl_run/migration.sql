@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "etl_run_status" AS ENUM ('running', 'committed', 'rolled_back', 'aborted', 'failed');
+CREATE TYPE "etl_run_status" AS ENUM ('running', 'validated', 'committed', 'rolled_back', 'aborted', 'failed');
 
 -- CreateTable
 CREATE TABLE "etl_run" (

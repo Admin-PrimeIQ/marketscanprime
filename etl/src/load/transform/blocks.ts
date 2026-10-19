@@ -1,17 +1,17 @@
-import type { Resolved } from "../model"
+import { UNDEFINED_PROJECT, type Resolved } from "../model"
 import type { RawRow } from "../snapshot"
 import type { AppRow } from "../specs"
 import { bool, date, doc, int, numeric, refDoc, stamps, text } from "./common"
 
 export function blockRow(resolved: Resolved, row: RawRow): AppRow {
-  const { present, rel } = resolved
+  const { present, rel, duplicateCodes } = resolved
   const id = Number(row.id)
   return {
     public_id: doc(row),
-    code: text(row.code),
+    code: duplicateCodes.blocks.has(id) ? null : text(row.code),
     name: text(row.name),
     legacy_id: text(row.legacy_id),
-    project_id: refDoc(present, "projects", rel.blockProject.get(id)),
+    project_id: refDoc(present, "projects", rel.blockProject.get(id)) ?? UNDEFINED_PROJECT,
     domain: text(row.domain),
     quarter: text(row.quarter),
     market: text(row.market),

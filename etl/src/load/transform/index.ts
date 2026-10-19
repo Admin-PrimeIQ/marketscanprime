@@ -1,5 +1,5 @@
-import type { Resolved } from "../model"
-import { SPECS, type AppData, type AppTable } from "../specs"
+import { ENUMS, UNDEFINED_NAME, UNDEFINED_PROJECT, UNDEFINED_STAMP, undefinedBlock, type Resolved } from "../model"
+import { SPEC_BY_TABLE, SPECS, type AppData, type AppRow, type AppTable } from "../specs"
 import { blockFinancing, blockRow } from "./blocks"
 import { CATALOG_SOURCES, catalogRow, profileCurrencies } from "./catalogs"
 import { projectLinks, projectRow } from "./projects"
@@ -36,7 +36,25 @@ export function transform(resolved: Resolved): AppData {
   data.unit_industrial = types.industrial
 
   data.user = [...present.up_users.values()].map((row) => userRow(resolved, row))
+  addUndefinedParents(data)
   return data
+}
+
+function undefinedRow(table: AppTable, fields: AppRow): AppRow {
+  const row: AppRow = Object.fromEntries(SPEC_BY_TABLE[table].columns.map((c) => [c.name, null]))
+  return { ...row, name: UNDEFINED_NAME, created_at: UNDEFINED_STAMP, updated_at: UNDEFINED_STAMP, ...fields }
+}
+
+/** Crea el proyecto y los bloques «No definido» que usan los hijos sin relación obligatoria. */
+function addUndefinedParents(data: AppData) {
+  const usedBlocks = new Set(data.unit.map((u) => u.block_id))
+  for (const domain of ENUMS.block_domain) {
+    const publicId = undefinedBlock(domain)
+    if (usedBlocks.has(publicId)) data.block.push(undefinedRow("block", { public_id: publicId, project_id: UNDEFINED_PROJECT, domain }))
+  }
+  if (data.block.some((b) => b.project_id === UNDEFINED_PROJECT)) {
+    data.project.push(undefinedRow("project", { public_id: UNDEFINED_PROJECT }))
+  }
 }
 
 export function countRows(data: AppData): Record<AppTable, number> {

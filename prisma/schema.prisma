@@ -171,6 +171,7 @@ enum SyncRunStatus {
 
 enum EtlRunStatus {
   running
+  validated
   committed
   rolled_back
   aborted

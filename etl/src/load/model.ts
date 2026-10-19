@@ -88,13 +88,13 @@ export const CATEGORIES = {
   "sin-publicar": "El documento solo existe como borrador (published_at nulo): Strapi no lo muestra.",
   "campo-obligatorio-vacio": "Un campo obligatorio en el esquema nuevo viene vacío en Strapi.",
   "enum-desconocido": "El valor no está entre los permitidos por el enum del esquema nuevo.",
-  "codigo-duplicado": "El code se repite y en el esquema nuevo es único.",
+  "codigo-duplicado": "El code se repite y en el esquema nuevo es único: todas las copias se cargan con code vacío para corregirlas después.",
   "iso-duplicado": "El código ISO del país se repite y en el esquema nuevo es único.",
   "usuario-duplicado": "El username o el email se repite y en el esquema nuevo es único.",
   "relacion-ambigua": "La relación es de un solo destino pero en Strapi apunta a varios distintos.",
   "relacion-rota": "El vínculo apunta a una fila que no existe o no está publicada.",
-  "bloque-sin-proyecto": "El bloque no tiene proyecto y en el esquema nuevo es obligatorio.",
-  "unidad-sin-bloque": "La unidad no tiene bloque y en el esquema nuevo es obligatorio.",
+  "bloque-sin-proyecto": "El bloque no tiene proyecto y en el esquema nuevo es obligatorio: se carga en el proyecto «No definido».",
+  "unidad-sin-bloque": "La unidad no tiene bloque y en el esquema nuevo es obligatorio: se carga en el bloque «No definido» de su tipo.",
   "rol-invalido": "El usuario no tiene rol o tiene uno que no existe en el esquema nuevo (p. ej. public).",
   "componente-desconocido": "Componente con un tipo o campo que el ETL no sabe migrar.",
   "tipo-unidad-multiple": "La unidad tiene más de una entrada en la zona dinámica unitType.",
@@ -110,7 +110,26 @@ export type Category = keyof typeof CATEGORIES
 export type Severity = "fatal" | "warning"
 
 /** Categorías que solo advierten: los datos se cargan igual y las relaciones siguen siendo válidas. */
-export const WARNING_CATEGORIES: ReadonlySet<Category> = new Set(["tipo-unidad-distinto-al-bloque", "componente-compartido"])
+export const WARNING_CATEGORIES: ReadonlySet<Category> = new Set([
+  "tipo-unidad-distinto-al-bloque",
+  "componente-compartido",
+  "codigo-duplicado",
+  "bloque-sin-proyecto",
+  "unidad-sin-bloque",
+])
+
+/**
+ * Padres «No definido» para los hijos sin relación obligatoria. No existen en Strapi: el ETL los
+ * crea con un `public_id` propio (los de Strapi no llevan guiones, así que no chocan). Hay un
+ * bloque por tipo porque `block.domain` es obligatorio y debe coincidir con el tipo de la unidad.
+ */
+export const UNDEFINED_NAME = "No definido"
+export const UNDEFINED_PROJECT = "etl-no-definido"
+export const undefinedBlock = (domain: Domain) => `etl-no-definido-${domain}`
+/** Fecha fija: las filas «No definido» no cambian entre corridas. */
+export const UNDEFINED_STAMP = "2026-10-19T00:00:00.000Z"
+/** Tipo del bloque «No definido» de una unidad sin unitType. */
+export const DEFAULT_DOMAIN: Domain = "housing"
 
 export interface Issue {
   category: Category
@@ -157,4 +176,6 @@ export interface Resolved {
   unitType: Map<number, { kind: Domain; row: RawRow }>
   financing: Map<number, { row: RawRow; banks: { bank: string; rate: RawRow[string] }[] }>
   currencies: Map<number, { currency: string; buy: RawRow[string]; sell: RawRow[string] }[]>
+  /** Ids Strapi con code repetido: se cargan con code vacío. */
+  duplicateCodes: { blocks: Set<number>; units: Set<number> }
 }

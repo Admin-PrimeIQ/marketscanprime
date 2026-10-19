@@ -323,6 +323,7 @@ export const SPECS: TableSpec[] = [
     table: "user",
     publicId: true,
     key: ["public_id"],
+    uniques: ["username", "email"],
     columns: [
       ...document,
       c("username", "text"),

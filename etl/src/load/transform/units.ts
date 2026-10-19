@@ -1,19 +1,20 @@
-import type { Resolved } from "../model"
+import { DEFAULT_DOMAIN, undefinedBlock, type Resolved } from "../model"
 import type { RawRow } from "../snapshot"
 import type { AppRow } from "../specs"
 import { bool, doc, int, numeric, refDoc, stamps, text } from "./common"
 
 /** Los campos de fórmula se copian tal como están en Strapi: no se recalculan al cargar. */
 export function unitRow(resolved: Resolved, row: RawRow): AppRow {
-  const { present, rel, unitType } = resolved
+  const { present, rel, unitType, duplicateCodes } = resolved
   const id = Number(row.id)
+  const kind = unitType.get(id)?.kind ?? null
   return {
     public_id: doc(row),
-    code: text(row.code),
+    code: duplicateCodes.units.has(id) ? null : text(row.code),
     name: text(row.name),
     legacy_id: text(row.legacy_id),
-    block_id: refDoc(present, "blocks", rel.unitBlock.get(id)),
-    kind: unitType.get(id)?.kind ?? null,
+    block_id: refDoc(present, "blocks", rel.unitBlock.get(id)) ?? undefinedBlock(kind ?? DEFAULT_DOMAIN),
+    kind,
     unit_number: text(row.unit_number),
     model: text(row.model),
     availability: text(row.availability),

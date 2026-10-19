@@ -104,23 +104,25 @@ async function loadIds(client: pg.Client, table: AppTable, mode: Mode, publicIds
 }
 
 /**
- * Antes del upsert, deja en NULL los valores únicos que van a cambiar de dueño (un code que pasa
- * de una fila a otra) y, en modo espejo, los de filas que se van a borrar. Si no, el índice único
- * fallaría a mitad de la carga aunque el estado final sea válido.
+ * Antes del upsert, cambia por un valor provisional los únicos que van a cambiar de dueño (un code
+ * que pasa de una fila a otra) y, en modo espejo, los de filas que se van a borrar. Si no, el índice
+ * único fallaría a mitad de la carga aunque el estado final sea válido. Provisional y no NULL porque
+ * `user.username` / `user.email` son NOT NULL; el upsert o el borrado posterior lo reemplazan siempre.
  */
 async function releaseUniques(client: pg.Client, spec: TableSpec, rows: AppRow[], mode: Mode) {
   for (const column of spec.uniques ?? []) {
     const c = q(column)
+    const placeholder = `'__etl_release__' || t.id::text`
     await step(`liberar ${spec.table}.${column}`, async () => {
       await client.query(
-        `UPDATE ${q(spec.table)} AS t SET ${c} = NULL
+        `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder}
            FROM unnest($1::text[], $2::text[]) AS s(public_id, value)
           WHERE t.public_id = s.public_id AND t.${c} IS NOT NULL AND t.${c} IS DISTINCT FROM s.value`,
         [rows.map((r) => r.public_id), rows.map((r) => r[column])],
       )
       if (mode === "full") {
         await client.query(
-          `UPDATE ${q(spec.table)} SET ${c} = NULL WHERE ${c} IS NOT NULL AND public_id NOT IN (SELECT unnest($1::text[]))`,
+          `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder} WHERE t.${c} IS NOT NULL AND t.public_id NOT IN (SELECT unnest($1::text[]))`,
           [rows.map((r) => r.public_id)],
         )
       }

@@ -1,5 +1,14 @@
 import type pg from "pg"
-import { CURRENCY_FIELDS, FINANCING_COMPONENT, UNIT_TYPE_COMPONENTS, type Present } from "./model"
+import {
+  CURRENCY_FIELDS,
+  DEFAULT_DOMAIN,
+  FINANCING_COMPONENT,
+  UNDEFINED_PROJECT,
+  UNIT_TYPE_COMPONENTS,
+  undefinedBlock,
+  type Domain,
+  type Present,
+} from "./model"
 import { bool, cents, float, int, numeric, text, timestamp, type Value } from "./normalize"
 import type { Collection, RawRow, Snapshot, StrapiTable } from "./snapshot"
 import { SPECS, rowKey, type AppData, type AppRow, type AppTable, type Column, type TableSpec } from "./specs"
@@ -180,9 +189,44 @@ async function pairs(client: pg.Client, sql: string, params: unknown[]): Promise
   return new Map(result.rows.map((r) => [r.k, r.v ?? ""]))
 }
 
-async function verifyRelations(client: pg.Client, snapshot: Snapshot, present: Present, mode: Mode): Promise<Check[]> {
+/**
+ * Dónde deben quedar los hijos sin relación obligatoria, sacado del snapshot crudo: unidad sin
+ * vínculo a un bloque publicado → bloque «No definido» de su tipo (unitType); bloque sin proyecto
+ * → proyecto «No definido», igual que los bloques «No definido» que se usen.
+ */
+interface UndefinedParents {
+  unitBlock: Map<string, string>
+  blockProject: Map<string, string>
+  blocks: string[]
+}
+
+function undefinedParents(snapshot: Snapshot, present: Present): UndefinedParents {
   const t = snapshot.tables
-  const docs = (table: Collection) => [...present[table].values()].map((r) => String(r.document_id))
+  const kinds = new Map<number, Domain>()
+  for (const cmp of t.units_cmps) {
+    const def = UNIT_TYPE_COMPONENTS[String(cmp.component_type)]
+    if (def && cmp.field === "unitType" && cmp.entity_id !== null) kinds.set(Number(cmp.entity_id), def.kind)
+  }
+  const linkedUnits = new Set(t.units_block_lnk.filter((l) => docOf(present, "blocks", l.block_id)).map((l) => Number(l.unit_id)))
+  const linkedBlocks = new Set(t.blocks_project_lnk.filter((l) => docOf(present, "projects", l.project_id)).map((l) => Number(l.block_id)))
+  const unitBlock = new Map<string, string>()
+  for (const [id, unit] of present.units) {
+    if (!linkedUnits.has(id)) unitBlock.set(String(unit.document_id), undefinedBlock(kinds.get(id) ?? DEFAULT_DOMAIN))
+  }
+  const blocks = [...new Set(unitBlock.values())]
+  const blockProject = new Map(blocks.map((b) => [b, UNDEFINED_PROJECT]))
+  for (const [id, block] of present.blocks) {
+    if (!linkedBlocks.has(id)) blockProject.set(String(block.document_id), UNDEFINED_PROJECT)
+  }
+  return { unitBlock, blockProject, blocks }
+}
+
+async function verifyRelations(client: pg.Client, snapshot: Snapshot, present: Present, undefinedTo: UndefinedParents, mode: Mode): Promise<Check[]> {
+  const t = snapshot.tables
+  const docs = (table: Collection) => [
+    ...[...present[table].values()].map((r) => String(r.document_id)),
+    ...(table === "blocks" ? undefinedTo.blocks : []),
+  ]
   const scoped = (owner: Collection, alias: string) =>
     mode === "sample" ? { where: ` WHERE ${alias}.public_id = ANY($1::text[])`, params: [docs(owner)] } : { where: "", params: [] }
   const checks: Check[] = []
@@ -194,6 +238,8 @@ async function verifyRelations(client: pg.Client, snapshot: Snapshot, present: P
       const target = docOf(present, rel.target, link[rel.targetCol])
       if (owner && target) expected.set(owner, target)
     }
+    const fallback = rel.lnk === "units_block_lnk" ? undefinedTo.unitBlock : rel.lnk === "blocks_project_lnk" ? undefinedTo.blockProject : null
+    for (const [owner, target] of fallback ?? []) if (!expected.has(owner)) expected.set(owner, target)
     const { where, params } = scoped(rel.owner, "o")
     const actual = await pairs(
       client,
@@ -301,9 +347,16 @@ async function verifyRelations(client: pg.Client, snapshot: Snapshot, present: P
 
 // ── 3. agregados por bloque ─────────────────────────────────────────────────
 
-async function verifyAggregates(client: pg.Client, snapshot: Snapshot, present: Present, mode: Mode): Promise<Check> {
+async function verifyAggregates(client: pg.Client, snapshot: Snapshot, present: Present, undefinedTo: UndefinedParents, mode: Mode): Promise<Check> {
   const totals = new Map<string, { units: number; cents: bigint }>()
   for (const block of present.blocks.values()) totals.set(String(block.document_id), { units: 0, cents: 0n })
+  for (const block of undefinedTo.blocks) totals.set(block, { units: 0, cents: 0n })
+  for (const unit of present.units.values()) {
+    const block = undefinedTo.unitBlock.get(String(unit.document_id))
+    if (!block) continue
+    totals.get(block)!.units++
+    totals.get(block)!.cents += cents(unit.total_price_usd as Value)
+  }
   const counted = new Set<number>()
   for (const link of snapshot.tables.units_block_lnk) {
     const unit = link.unit_id === null ? undefined : present.units.get(Number(link.unit_id))
@@ -330,8 +383,9 @@ async function verifyAggregates(client: pg.Client, snapshot: Snapshot, present: 
 export async function verify(client: pg.Client, snapshot: Snapshot, present: Present, data: AppData, mode: Mode): Promise<VerifyResult> {
   const tables: Check[] = []
   for (const spec of SPECS) tables.push(await verifyTable(client, spec, data, mode))
-  const relations = await verifyRelations(client, snapshot, present, mode)
-  const aggregates = await verifyAggregates(client, snapshot, present, mode)
+  const undefinedTo = undefinedParents(snapshot, present)
+  const relations = await verifyRelations(client, snapshot, present, undefinedTo, mode)
+  const aggregates = await verifyAggregates(client, snapshot, present, undefinedTo, mode)
   const ok = ![...tables, ...relations, aggregates].some(failed)
   return { ok, tables, relations, aggregates }
 }

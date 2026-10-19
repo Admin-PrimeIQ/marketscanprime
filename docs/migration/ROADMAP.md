@@ -142,12 +142,12 @@ Diseñar `prisma/schema.prisma` de la app (no el de Strapi). Lineamientos:
 Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert por `publicId`). Una sola transacción por corrida: si algo falla, ROLLBACK completo. Uso en `etl/README.md` → «Carga Strapi → msp_app».
 
 - [x] Orden: catálogos → desarrolladores → perfiles de tipo de cambio → proyectos → bloques (+ financiamiento) → unidades (+ tipo) → usuarios.
-- [x] Solo filas publicadas. Las unidades huérfanas (~688) bloquean la carga; con `--allow unidad-sin-bloque` se excluyen y quedan en el reporte, no en la base.
+- [x] Solo filas publicadas. Unidades sin bloque (620) y bloques sin proyecto (2) se cargan en un padre «No definido» (`etl-no-definido`, `etl-no-definido-<domain>`); los `code` repetidos (42) se cargan vacíos. Las tres quedan como advertencias en el reporte.
 - [x] Unidades paginadas por cursor (`id > último`, lotes de ~2,000, pausa entre lotes, pool ≤ 2 conexiones). `units_cmps` se resuelve según `component_type`.
 - [x] Cargas completas **fuera de horario laboral** (la extracción completa se rechaza entre 7:00 y 19:00): la base `strapi` es la misma que usa Strapi en producción.
 - [ ] Al cargar cada unidad, **recalcular** los campos de fórmula con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hoy se copian tal cual.
 - [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados (falta la parte de fórmulas).
-- [ ] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`.
+- [x] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`. Hecho el 19 oct con el snapshot del 16 oct; falta refrescar con un snapshot nuevo leído de noche.
 
 **Hecho cuando:** dos corridas seguidas dejan la base idéntica y los conteos cuadran con `strapi:check`.
 

@@ -160,7 +160,7 @@ export function validate(snapshot: Snapshot, allowed: ReadonlySet<string> = new 
   }
   for (const row of present.units.values()) checkEnum("units", row, row.availability, ENUMS.availability, "availability")
 
-  const checkUnique = (table: Collection, column: string, category: Category) => {
+  const checkUnique = (table: Collection, column: string, category: Category, repeated?: Set<number>) => {
     const byValue = new Map<string, RawRow[]>()
     for (const row of present[table].values()) {
       const value = str(row[column])
@@ -168,11 +168,16 @@ export function validate(snapshot: Snapshot, allowed: ReadonlySet<string> = new 
       byValue.set(value, [...(byValue.get(value) ?? []), row])
     }
     for (const [value, rows] of byValue) {
-      if (rows.length > 1) for (const row of rows) add(category, table, row, `${column} = ${JSON.stringify(value)} en ${rows.length} filas`)
+      if (rows.length <= 1) continue
+      for (const row of rows) {
+        add(category, table, row, `${column} = ${JSON.stringify(value)} en ${rows.length} filas`)
+        repeated?.add(Number(row.id))
+      }
     }
   }
-  checkUnique("blocks", "code", "codigo-duplicado")
-  checkUnique("units", "code", "codigo-duplicado")
+  const duplicateCodes: Resolved["duplicateCodes"] = { blocks: new Set(), units: new Set() }
+  checkUnique("blocks", "code", "codigo-duplicado", duplicateCodes.blocks)
+  checkUnique("units", "code", "codigo-duplicado", duplicateCodes.units)
   checkUnique("countries", "iso_code", "iso-duplicado")
   checkUnique("countries", "iso_code_2", "iso-duplicado")
   checkUnique("up_users", "username", "usuario-duplicado")
@@ -425,7 +430,10 @@ export function validate(snapshot: Snapshot, allowed: ReadonlySet<string> = new 
   }
   pruneResolved(present, sets, unitType, financing, currencies)
 
-  return { issues, blocking, exclusions, ignoredLinks, resolved: { present, rel, sets, unitType, financing, currencies } }
+  for (const id of duplicateCodes.blocks) if (!present.blocks.has(id)) duplicateCodes.blocks.delete(id)
+  for (const id of duplicateCodes.units) if (!present.units.has(id)) duplicateCodes.units.delete(id)
+
+  return { issues, blocking, exclusions, ignoredLinks, resolved: { present, rel, sets, unitType, financing, currencies, duplicateCodes } }
 }
 
 /** Excluye en cascada lo que depende de una fila excluida (en orden de dependencia). */
