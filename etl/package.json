@@ -22,6 +22,10 @@
     "stage:cert": "tsx src/stage/fetch-cert.ts",
     "stage:ping": "tsx src/stage/ping.ts",
     "stage:describe": "tsx src/stage/describe.ts",
+    "load": "tsx src/load/index.ts run",
+    "load:validate": "tsx src/load/index.ts validate",
+    "load:verify": "tsx src/load/index.ts verify",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

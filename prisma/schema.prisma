@@ -169,6 +169,16 @@ enum SyncRunStatus {
   @@map("sync_run_status")
 }
 
+enum EtlRunStatus {
+  running
+  committed
+  rolled_back
+  aborted
+  failed
+
+  @@map("etl_run_status")
+}
+
 enum SyncOperation {
   push
   pull
@@ -761,6 +771,26 @@ model SyncRunBlock {
   @@index([runId])
   @@index([blockId])
   @@map("sync_run_block")
+}
+
+/// Bitácora del ETL Strapi → msp_app (etl/src/load). Se escribe por una conexión aparte, así que
+/// queda registro aunque la carga termine en ROLLBACK. `mode`: full | sample.
+model EtlRun {
+  id         String       @id @db.Uuid
+  command    String
+  mode       String
+  dryRun     Boolean      @map("dry_run")
+  status     EtlRunStatus
+  snapshot   String?
+  allowed    String[]
+  counts     Json?
+  issues     Json?
+  error      String?
+  startedAt  DateTime     @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime?    @map("finished_at") @db.Timestamptz(6)
+
+  @@index([startedAt])
+  @@map("etl_run")
 }
 
 /// Histórico del tipo de cambio (Banguat), reemplaza al JSON en S3.

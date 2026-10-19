@@ -66,5 +66,8 @@ logs
 
 etl/node_modules/
 etl/generated/
+# Datos reales de Strapi (incluye hashes de contraseñas): nunca se versionan.
+etl/.snapshots/
+etl/reports/
 
 graphify-out/

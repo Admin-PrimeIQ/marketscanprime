@@ -1,6 +1,6 @@
-# etl — migración Strapi → dbo_stage
+# etl — migración Strapi → msp_app
 
-Paquete aislado (npm propio, fuera del build de Next.js) que lee la base MySQL de Strapi con Prisma 7 para cargarla después en `dbo_stage`. Contexto completo de la migración: [`docs/migration/README.md`](../docs/migration/README.md).
+Paquete aislado (npm propio, fuera del build de Next.js) que lee la base MySQL de Strapi con Prisma 7 y la carga en el esquema de la app nueva (`msp_app`, ver [Carga Strapi → msp_app](#carga-strapi--msp_app)). Contexto completo de la migración: [`docs/migration/README.md`](../docs/migration/README.md).
 
 ## Reglas
 
@@ -52,6 +52,10 @@ Railway firma el certificado del Postgres con una raíz propia y lo emite para `
 | `app:deploy` | Aplica las migraciones pendientes de `../prisma/migrations` en `msp_app`. | Sí, **escribe** |
 | `app:pull:print` | Esquema introspectado de `msp_app`, sin escribir archivos. | Sí |
 | `app:ping` | Esquema de la sesión y conteos de `msp_app`. | Sí |
+| `load:validate` | Extrae Strapi a un snapshot (o reusa uno), valida relaciones y transforma. No escribe en `msp_app`. | Strapi (lectura) |
+| `load` | Carga a `msp_app` en una sola transacción, verifica y hace COMMIT; si algo falla, ROLLBACK. | Strapi (lectura) + `msp_app`, **escribe** |
+| `load:verify` | Compara `msp_app` con un snapshot, en una transacción de solo lectura. | `msp_app` (lectura) |
+| `test` | Pruebas de validación y transformación con un snapshot sintético. | No |
 | `typecheck` | `tsc --noEmit`. | No |
 
 Para crear una migración nueva sin base "shadow" (el usuario no puede crear bases):
@@ -77,10 +81,22 @@ etl/
     │   ├── check.ts              # verificación de solo lectura
     │   └── distinct-values.ts    # valores de las columnas que pasan a enum
     ├── stage/                    # Postgres de staging: conexión de solo lectura, CA, ping
-    └── app/
-        ├── client.ts             # createAppClient() con @prisma/adapter-pg, fijo a msp_app
-        ├── connection.ts         # pool (search_path=msp_app) y URL del CLI
-        └── prisma-cli.ts         # CLI de Prisma por el proxy local
+    ├── app/
+    │   ├── client.ts             # createAppClient() con @prisma/adapter-pg, fijo a msp_app
+    │   ├── connection.ts         # pool (search_path=msp_app) y URL del CLI
+    │   └── prisma-cli.ts         # CLI de Prisma por el proxy local
+    └── load/                     # ETL Strapi → msp_app
+        ├── index.ts              # CLI: validate | run | verify
+        ├── extract.ts            # lectura por lotes a snapshot (todas las filas, también borradores)
+        ├── snapshot.ts           # NDJSON en etl/.snapshots/ (gitignored)
+        ├── validate.ts           # fila publicada, relaciones, únicos, enums, componentes; --allow
+        ├── model.ts              # enums, componentes y categorías de incidencia (con su porqué)
+        ├── transform/            # funciones puras: snapshot validado → filas de msp_app
+        ├── specs.ts              # tablas destino, llaves y columnas (escritura y verificación)
+        ├── write.ts              # upsert por llave natural, hijas obsoletas, espejo
+        ├── verify.ts             # filas, relaciones desde el snapshot crudo y agregados
+        ├── report.ts             # consola, etl/reports/*.json y msp_app.etl_run
+        └── load.test.ts          # pruebas (fixtures.ts: snapshot sintético)
 ```
 
 ## El esquema
@@ -104,3 +120,27 @@ const blocks = await strapi.blocks.findMany({
 })
 await strapi.$disconnect()
 ```
+
+## Carga Strapi → msp_app
+
+```bash
+npm run load:validate                                  # 1. ver incidencias reales (no escribe)
+npm run load:validate -- --snapshot <nombre>           #    repetir sobre el mismo snapshot, sin leer el RDS
+npm run load -- --snapshot <nombre> --dry-run          # 2. carga completa y ROLLBACK al final
+npm run load -- --snapshot <nombre>                    # 3. carga real
+npm run load:verify -- --snapshot <nombre>             #    revisar después, en solo lectura
+npm run load -- --sample <docBloque1>,<docBloque2>     # prueba con pocos bloques (siempre --dry-run)
+```
+
+Cómo funciona:
+
+1. **Extracción.** Lee las 52 tablas en lotes de 2,000 por cursor de `id`, con pausa entre lotes y pool ≤ 2, y guarda un snapshot en `etl/.snapshots/<fecha>-full|sample/`. La lectura completa del RDS se rechaza entre 7:00 y 19:00 (hora de Guatemala), salvo con `--allow-business-hours`: la decisión es del usuario y la lectura va más lenta (500 ms entre lotes). Con `--snapshot` no se toca el RDS y se puede correr a cualquier hora.
+2. **Validación.** Elige la única fila publicada de cada `document_id` y revisa cada relación (`_lnk`) y componente (`_cmps`). Cada incidencia tiene categoría y explicación (`model.ts` → `CATEGORIES`). Si hay alguna fatal, **no se escribe nada** y el reporte dice qué filas y por qué. `--allow cat1,cat2` acepta esas categorías: excluye la fila y, en cascada, lo que depende de ella (país → proyectos → bloques → unidades). Las advertencias (`tipo-unidad-distinto-al-bloque`, `componente-compartido`) no bloquean.
+3. **Transformación.** Funciones puras. Las relaciones se resuelven por `document_id`, que en `msp_app` es `public_id`. Los campos de fórmula se copian tal cual, sin recalcular.
+4. **Escritura.** Todo en **una transacción** con candado (`pg_try_advisory_xact_lock`, una carga a la vez). Hace upsert por llave natural, así que los `id` se conservan entre corridas y una fila idéntica no se reescribe. En las tablas hijas se borra lo que ya no está en Strapi. En modo completo, `msp_app` queda como **espejo** de lo publicado: lo que ya no existe en Strapi se borra. En modo muestra no se borra nada fuera de la muestra.
+5. **Verificación, antes del COMMIT.** Compara cada tabla columna por columna contra la transformación. Compara cada relación contra los pares sacados directo de las tablas `_lnk`/`_cmps` del snapshot crudo, sin pasar por la validación. Compara unidades y suma de `total_price_usd` por bloque. Si algo no cuadra, ROLLBACK: `msp_app` queda como estaba.
+6. **Reporte.** Resumen en consola y `etl/reports/<fecha>-<id>.json` (gitignored), con todas las incidencias y exclusiones. Cada `run` queda en `msp_app.etl_run` por una conexión aparte, incluso si terminó en ROLLBACK (requiere la migración `20261016120000_etl_run`).
+
+Cada corrida es completa: vuelve a leer todo y escribe solo las diferencias. No hay modo incremental por `updated_at`, porque la validación necesita ver el grafo entero para saber si una relación quedó rota.
+
+Snapshots y reportes contienen datos reales (incluidos hashes de contraseñas): nunca se commitean.
