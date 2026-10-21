@@ -155,10 +155,10 @@ Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert
 
 Mientras Strapi siga vivo, el push lee de Strapi; después del corte, de Postgres. La lógica de mapeo es la misma (`README.md` §5).
 
-El push nuevo **nunca escribe en `dbo_stage` ni en `dbo`** antes del corte. Escribe en una **copia sombra** y se compara contra lo que n8n deja en el `dbo_stage` real.
+El push nuevo **nunca escribe en el `dbo_stage` ni en el `dbo` de producción (MySQL, y el `dbo` de Postgres)** antes del corte. Escribe en una **copia sombra** (el `dbo_stage` del Postgres de staging) y se compara contra lo que n8n deja en el `dbo_stage` real.
 
-- [ ] Lectura del `dbo_stage` real (MySQL, mismo RDS que `strapi`) para la prueba de paridad, **solo lectura**. Requiere el `GRANT SELECT` de `README.md` §13.3. Esquema escrito a mano con introspección `db pull --print` (nunca `db pull` sin `--print`, `migrate` ni `db push`).
-- [ ] Copia sombra: el candidato es el esquema `dbo_stage` del Postgres de staging (`README.md` §3, decisión 9, y §11), que ya tiene las 11 tablas del push vacías. Falta que el usuario confirme que es el destino y con qué usuario se escribe. El SQL del push debe adaptarse a Postgres (`README.md` §11.4: `IDENTITY ALWAYS`, columnas con eñe entre comillas, amenidades `boolean`, industrial con `char(64)` y `real`).
+- [ ] Lectura del `dbo_stage` real (MySQL, instancia RDS del warehouse, distinta de la de `strapi` según el manual) para la prueba de paridad, **solo lectura**. La conexión ya está en `etl/src/warehouse/`; falta confirmar el acceso con `npm run warehouse:ping` (`README.md` §13.3). Esquema escrito a mano con introspección `db pull --print` (nunca `db pull` sin `--print`, `migrate` ni `db push`).
+- [x] Copia sombra: el esquema `dbo_stage` del Postgres de staging (`README.md` §3, decisión 9, y §11), que ya tiene las 11 tablas del push vacías. Confirmado por el usuario el 21 oct: se escribe con `j_stage_admin`, solo en esas 11 tablas, nunca en las `sec_*`. El SQL del push debe adaptarse a Postgres (`README.md` §11.4: `IDENTITY ALWAYS`, columnas con eñe entre comillas, amenidades `boolean`, industrial con `char(64)` y `real`).
 - [ ] Mapeador puro `lib/domain/warehouse-mapper.ts`: bloque + unidades → filas `housing_universe`, `housing_units`, `housing_amenities`, `banking_info` (y equivalentes de oficinas/industrial).
 - [ ] **Prueba de paridad:** para N bloques, la salida del mapeador debe coincidir celda por celda con lo que n8n ya dejó en `dbo_stage`. Atención a redondeo de `Decimal`, textos recortados a 50/20 y `NULL` en columnas `_qtz`.
 - [ ] Escritura por bloque en una transacción en la copia sombra (borrar e insertar unidades, como hoy).
@@ -174,16 +174,16 @@ El detalle de **qué cambia en cada módulo** y qué funciones deben seguir func
 - `strapi`: la actual, sin cambios.
 - `prisma`: llama a Server Actions / Route Handlers que usan `lib/db/*` y convierten filas de Postgres a esa misma forma (DTO).
 
-Una variable `DATA_BACKEND=strapi|prisma` elige la implementación **para toda la app a la vez** (no por módulo: mezclar dejaría dos fuentes de verdad). Producción sigue en `strapi` hasta el corte; staging corre en `prisma`. Así los componentes casi no cambian durante la migración y se simplifican después, con la app ya estable.
+Una variable `NEXT_PUBLIC_DATA_BACKEND=strapi|prisma` elige la implementación **para toda la app a la vez** (no por módulo: mezclar dejaría dos fuentes de verdad). Producción sigue en `strapi` hasta el corte; staging corre en `prisma`. Así los componentes casi no cambian durante la migración y se simplifican después, con la app ya estable.
 
-1. [ ] **Limpieza previa** (se puede hacer ya, sin esperar nada): borrar el código muerto de la sección 4.1.
+1. [x] **Limpieza previa**: borrado el código muerto de la sección 4.1 (21 oct, v1.28.2, rama `feat/data-facade`). Quedan en `package.json` las dependencias `@univerjs/*` y `luckysheet`, ya sin uso.
 2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/`; tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/block-domain-ui.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`). `lib/domain/` ya existe (19 oct): `units/formulas.ts`, `units/varas.ts`, `units/context.ts` (contexto de bloque para el motor), `region.ts` y `geo.ts`, con pruebas en `npm test`. `lib/constants.ts` y `lib/region.ts` quedan como reexportaciones más lo de UI; el antiguo `lib/domain.ts` (etiquetas de UI) pasó a `lib/block-domain-ui.ts`.
-3. [ ] **Fachada** `lib/api/client.ts` con la implementación `strapi`; cambiar los imports de la UI de `strapiClient` a la fachada. Producción no nota nada.
+3. [x] **Fachada** `lib/api/client.ts` con la implementación `strapi`; los imports de la UI pasaron de `strapiClient` a `dataClient` (21 oct, v1.28.2, rama `feat/data-facade`). El contrato es el tipo `DataClient` (31 métodos) y el backend lo elige `NEXT_PUBLIC_DATA_BACKEND` (tiene que ser `NEXT_PUBLIC_` porque la UI lo lee en el navegador). Fuera de `lib/api/` nadie importa `strapiClient`; los tipos `Strapi*` y los helpers puros siguen saliendo de `strapi.ts` hasta el paso 2.
 4. [ ] Implementación `prisma`, módulo por módulo, en el orden de la sección 4: auth → catálogos → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
-5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `DATA_BACKEND=prisma`.
+5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
 6. [ ] Linter funcionando (`eslint` instalado) y `tsc --noEmit` limpio en los archivos nuevos; quitar `ignoreBuildErrors`.
 
-**Hecho cuando:** todas las listas "debe seguir funcionando" pasan en staging con `DATA_BACKEND=prisma` y ninguna petición sale hacia Strapi.
+**Hecho cuando:** todas las listas "debe seguir funcionando" pasan en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma` y ninguna petición sale hacia Strapi.
 
 Después del corte (fase 8) se borra la implementación `strapi` y, ya sin presión, se simplifica la forma de los datos (quitar `documentId` duplicado, arreglo `unitType`, etc.).
 
@@ -231,7 +231,7 @@ Es la **única** fase que cambia producción. La ejecuta una persona con acceso,
 ### Fase 8 — Limpieza
 
 - [ ] (Persona con acceso) Apagar Strapi (App Runner) y archivar un respaldo final de la base `strapi`.
-- [ ] Borrar `etl/` (o dejar solo el mapeador si vive en `lib/domain`), `.migration/`, `lib/api/strapi.ts`, la implementación `strapi` de la fachada, el proxy `app/api/strapi/`, las rutas `generate-code`, `lib/sync/runs-api.ts`, `lib/server-logger.ts` (parte de `/users/me`), `lib/auth/is-strapi-super-admin.ts`, `verify-strapi-bearer.ts` y la variable `DATA_BACKEND`.
+- [ ] Borrar `etl/` (o dejar solo el mapeador si vive en `lib/domain`), `.migration/`, `lib/api/strapi.ts`, la implementación `strapi` de la fachada, el proxy `app/api/strapi/`, las rutas `generate-code`, `lib/sync/runs-api.ts`, `lib/server-logger.ts` (parte de `/users/me`), `lib/auth/is-strapi-super-admin.ts`, `verify-strapi-bearer.ts` y la variable `NEXT_PUBLIC_DATA_BACKEND`.
 - [ ] Quitar las variables de entorno de la sección 4.13.
 - [ ] Retirar de Supabase las tablas de sync (si el Copilot ya no las usa).
 - [ ] Revisar el repo hermano `scripts/sync-database`: también habla con Strapi; retirarlo o apuntarlo a Postgres.
@@ -419,7 +419,7 @@ A revisar con negocio:
 | `SYNC_API_URL`, `SYNC_API_KEY` | `AUTH_SECRET` (sesiones) |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Llave del proveedor de correo (Resend o SES) |
 | — | `STAGE_DATABASE_URL` (solo workers: `dbo_stage`) |
-| — | `DATA_BACKEND` (solo durante la migración) |
+| — | `NEXT_PUBLIC_DATA_BACKEND` (solo durante la migración) |
 
 Se quedan mientras el Copilot siga en n8n: `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` / `N8N_CHAT_WEBHOOK_UPSTREAM_URL`.
 
@@ -456,5 +456,5 @@ Se quedan mientras el Copilot siga en n8n: `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` / 
 Las fases 1, 2 y 3 están hechas (`README.md` §6). Los pendientes concretos de la migración están en `README.md` §8; en este plan:
 
 1. Responder la fase 0 (al menos identidad de filas, pull y red) y los puntos "a revisar con negocio" de la sección 4.1.
-2. Borrar el código muerto de la sección 4.1 en este repo (no afecta producción) y reportar al responsable del backoffice el hueco de las rutas `generate-code`.
-3. Preparar la fase 4: acceso de solo lectura al `dbo_stage` de MySQL (`README.md` §13.3) y confirmar el destino de la copia sombra (decisión 9).
+2. ~~Borrar el código muerto de la sección 4.1~~ (hecho el 21 oct, con la fachada de la fase 5). Falta reportar al responsable del backoffice el hueco de las rutas `generate-code`.
+3. Preparar la fase 4: acceso de solo lectura al `dbo_stage` de MySQL (`README.md` §13.3). El destino de la copia sombra ya está confirmado (decisión 9, 21 oct).

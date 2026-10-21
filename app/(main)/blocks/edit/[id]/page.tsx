@@ -13,7 +13,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { BlockForm } from "@/components/blocks/block-form"
-import { strapiClient, type StrapiBlock } from "@/lib/api/strapi"
+import { type StrapiBlock } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useParams, useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -40,7 +41,7 @@ export default function EditBlockPage() {
         }
         setIsLoading(true)
         setError(null)
-        const blockData = await strapiClient.getBlockById(documentId)
+        const blockData = await dataClient.getBlockById(documentId)
         setBlock(blockData)
       } catch (err) {
         const message = err instanceof Error ? err.message : t('errorLoadingBlock') || "No se pudo cargar el bloque"

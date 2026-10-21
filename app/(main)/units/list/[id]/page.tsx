@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Monitor, X } from "lucide-react"
 import { DatasheetUnitsTable } from "@/components/units/datasheet-units-table"
-import { strapiClient, type StrapiUnit, type StrapiBlock } from "@/lib/api/strapi"
+import { type StrapiUnit, type StrapiBlock } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -51,8 +52,8 @@ export default function UnitsByBlockPage() {
         setError(null)
         if (currentBlock) {
           const [blockData, unitsRes] = await Promise.all([
-            strapiClient.getBlockById(currentBlock).catch(() => null),
-            strapiClient.getUnitsAllPages({ blockDocumentId: currentBlock, pageSize: 200 })
+            dataClient.getBlockById(currentBlock).catch(() => null),
+            dataClient.getUnitsAllPages({ blockDocumentId: currentBlock, pageSize: 200 })
           ])
           if (blockData) setCurrentBlockInfo(blockData)
           setUnits(unitsRes.data || [])
@@ -202,7 +203,7 @@ export default function UnitsByBlockPage() {
             try {
               setIsLoading(true)
               if (currentBlock) {
-                const unitsRes = await strapiClient.getUnitsAllPages({
+                const unitsRes = await dataClient.getUnitsAllPages({
                   blockDocumentId: currentBlock,
                   pageSize: 200,
                 })

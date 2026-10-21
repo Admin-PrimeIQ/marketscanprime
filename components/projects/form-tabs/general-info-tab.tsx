@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { type StrapiProject, type CatalogItem, strapiClient } from "@/lib/api/strapi"
+import { type StrapiProject, type CatalogItem } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import {
   Popover,
@@ -93,7 +94,7 @@ export function GeneralInfoTab({ initialData, disabled = false, onStateChange, o
       if (selectedDeveloperId && developers.length === 0 && !openDeveloper) {
         try {
           // Intentar cargar el developer específico primero
-          const item = await strapiClient.getCatalogItem('developers', selectedDeveloperId)
+          const item = await dataClient.getCatalogItem('developers', selectedDeveloperId)
           if (item) {
             setDevelopers([item])
           }
@@ -173,7 +174,7 @@ export function GeneralInfoTab({ initialData, disabled = false, onStateChange, o
       
       setIsLoadingDevelopers(true)
       try {
-        const response = await strapiClient.getCatalogList('developers', {
+        const response = await dataClient.getCatalogList('developers', {
           page: 1,
           pageSize: 1000,
           search: developerSearchQuery || undefined,
@@ -196,7 +197,7 @@ export function GeneralInfoTab({ initialData, disabled = false, onStateChange, o
     const loadInitialSecurityType = async () => {
       if (selectedSecurityTypeId && securityTypes.length === 0 && !openSecurityType) {
         try {
-          const item = await strapiClient.getCatalogItem('security-types', selectedSecurityTypeId)
+          const item = await dataClient.getCatalogItem('security-types', selectedSecurityTypeId)
           if (item) {
             setSecurityTypes([item])
           }
@@ -219,7 +220,7 @@ export function GeneralInfoTab({ initialData, disabled = false, onStateChange, o
       
       setIsLoadingSecurityTypes(true)
       try {
-        const response = await strapiClient.getCatalogList('security-types', {
+        const response = await dataClient.getCatalogList('security-types', {
           page: 1,
           pageSize: 1000,
           search: securityTypeSearchQuery || undefined,

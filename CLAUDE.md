@@ -39,9 +39,11 @@ Tests: `npm test` runs the pure modules with `node --test` (no dependencies need
 
 ## Architecture
 
-### Data layer — everything goes through `lib/api/strapi.ts`
+### Data layer — the UI goes through `dataClient`, backed by `lib/api/strapi.ts`
 
 A single ~3k-line [`StrapiClient`](lib/api/strapi.ts) singleton (`strapiClient`) holds all API knowledge: entity interfaces (`StrapiProject`, `StrapiBlock`, `StrapiUnit`, `StrapiExchangeRateProfile`, `CatalogItem`), query-string building for Strapi v5 filters/populate/pagination, and every CRUD method. New backend calls belong here, not inline in components.
+
+Pages and components never import `strapiClient`: they call `dataClient` from the facade [`lib/api/client.ts`](lib/api/client.ts), whose `DataClient` type lists the methods the UI uses. `NEXT_PUBLIC_DATA_BACKEND` picks the implementation (`strapi`, the default and only one so far; a `prisma` one is being built for the migration, see `docs/migration/ROADMAP.md` phase 5). A new method the UI needs goes in `strapi.ts` **and** in `DataClient`. Types `Strapi*` and pure helpers are still imported from `strapi.ts`.
 
 **Base URL is environment-dependent** and this matters: in the browser the client points at `/api/strapi`; on the server it calls Strapi directly (avoids loopback). [`app/api/strapi/[...path]/route.ts`](app/api/strapi/[...path]/route.ts) is a transparent proxy whose sole purpose is **server-side logging** of every call (method, path, resolved user email, status, duration, body/summary) via [`lib/server-logger.ts`](lib/server-logger.ts) into Vercel Functions logs. Keep browser traffic flowing through it.
 
@@ -71,7 +73,7 @@ shadcn/ui "new-york" style in `components/ui/` (Radix + Tailwind v4 + `lucide-re
 
 ## The units datasheet — the core of the app
 
-[`components/units/datasheet-units-table.tsx`](components/units/datasheet-units-table.tsx) (~7.8k lines) is a Glide Data Grid spreadsheet at `/units/list/[id]` (units of one block) and the most business-dense file in the repo. Sibling implementations (`editable-units-table`, `luckysheet-units-table`, `univer-units-table`, `units-table`) are alternates/legacy — the datasheet is the live one.
+[`components/units/datasheet-units-table.tsx`](components/units/datasheet-units-table.tsx) (~7.8k lines) is a Glide Data Grid spreadsheet at `/units/list/[id]` (units of one block) and the most business-dense file in the repo. It is the only units grid: the old alternates (`editable-`, `luckysheet-`, `univer-units-table`, `units-table`) were deleted in v1.28.2.
 
 Declarative configuration is split out into [`datasheet-units-table-config.ts`](components/units/datasheet-units-table-config.ts) (`DATASHEET_CONFIG`: field labels, USD field lists, foreign-currency behavior, cascade rules). Its header documents the exact 7-step recipe for **adding a new field group** — follow it; runtime sync functions stay in the component and are wired by name through `syncFnRegistry`.
 

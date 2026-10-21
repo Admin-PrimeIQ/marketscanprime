@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useTranslations } from "next-intl"
-import { strapiClient, type CatalogItem } from "@/lib/api/strapi"
+import { type CatalogItem } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { Spinner } from "@/components/ui/spinner"
 
 interface ServicesTabProps {
@@ -35,7 +36,7 @@ export function ServicesTab({ selected = [], disabled = false, onChange, onLoadi
         setIsLoading(true)
         onLoadingChange?.(true)
         setError(null)
-        const response = await strapiClient.getCatalogList('services', {
+        const response = await dataClient.getCatalogList('services', {
           page: 1,
           pageSize: 1000,
           sort: 'name:asc',

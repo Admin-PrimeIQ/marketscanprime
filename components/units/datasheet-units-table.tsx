@@ -39,10 +39,10 @@ import {
   StrapiUnit,
   type StrapiError,
   type CatalogItem,
-  strapiClient,
   localCurrencyUnitsPerOneUsd,
   getStrapiPublicBaseUrl,
 } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useAuth } from "@/context/AuthContext"
 import { blockBehavior } from "@/lib/block-category"
 import { isStrapiSuperAdmin } from "@/lib/auth/is-strapi-super-admin"
@@ -1235,7 +1235,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           firstUnit.block.project.documentId || firstUnit.block.project.id
       } else if (blockId) {
         try {
-          const block = await strapiClient.getBlockById(blockId)
+          const block = await dataClient.getBlockById(blockId)
           const p = block.project
           if (!p || typeof p !== 'object') {
             setProjectWithCurrencies(null)
@@ -1258,7 +1258,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
       }
 
       try {
-        const project = await strapiClient.getProjectById(projectId)
+        const project = await dataClient.getProjectById(projectId)
         setProjectWithCurrencies(project)
       } catch (error) {
         console.error('Error loading project with currencies:', error)
@@ -1611,9 +1611,9 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
     const loadCatalogs = async () => {
       try {
         const [parkingTypesRes, unitUsagesRes, topographiesRes] = await Promise.all([
-          strapiClient.getCatalogList('unit-parking-types', { pageSize: 200 }),
-          strapiClient.getCatalogList('unit-usages', { pageSize: 200 }),
-          strapiClient.getCatalogList('unit-topographies', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-parking-types', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-usages', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-topographies', { pageSize: 200 }),
         ])
         setParkingTypes(parkingTypesRes.data || [])
         setUnitUsages(unitUsagesRes.data || [])
@@ -2646,7 +2646,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           markCellSaving(row, col)
         }
         
-        return strapiClient.updateUnit(unitId, field, value, blockDocumentId)
+        return dataClient.updateUnit(unitId, field, value, blockDocumentId)
           .then(() => {
             if (process.env.NODE_ENV === "development") {
               console.log(`[Undo/Redo] Updated unit ${unitId}, field: ${field}`)
@@ -2878,7 +2878,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           let codeAttempts = 0
           while (true) {
             try {
-              await strapiClient.updateUnitBatch(unitId, updates, blockDocumentId)
+              await dataClient.updateUnitBatch(unitId, updates, blockDocumentId)
               break
             } catch (writeErr) {
               if (isUnitCodeConflict(writeErr) && codeAttempts < 5) {
@@ -3084,7 +3084,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
         let createCodeAttempts = 0
         while (true) {
           try {
-            createdUnit = await strapiClient.createUnit(unitData)
+            createdUnit = await dataClient.createUnit(unitData)
             break
           } catch (createErr) {
             if (isUnitCodeConflict(createErr) && createCodeAttempts < 5) {
@@ -3384,7 +3384,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
     if (blockId) {
       try {
         // Load units from API (same as when block changes)
-        const unitsRes = await strapiClient.getUnitsAllPages({
+        const unitsRes = await dataClient.getUnitsAllPages({
           blockDocumentId: String(blockId),
           pageSize: 200,
         })
@@ -4935,7 +4935,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
       })
       setTotalUpdates((prev) => prev + 1)
 
-      strapiClient.updateUnit(unitId, fieldDz, convertedValueDz, blockDocumentIdDz)
+      dataClient.updateUnit(unitId, fieldDz, convertedValueDz, blockDocumentIdDz)
         .then(() => {
           if (process.env.NODE_ENV === "development") {
             console.log(`Updated unit ${unitId}, field: ${fieldDz}`)
@@ -5303,7 +5303,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
 
     // Update in Strapi (without forcing grid refresh)
     // Pass block to avoid GET request
-    strapiClient.updateUnit(unitId, field, convertedValue, blockDocumentId)
+    dataClient.updateUnit(unitId, field, convertedValue, blockDocumentId)
       .then(() => {
         if (process.env.NODE_ENV === "development") {
           console.log(`Updated unit ${unitId}, field: ${field}`)

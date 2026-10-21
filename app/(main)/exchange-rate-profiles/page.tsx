@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, X } from "lucide-react"
 import Link from "next/link"
-import { strapiClient, type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import { ExchangeRateProfilesTable } from "@/components/exchange-rate-profiles/exchange-rate-profiles-table"
 import {
@@ -49,7 +50,7 @@ export default function ExchangeRateProfilesPage() {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await strapiClient.getExchangeRateProfiles({
+      const response = await dataClient.getExchangeRateProfiles({
         page: currentPage,
         pageSize,
         sort,

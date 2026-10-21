@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, Check, ChevronsUpDown } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { strapiClient, type StrapiBlock, type BlockDomain } from "@/lib/api/strapi"
+import { type StrapiBlock, type BlockDomain } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { departmentsForIso } from "@/lib/domain/geo"
 import { useTranslations } from "next-intl"
 import {
@@ -64,7 +65,7 @@ export default function UnitsPage() {
   // todos los proyectos y la página entra al toque.
   useEffect(() => {
     let cancelled = false
-    strapiClient
+    dataClient
       .getCatalogList('countries', { pageSize: 100, sort: 'name:asc' })
       .then((res) => {
         if (cancelled) return
@@ -105,7 +106,7 @@ export default function UnitsPage() {
     const loadBlocks = async () => {
       setIsLoadingBlocks(true)
       try {
-        const response = await strapiClient.getBlocks({
+        const response = await dataClient.getBlocks({
           page: 1,
           pageSize: 200,
           search: blockSearchQuery || undefined,

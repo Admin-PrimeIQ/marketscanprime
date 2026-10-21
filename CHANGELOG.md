@@ -6,6 +6,18 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## La UI pide los datos a una fachada, no a Strapi; fuera el código muerto (v1.28.2)
+
+_2026-10-21_
+
+Primer paso de la fase 5 de la migración (`docs/migration/ROADMAP.md`): que la UI no sepa de qué backend vienen los datos.
+
+- **Fachada de datos**: [lib/api/client.ts](lib/api/client.ts) exporta `dataClient` y el tipo `DataClient`, con los 31 métodos que la UI usa hoy. Detrás está el mismo `strapiClient` de siempre: no cambia ninguna petición, ni el proxy `/api/strapi`, ni la forma de los datos. `NEXT_PUBLIC_DATA_BACKEND` elige la implementación (`strapi` por defecto; `prisma` todavía no existe y falla con un mensaje claro).
+- **33 archivos** (páginas, formularios, la hoja de unidades, `AuthContext` y `lib/auth/auth.ts`) importan `dataClient` en vez de `strapiClient`. Fuera de `lib/api/` ya nadie importa el cliente de Strapi. Los tipos `Strapi*` y los helpers puros (`getRelationDocumentId`, `localCurrencyUnitsPerOneUsd`, `CATALOG_TYPES`, …) se siguen importando de [lib/api/strapi.ts](lib/api/strapi.ts); pasan a tipos de dominio en un paso aparte.
+- **Código muerto borrado** (nada lo importaba ni lo enlazaba desde una pantalla viva): las tablas alternativas de unidades `editable-units-table`, `luckysheet-units-table`, `univer-units-table` y `units-table`; `projects-table-old` y `projects-table-advanced`; y las rutas huérfanas `projects/[id]`, `projects/[id]/edit` y `blocks/[id]/edit`. Esas tres URL ahora dan 404; las vivas son `projects/view|edit/[documentId]` y `blocks/view|edit/[id]`.
+- **Dependencias sin quitar todavía**: `@univerjs/*` y `luckysheet` ya no las usa ningún archivo, pero siguen en `package.json` para no cambiar el lockfile en este paso.
+- **Verificación**: la fachada compila en modo estricto junto con `strapi.ts`; los 31 métodos llamados coinciden uno a uno con el contrato; `npm test` 74/74. El `tsc` de toda la app no se pudo correr porque la raíz no tiene `node_modules`.
+
 ## Las reglas de unidad viven en `lib/domain/` y el ETL las usa para medir diferencias (v1.28.1)
 
 _2026-10-19_

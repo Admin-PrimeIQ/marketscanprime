@@ -15,7 +15,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { strapiClient, type StrapiCurrenciesComponent, type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { type StrapiCurrenciesComponent, type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useParams, useRouter } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { TriangleAlert } from "lucide-react"
@@ -72,7 +73,7 @@ export default function ExchangeRateProfileViewPage() {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await strapiClient.getExchangeRateProfileById(id)
+        const data = await dataClient.getExchangeRateProfileById(id)
         setProfile(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : t("error"))

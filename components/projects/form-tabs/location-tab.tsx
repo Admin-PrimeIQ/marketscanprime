@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { MapPin } from "lucide-react"
 import { lazy, Suspense } from "react"
 const ProjectMap = lazy(() => import("@/components/ui/project-map").then(m => ({ default: m.ProjectMap })))
-import { type StrapiProject, type CatalogItem, strapiClient } from "@/lib/api/strapi"
+import { type StrapiProject, type CatalogItem } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import {
   Popover,
@@ -110,7 +111,7 @@ export function LocationTab({ initialData, disabled = false, onStateChange, onFo
 
       setIsLoadingCountries(true)
       try {
-        const response = await strapiClient.getCatalogList('countries', {
+        const response = await dataClient.getCatalogList('countries', {
           page: 1,
           pageSize: 1000,
           search: countrySearchQuery || undefined,

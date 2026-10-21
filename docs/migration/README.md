@@ -44,6 +44,8 @@ El sistema completo está documentado en [`docs/manual-del-sistema.md`](../manua
 
 También: [`CLAUDE.md`](../../CLAUDE.md) (arquitectura del backoffice) y [`.migration/README.md`](../../.migration/README.md) (CLI que recalculaba fórmulas de unidades vía API de Strapi; congelado desde el 11 sep 2026, su copia del motor es vieja y ya no es contrato de paridad).
 
+Dónde está cada fórmula del sistema (motor, hoja, n8n, warehouse): [`FORMULAS.md`](FORMULAS.md).
+
 ---
 
 ## 2. El sistema actual, en corto
@@ -97,7 +99,7 @@ Dejar de depender de Strapi y n8n, en un proyecto propio y optimizado:
 | 6 | Después: **cliente Prisma de `dbo_stage`** (MySQL) para insertar lo leído de Strapi. El usuario enviará la conexión. **Hasta el corte, `dbo_stage` solo se lee; el ETL escribe en una copia sombra** (ver `ROADMAP.md`, fase 4). *Actualizada por la decisión 9: la conexión que llegó es Postgres, no MySQL.* |
 | 7 | La promoción `dbo_stage` → `dbo` (MySQL y Postgres) **sigue siendo manual**, como hoy. |
 | 8 | (15 oct 2026) El esquema de la app nueva vive en el **Postgres de staging de Railway** (`DATABASE_URL_DBO_STAGE`, base `railway`), en el esquema **`msp_app`**, junto al esquema `dbo_stage` de ese mismo servidor (5 tablas `sec_*`), que **solo se lee**. El usuario confirmó que nada de producción escribe en ese servidor y que no aloja el `dbo` de los otros proyectos. `msp_app` lo creó un administrador con dueño `j_stage_admin`; ese usuario no puede crear esquemas ni bases. |
-| 9 | (15–16 oct 2026) El `dbo_stage` de referencia pasa a ser el **Postgres de staging**, tratado "como si fuera el `dbo_stage` de MySQL". El usuario (no el agente) creó ahí las **11 tablas del push** de n8n, vacías, en `dbo_stage` (con escritura para `j_stage_admin`) y en un esquema `dbo` (sin acceso para `j_stage_admin`). Ver §11.3. **Por confirmar con el usuario:** si `dbo_stage` de este servidor es el destino del ETL/push nuevo (la "copia sombra" de la Fase 4) y si el agente puede escribir en él. Mientras no lo confirme, el ETL lo abre en solo lectura. |
+| 9 | (15–16 oct 2026) El `dbo_stage` de referencia pasa a ser el **Postgres de staging**, tratado "como si fuera el `dbo_stage` de MySQL". El usuario (no el agente) creó ahí las **11 tablas del push** de n8n, vacías, en `dbo_stage` (con escritura para `j_stage_admin`) y en un esquema `dbo` (sin acceso para `j_stage_admin`). Ver §11.3. **Confirmado por el usuario (21 oct 2026):** el `dbo_stage` de este servidor es la copia sombra de la Fase 4 y el push nuevo escribe en él con `j_stage_admin`, **solo en las 11 tablas del warehouse** (§11.3); las 5 tablas `sec_*` no se tocan nunca. Las conexiones que no son del push siguen abriéndolo en solo lectura. |
 
 ### Propuestas descartadas durante la conversación (no retomar sin motivo)
 
@@ -162,7 +164,7 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 
 ## 6. Estado actual del trabajo
 
-Al 21 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). El trabajo del 19 oct (`lib/domain/`, reporte y recálculo de fórmulas) está en la rama **`feat/lib-domain`** (commits `87809d4` y `05b0cdb`, subidos por el usuario a `origin/feat/lib-domain`), **sin fusionar a `main`**. El agente **no hace `git push`** ni fusiona sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
+Al 21 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). El trabajo del 19 y 21 oct está en la rama **`feat/lib-domain`**, **sin fusionar a `main`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, documentos corregidos), los tres subidos por el usuario a `origin/feat/lib-domain`. Sin commit todavía: `docs/migration/FORMULAS.md` y esta versión del README. El agente **no hace `git push`** ni fusiona sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -174,6 +176,7 @@ Al 21 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). El
 | **Fase 2: esquema de la app** | `prisma/schema.prisma` (29 modelos, 30 tablas con `_prisma_migrations`) y la migración `prisma/migrations/20261015210000_init`, aplicada en `msp_app` el 15 oct 2026. `migrate status`: al día; `migrate diff` contra la base: sin diferencias. Tablas vacías. Se opera desde `etl/` con `npm run app:*` (ver `etl/README.md`). |
 | Revisión del warehouse en Postgres | 15–16 oct: comparadas las tablas del push de n8n contra el servidor de staging. Resultado en §11.3 y §11.4. |
 | **Fase 3: ETL Strapi → `msp_app`** | **Carga inicial hecha** (19 oct, COMMIT) con el snapshot del RDS del 16 oct 22:21: 1,135 proyectos, 1,688 bloques, 238,226 unidades, 17 usuarios, catálogos, perfiles, financiamiento y tasas (los totales incluyen los padres «No definido»). Verificación antes del COMMIT y `load:verify` posterior: 25/25 tablas, 19/19 relaciones, 1/1 agregados. 0 filas excluidas; 664 advertencias. Migración `20261016120000_etl_run` aplicada (bitácora en `msp_app.etl_run`). Idempotencia comprobada el 19 oct: un `--dry-run` con el mismo snapshot dio 0 filas nuevas, 0 cambiadas y 0 borradas en las 25 tablas. Reporte de diferencias de fórmulas hecho el 19 oct (§12.8): 52 % de las unidades difiere del motor en al menos un campo, casi todo por reglas distintas en períodos viejos. Del 19 al 21 oct la carga guardó el valor recalculado; desde el 21 oct copia los campos de fórmula tal cual vienen de Strapi (recarga con COMMIT el 21 oct con el mismo snapshot: 123,442 unidades vueltas a su valor de Strapi, verificación y `load:verify` 25/25, 19/19, 1/1). Falta refrescar con un snapshot nuevo. Detalle completo en la §12. |
+| **Fase 5 (inicio): fachada y limpieza** | 21 oct, rama **`feat/data-facade`** (sale de `feat/lib-domain`, sin commit, v1.28.2). Borrado el código muerto de `ROADMAP.md` §4.1 (9 archivos). La UI pide los datos a `dataClient` (`lib/api/client.ts`, contrato `DataClient` de 31 métodos) en vez de `strapiClient`; detrás sigue el mismo cliente de Strapi, así que producción no cambia. Backend elegido con `NEXT_PUBLIC_DATA_BACKEND` (solo `strapi` por ahora). Siguiente: implementación `prisma`, empezando por auth y catálogos. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -188,6 +191,7 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 19 oct (unidades 238,226, bloques 1,688, proyectos 1,135, usuarios 17). |
 | `npm test` | 48 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre las del motor de fórmulas en `lib/domain/`. |
 | `npm run load:verify -- --snapshot 20261016-222126-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
+| `npm run warehouse:ping` | **Todavía no se ha corrido con éxito.** Necesita `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3). Debe mostrar solo `SELECT`/`SHOW VIEW` y las 11 tablas del push en `dbo_stage` y `dbo`. |
 
 ---
 
@@ -224,10 +228,10 @@ Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Post
 Lo inmediato:
 
 1. **Refrescar la carga de la Fase 3.** `msp_app` refleja Strapi al 16 oct 22:21. Desde `etl/`, **fuera de 7:00–19:00 (UTC-6)**: `npm run load -- --dry-run` (lee un snapshot nuevo del RDS, carga y hace ROLLBACK), y si cuadra, `npm run load -- --snapshot <el que acaba de crear>` para el COMMIT sin volver a leer el RDS. Es idempotente: solo inserta, actualiza o borra lo que cambió. El usuario ya autorizó esta carga en espejo hacia `msp_app`; avisarle del resultado.
-2. **Confirmar qué regla de Interior vale** (§12.8 y §13). Desde el 21 oct `msp_app` guarda los valores de Strapi tal cual; la respuesta decide con qué regla se recalculará después (en la app nueva o en una carga posterior). Dos vías, no excluyentes: preguntarle al negocio (§13.2) o leer el warehouse cuando llegue el acceso. El usuario está pidiendo el acceso (21 oct); el procedimiento para cuando llegue está en la §13.3.
-3. **Confirmar el destino de escritura** (decisión 9): si el ETL/push nuevo escribe en `dbo_stage` de staging y con qué usuario. Si sí, crear su cliente Prisma **sin migraciones** (introspección con `db pull --print` y esquema a mano, como el de Strapi; nunca `migrate`/`db push` sobre `dbo_stage`), con una conexión de escritura separada de la de solo lectura.
+2. **Confirmar qué regla de Interior vale** (§12.8 y §13). Desde el 21 oct `msp_app` guarda los valores de Strapi tal cual; la respuesta decide con qué regla se recalculará después (en la app nueva o en una carga posterior). Dos vías, no excluyentes: preguntarle al negocio (§13.2) o leer el warehouse. El usuario dice que ya hay acceso (21 oct, mismas credenciales que `j_stage_admin`); falta comprobarlo con `npm run warehouse:ping` (§13.3).
+3. **Cliente de escritura para `dbo_stage` de staging** (decisión 9, confirmada el 21 oct: copia sombra con `j_stage_admin`, solo las 11 tablas del warehouse). Crear su cliente Prisma **sin migraciones** (introspección con `db pull --print` y esquema a mano, como el de Strapi; nunca `migrate`/`db push` sobre `dbo_stage`), con una conexión de escritura separada de la de solo lectura y una lista cerrada de las 11 tablas: cualquier escritura fuera de ella, en especial en `sec_*`, debe fallar en el código.
 4. Revisar en el repo `n8n-manager` el workflow **Sync Block Worker** (`yBuM3XVk36DwRgbs`): cómo inserta en `housing_units`, si manda `id` explícito (choca con `IDENTITY ALWAYS`, §11.4) y si devuelve el ID nuevo a Strapi. Define cómo asignar `legacyId` a unidades nuevas.
-5. **Fase 4:** mapeador puro bloque + unidades → filas del warehouse, con prueba de paridad contra lo que n8n dejó en el `dbo_stage` de MySQL (requiere una forma de leerlo: hoy no hay conexión a MySQL `dbo_stage`; ver §13.3).
+5. **Fase 4:** mapeador puro bloque + unidades → filas del warehouse, con prueba de paridad contra lo que n8n dejó en el `dbo_stage` de MySQL (requiere leer el MySQL `dbo_stage`: la conexión ya está escrita en `etl/src/warehouse/`, falta confirmar el acceso; ver §13.3).
 6. Workers BullMQ en Railway: contadores de bloque (debounce por `jobId`), tipo de cambio Banguat (repetitivo cada 6 h), sincronización hacia `dbo_stage`.
 
 ---
@@ -236,7 +240,7 @@ Lo inmediato:
 
 - ~~¿Dónde está "la base de Strapi en mi db" (16 oct) y se usa como fuente de la Fase 3?~~ Resuelto el 16 oct: el usuario eligió el **RDS** (`strapi`, solo lectura) como fuente del ETL.
 - ¿Quién corrige en Strapi los datos que el ETL cargó con parche (§12.5): las 620 unidades sin bloque, los 2 bloques de El Paraíso Fase 2 sin proyecto y las 42 unidades con `code` repetido? ¿Y qué hace la app nueva con los padres «No definido» (ocultarlos, una pantalla para reasignar)? Mientras no se corrija en Strapi, cada carga los vuelve a dejar igual.
-- ¿El `dbo_stage` del Postgres de staging es el destino del ETL/push nuevo? ¿Para qué es el esquema `dbo` de ese mismo servidor (sin acceso para `j_stage_admin`)? ¿Las 5 tablas `sec_*` (mercado secundario) entran al alcance de la migración?
+- ~~¿El `dbo_stage` del Postgres de staging es el destino del ETL/push nuevo?~~ Resuelto el 21 oct: sí, como copia sombra, con `j_stage_admin` y solo en las 11 tablas del warehouse (decisión 9). Siguen abiertas: ¿para qué es el esquema `dbo` de ese mismo servidor (sin acceso para `j_stage_admin`)? ¿Las 5 tablas `sec_*` (mercado secundario) entran al alcance de la migración?
 - `dbo_stage` de staging no tiene las 3 llaves foráneas unidades → universo que sí tiene `dbo` (§11.4). ¿Es intencional?
 - ¿`dbo` en MySQL y `dbo` en Postgres de producción son realmente idénticos? ¿Y el `dbo_stage` de MySQL tiene la misma estructura que `dbo`?
 - ¿Otros proyectos **escriben** en las tablas de Market Scan dentro de `dbo` (`housing_*`, `office_*`, `industrial_*`, `banking_info`) o solo las leen?
@@ -255,7 +259,7 @@ Lo inmediato:
 - La conexión de Strapi a MySQL usa SSL sin validar el certificado (`DATABASE_SSL_REJECT_UNAUTHORIZED=false`).
 - El pull de n8n no tiene reversa y borra del CRM las unidades que no estén en el warehouse.
 - **Pendientes del esquema de la app (Fase 2):** los enums con `@map` (`Availability.Not_Available` ↔ `"Not Available"`, `OfficeClassification.Micro_1` ↔ `"Micro 1"`, …) necesitan un mapeo explícito al cargar desde Strapi y al exponer DTOs; el índice único parcial "una sola corrida de sync activa" no está modelado (Prisma no lo soporta; agregarlo a mano en una migración); `m2_range` de oficinas y la calidad industrial quedaron como texto porque Strapi tiene variantes sucias.
-- **Permisos en staging:** `j_stage_admin` tiene `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` sobre todo `dbo_stage` (incluidas las `sec_*`). El ETL igual abre `dbo_stage` en solo lectura hasta que el usuario confirme la decisión 9.
+- **Permisos en staging:** `j_stage_admin` tiene `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` sobre todo `dbo_stage` (incluidas las `sec_*`). Desde el 21 oct (decisión 9) el push nuevo puede escribir en las 11 tablas del warehouse; como el permiso alcanza también a las `sec_*`, la protección de esas tablas tiene que estar en el código (lista cerrada de tablas en el cliente de escritura).
 - **Skill e inventario de producción desactualizados:** `inventario-produccion.md` y la skill `proteger-produccion` todavía nombran `STRAPI_DATABASE_URL` (hoy son las variables `DATABASE_*_STRAPI`) y no registran el Postgres de staging (`railway`, esquemas `msp_app`/`dbo_stage`/`dbo`). La skill además pide un proyecto de Railway nuevo para la app, y la decisión 8 usó el servidor de staging. Solo el usuario puede editarlos.
 
 ---
@@ -315,7 +319,7 @@ Valores reales de Strapi usados para los enums de `msp_app` (leídos el 15 oct c
 ### 11.6 Reglas específicas de este servidor
 
 - Migraciones de Prisma **solo** en `msp_app` (`npm run app:deploy`). El SQL de una migración nueva no debe mencionar `dbo_stage` ni `dbo` ni crear esquemas.
-- `dbo_stage` y `dbo`: no crear, alterar ni borrar nada desde el agente. Escribir datos en `dbo_stage` solo cuando el usuario lo confirme (decisión 9).
+- `dbo_stage` y `dbo`: no crear, alterar ni borrar estructura desde el agente. Datos en `dbo_stage`: solo el push nuevo, solo en las 11 tablas del warehouse (decisión 9, 21 oct). Las `sec_*` no se escriben nunca.
 - Nunca `migrate reset`, `db push` ni `db pull` sin `--print` contra este servidor.
 
 ---
@@ -416,10 +420,11 @@ Por período: 2026 T3 vivienda 25 % con diferencias, 2026 S1 vivienda 71 % (la c
 
 ### 13.1 Estado
 
-- Código y documentos en la rama `feat/lib-domain` (subida, sin fusionar; ver §6).
-- `msp_app` tiene la carga del snapshot `20261016-222126-full` **con los campos de fórmula tal cual vienen de Strapi** (recarga con COMMIT del 21 oct, `load:verify` limpio; ver §12.1). Strapi, el warehouse y n8n no se tocaron.
-- 21 oct: nuevo `npm run warehouse:ping` en `etl/` para el warehouse MySQL. El manual ubica el warehouse en otra instancia de RDS (`prim….us-east-2`), no en la de Strapi; falta `DATABASE_HOST_WAREHOUSE` en el `.env` para probar el acceso de `j_stage_admin` (§13.3).
-- No hay nada a medias en el código. Lo pendiente son respuestas externas: las de la §13.2 y el acceso de la §13.3.
+- Código y documentos en la rama `feat/lib-domain` (subida hasta `f8c8ea6`, sin fusionar; ver §6). Sin commit: `docs/migration/FORMULAS.md` y esta versión del README.
+- `msp_app` tiene la carga del snapshot `20261016-222126-full` **con los campos de fórmula tal cual vienen de Strapi** (recarga con COMMIT del 21 oct, `load:verify` limpio; ver §12.1). Se confirmó con el usuario que las tablas y los datos de Strapi están en `msp_app` (25/25 tablas, 19/19 relaciones, 1/1 agregados; 664 advertencias conocidas, §12.5). Strapi, el warehouse y n8n no se tocaron.
+- 21 oct: nuevo [`FORMULAS.md`](FORMULAS.md), el mapa de dónde vive cada fórmula (motor en `lib/domain/`, hoja de unidades, moneda local, n8n, warehouse, ETL). Respuesta corta para el usuario: las fórmulas no están en la base ni en Strapi; están en `lib/domain/units/formulas.ts` y corren en el navegador; los promedios del bloque los calcula n8n.
+- 21 oct: nuevo `npm run warehouse:ping` en `etl/` para el warehouse MySQL. Todavía no se ha probado: falta `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3).
+- No hay nada a medias en el código. Lo pendiente son respuestas externas: las de la §13.2 y la prueba de acceso de la §13.3.
 
 ### 13.2 La duda que queda abierta: ¿qué regla de Interior es la correcta?
 
@@ -440,12 +445,48 @@ Qué hacer con la respuesta:
 - **Vale la hoja:** la regla no cambia. Anotarlo en la §12.8 y cerrar el punto 2 de la §8. Decidir con el usuario cuándo y dónde se recalculan las unidades legacy (en la app nueva o en una carga posterior; el código que aplicaba el recálculo en la carga, `applyFormulas()`, está en el historial de git, commit `05b0cdb`).
 - **Vale lo de los datos:** cambiar la regla en `lib/domain/units/formulas.ts` (la cuota tendría que depender también del trimestre, no solo del ISO), con pruebas en `formulas.test.ts`, y volver a correr `npm run load:formulas -- --snapshot <nombre>` para ver cuántas diferencias quedan. **Ojo:** el mismo cambio altera la hoja del admin en producción (`admin.primeiqlatam.com`), así que fusionarlo y desplegarlo es una decisión aparte del usuario. Actualizar `CHANGELOG.md`, la versión y la §12.8.
 
-### 13.3 Cuando llegue el acceso al warehouse
+### 13.3 Acceso al warehouse MySQL: listo en código, falta probarlo
 
-El usuario está pidiendo acceso de solo lectura (21 oct). No es imprescindible para la §13.2, pero sirve para confirmar la hipótesis de la §12.8 y lo va a necesitar la Fase 4 (paridad del push contra `dbo_stage`).
+No es imprescindible para la §13.2, pero sirve para confirmar la hipótesis de la §12.8 y lo va a necesitar la Fase 4 (paridad del push contra `dbo_stage`).
 
-- **Dónde está:** MySQL en el mismo RDS (us-east-2) que la base `strapi`, bases `dbo_stage` (destino del push de n8n) y `dbo` (final, compartida con otros proyectos). Hay una copia de `dbo` en un Postgres de producción en Railway, distinta del Postgres de staging de la §11.
-- **Qué pedir:** que un administrador (no el agente) ejecute `GRANT SELECT, SHOW VIEW ON dbo_stage.* TO 'j_stage_admin'@'%';`. Hoy ese usuario solo tiene `USAGE` global y `SELECT, SHOW VIEW` sobre `strapi`. Si el usuario prefiere otra credencial, la agregará al `.env` y avisará el nombre de la variable. No imprimir su valor.
-- **Primero:** `npm run strapi:ping` desde `etl/`. Debe seguir mostrando solo `SELECT`/`SHOW VIEW`; si aparece cualquier permiso de escritura, detenerse y avisar.
-- **La consulta:** una muestra pequeña, a cualquier hora (no es carga completa), pool ≤ 2. Unos 5 bloques de Interior 2026 y 3 de lotes de Interior 2024–2025, tomados de `formulas-<fecha>.csv`. Unir por `housing_units.id = legacy_id` de la unidad, o por `housing_universe.cod_proyecto` = `legacy_id` del bloque. Comparar `cuota`, `ingresos` y el precio sin IVA del warehouse contra las columnas `_stored` del CSV. Escribir un script nuevo en `etl/src/strapi/` siguiendo `distinct-values.ts` (cliente de solo lectura). No usar el cliente Prisma de `strapi` con otra base sin revisar que la extensión que bloquea escrituras siga aplicando.
+- **Dónde está:** MySQL en RDS us-east-2, bases `dbo_stage` (destino del push de n8n) y `dbo` (final, compartida con otros proyectos). Según el manual está en **otra instancia** de RDS (`prim….us-east-2`), no en la de `strapi` (`strapi.cfkk….us-east-2`). Hay una copia de `dbo` en un Postgres de producción en Railway, distinta del Postgres de staging de la §11.
+- **Lo que dijo el usuario (21 oct):** "ya tenemos acceso al dbo", en la instancia `prim…`, con las mismas credenciales de `j_stage_admin`. No se ha comprobado.
+- **Lo que ya está escrito** (commit `f8c8ea6`):
+  - `etl/src/warehouse/connection.ts` arma la conexión:
+    - Exige `DATABASE_HOST_WAREHOUSE`; el puerto opcional es `DATABASE_PORT_WAREHOUSE` (3306 por defecto).
+    - Usa `DATABASE_USER_WAREHOUSE`/`DATABASE_PASSWORD_WAREHOUSE` si existen; si no, las de Strapi.
+    - Sin base por defecto, pool ≤ 2 y SSL validado con `etl/certs/rds-global-bundle.pem`.
+    - Rechaza el usuario de la app de Strapi (prefijo `adm`).
+  - `etl/src/warehouse/ping.ts` (`npm run warehouse:ping`):
+    - Primero revisa los permisos y se detiene si hay algo más que `SELECT`/`USAGE`/`SHOW VIEW`.
+    - Luego lee una fila de `dbo_stage.housing_universe`.
+    - Al final lista las bases visibles y la estimación de filas de las 11 tablas del push en `dbo_stage` y `dbo`.
+  - Lista de tablas compartida en `etl/src/db/warehouse-tables.ts`.
+- **Siguiente paso:**
+  1. El usuario agrega `DATABASE_HOST_WAREHOUSE` al `.env` de la raíz. El agente no lee ni imprime valores del `.env`, y el revisor automático bloquea incluso buscar nombres de variables en él: preguntarle al usuario si ya la agregó.
+  2. Correr `npm run warehouse:ping` desde `etl/`. Es una muestra, vale a cualquier hora.
+  3. Si muestra algún permiso de escritura, detenerse y avisar.
+  4. Si falla por permisos, pedir que un administrador (no el agente) ejecute en esa instancia `GRANT SELECT, SHOW VIEW ON dbo_stage.* TO 'j_stage_admin'@'%';` (y en `dbo` si se necesita).
+  5. Con el ping en verde, corregir las menciones del warehouse en este README si la instancia resultó otra.
+- **La consulta de la §12.8:**
+  - Una muestra pequeña, a cualquier hora (no es carga completa), pool ≤ 2.
+  - Unos 5 bloques de Interior 2026 y 3 de lotes de Interior 2024–2025, tomados de `formulas-<fecha>.csv`.
+  - Unir por `housing_units.id = legacy_id` de la unidad, o por `housing_universe.cod_proyecto` = `legacy_id` del bloque.
+  - Comparar `cuota`, `ingresos` y el precio sin IVA del warehouse contra las columnas `_stored` del CSV.
+  - Escribir un script nuevo en `etl/src/warehouse/` con `warehousePoolConfig()`, y verificar permisos primero como hace `ping.ts`.
 - **Resultado esperado** si la hipótesis es correcta: los valores del warehouse son iguales a los `_stored` de Strapi (8 % a 10 años; ×0.916 en lotes). Documentarlo en la §12.8, sea cual sea, y quitar el «Falta confirmarlo».
+
+### 13.4 Ofrecido al usuario y sin respuesta
+
+Preguntárselo antes de hacerlo; ninguno está autorizado todavía:
+
+- **Refrescar la carga** con un snapshot nuevo del RDS, de noche (después de las 19:00 UTC-6) o con `--allow-business-hours` si él lo pide (§8, punto 1).
+- **Entrada en `CHANGELOG.md`** del trabajo del 21 oct (copia tal cual, `warehouse:ping`, `FORMULAS.md`). Es solo documentación del ETL: no cambia la app ni su versión.
+- **Commit** de `FORMULAS.md` y del README. **Sin `git push`**: el usuario sube él mismo.
+
+Cómo trabaja el usuario:
+
+- Escribe en español, con pedidos cortos.
+- Cuando hay que elegir, prefiere que se le den opciones concretas.
+- Ya autorizó escribir en `msp_app` (cargas en espejo desde Strapi).
+- Cualquier otra escritura (`dbo_stage` de staging, producción) requiere preguntarle.

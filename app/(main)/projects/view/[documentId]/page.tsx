@@ -25,7 +25,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { strapiClient, type StrapiProject } from "@/lib/api/strapi"
+import { type StrapiProject } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useRouter, useParams } from "next/navigation"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { TriangleAlert } from "lucide-react"
@@ -65,7 +66,7 @@ export default function ProjectViewPage() {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await strapiClient.getProjectById(documentId)
+        const data = await dataClient.getProjectById(documentId)
         setProject(data)
       } catch (err) {
         const message = err instanceof Error ? err.message : "No se pudo cargar el proyecto"

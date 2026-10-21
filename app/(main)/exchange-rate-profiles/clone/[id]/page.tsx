@@ -13,7 +13,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { ExchangeRateProfileForm } from "@/components/exchange-rate-profiles/exchange-rate-profile-form"
-import { strapiClient, type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useParams, useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -40,7 +41,7 @@ export default function CloneExchangeRateProfilePage() {
         }
         setIsLoading(true)
         setError(null)
-        const data = await strapiClient.getExchangeRateProfileById(id)
+        const data = await dataClient.getExchangeRateProfileById(id)
         setProfile(data)
       } catch (err) {
         const message = err instanceof Error ? err.message : t("error")

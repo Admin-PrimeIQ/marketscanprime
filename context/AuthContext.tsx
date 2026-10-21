@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { strapiClient, type StrapiUser } from '@/lib/api/strapi'
+import { type StrapiUser } from '@/lib/api/strapi'
+import { dataClient } from '@/lib/api/client'
 import { saveSession, clearSession, getSession, getCurrentUser, isAuthenticated, updateUser, type AuthSession } from '@/lib/auth/auth'
 
 interface AuthContextType {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session && savedUser && isAuthenticated()) {
           // Verificar que el token sigue siendo válido obteniendo el usuario actual
           try {
-            const currentUser = await strapiClient.getMe()
+            const currentUser = await dataClient.getMe()
             setUser(currentUser)
             updateUser(currentUser)
           } catch (error) {
@@ -63,12 +64,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (identifier: string, password: string) => {
     try {
       setIsLoading(true)
-      const authResponse = await strapiClient.login(identifier, password)
+      const authResponse = await dataClient.login(identifier, password)
       
       // Guardar sesión
       saveSession(authResponse)
       // Obtener usuario completo con role (auth/local no devuelve role por defecto)
-      const me = await strapiClient.getMe()
+      const me = await dataClient.getMe()
       setUser(me)
       updateUser(me)
 
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const currentUser = await strapiClient.getMe()
+      const currentUser = await dataClient.getMe()
       setUser(currentUser)
       updateUser(currentUser)
     } catch (error) {

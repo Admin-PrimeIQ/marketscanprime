@@ -30,7 +30,7 @@ import { RunFilesBrowser } from "@/components/sync/run-files-browser"
 import { useAuth } from "@/context/AuthContext"
 import { isStrapiSuperAdmin } from "@/lib/auth/is-strapi-super-admin"
 import { getSession } from "@/lib/auth/auth"
-import { strapiClient } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import type { SyncRunDetail } from "@/lib/sync/runs-api"
 
 const POLL_MS = 5000
@@ -149,7 +149,7 @@ export default function SyncRunDetailPage() {
      */
     const porLegacy = run?.operation === "pull"
 
-    strapiClient
+    dataClient
       .getBlocksLite(
         missing.length <= IN_URL_LIMIT
           ? porLegacy
