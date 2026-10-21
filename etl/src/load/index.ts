@@ -4,7 +4,7 @@ import pg from "pg"
 import { appPoolConfig } from "../app/connection"
 import { BUSINESS_END, BUSINESS_START, isBusinessHours } from "./business-hours"
 import { BUSINESS_HOURS_PAUSE_MS, extract } from "./extract"
-import { applyFormulas, checkUnits, summarizeFormulas, writeFormulaReport, type FormulaReport } from "./formulas"
+import { checkUnits, formulaDiffs, summarizeFormulas, writeFormulaReport, type FormulaReport } from "./formulas"
 import { CATEGORIES } from "./model"
 import { printValidation, printVerify, RunLog, summarizeValidation, writeReportFile, type RunReport } from "./report"
 import { readSnapshot, writeSnapshot, type Snapshot } from "./snapshot"
@@ -17,8 +17,8 @@ import { massDeletions, write } from "./write"
  * ETL de Strapi (MySQL, solo lectura) → `msp_app` (Postgres).
  *
  *   validate  extrae (o reusa un snapshot), valida y transforma; no toca msp_app. Los campos de
- *             fórmula de cada unidad se recalculan con el motor de la hoja (lib/domain/units) y
- *             reemplazan a lo copiado de Strapi; los originales quedan en etl/reports/formulas-*.
+ *             fórmula se copian tal cual de Strapi; el motor de la hoja (lib/domain/units) solo
+ *             los compara y deja las diferencias en etl/reports/formulas-*.
  *   run       además escribe y verifica en UNA transacción: si algo falla, ROLLBACK y no queda
  *             nada de esta corrida. Con --dry-run termina en ROLLBACK aunque todo cuadre.
  *   verify    compara msp_app con un snapshot en una transacción de solo lectura.
@@ -183,13 +183,13 @@ async function main() {
     console.log(`\nTransformación: ${Object.entries(countRows(data)).map(([t, n]) => `${t} ${n}`).join(", ")}`)
 
     const checks = checkUnits(data)
-    const files = writeFormulaReport(summarizeFormulas(checks, snapshot.meta.name), checks)
-    report.formulas = { ...applyFormulas(checks), report: files.json, csv: files.csv }
-    const kept = Object.values(report.formulas.keptNull).reduce((a, b) => a + b, 0)
+    const summary = summarizeFormulas(checks, snapshot.meta.name)
+    const files = writeFormulaReport(summary, checks)
+    report.formulas = { ...formulaDiffs(summary), report: files.json, csv: files.csv }
     console.log(
-      `Fórmulas: ${report.formulas.units.toLocaleString("es-GT")} unidades con valores recalculados ` +
-        `(${Object.entries(report.formulas.replaced).map(([f, n]) => `${f} ${n}`).join(", ")}); ` +
-        `${kept.toLocaleString("es-GT")} vacíos de Strapi se dejan vacíos. Originales: ${files.csv}`,
+      `Fórmulas (solo reporte; se carga lo que trae Strapi): ${report.formulas.units.toLocaleString("es-GT")} unidades ` +
+        `difieren del motor de la hoja (${Object.entries(report.formulas.byField).map(([f, n]) => `${f} ${n}`).join(", ")}). ` +
+        `Detalle: ${files.csv}`,
     )
     if (command === "validate") {
       await finish("validated", "Sin incidencias bloqueantes; no se escribió nada en msp_app")

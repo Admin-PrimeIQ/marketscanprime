@@ -1,4 +1,5 @@
 import pg from "pg"
+import { WAREHOUSE_TABLES } from "../db/warehouse-tables"
 import { stageClientConfig } from "./connection"
 
 /**
@@ -8,22 +9,6 @@ import { stageClientConfig } from "./connection"
  * tablas hay. Sirve para saber, antes de leer datos, si la base es el `dbo` de producción
  * (compartido con otros proyectos) o una base propia de la migración.
  */
-
-// Las 11 tablas que el push de n8n (Sync Block Worker) escribe en el dbo_stage de MySQL.
-const WAREHOUSE_TABLES = [
-  "housing_universe",
-  "housing_units",
-  "housing_amenities",
-  "housing_services",
-  "banking_info",
-  "office_universe",
-  "office_units",
-  "office_amenities",
-  "industrial_universe",
-  "industrial_units",
-  "industrial_amenities",
-]
-
 async function main() {
   const client = new pg.Client(stageClientConfig())
   const started = Date.now()

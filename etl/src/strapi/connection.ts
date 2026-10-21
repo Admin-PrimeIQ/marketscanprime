@@ -12,6 +12,15 @@ export interface StrapiDbEnv {
   password: string
 }
 
+export function rejectStrapiAppUser(variable: string, user: string) {
+  if (user.toLowerCase().startsWith(STRAPI_APP_USER_PREFIX)) {
+    throw new Error(
+      `${variable} parece el usuario de Strapi («${STRAPI_APP_USER_PREFIX}…»), que tiene escritura. ` +
+        "Usa un usuario con solo SELECT (p. ej. msp_readonly).",
+    )
+  }
+}
+
 export function readStrapiDbEnv(): StrapiDbEnv {
   const required = {
     DATABASE_HOST_STRAPI: process.env.DATABASE_HOST_STRAPI,
@@ -27,12 +36,7 @@ export function readStrapiDbEnv(): StrapiDbEnv {
   }
 
   const user = required.DATABASE_USER_STRAPI!.trim()
-  if (user.toLowerCase().startsWith(STRAPI_APP_USER_PREFIX)) {
-    throw new Error(
-      `DATABASE_USER_STRAPI parece el usuario de Strapi («${STRAPI_APP_USER_PREFIX}…»), que tiene escritura. ` +
-        "Usa un usuario con solo SELECT (p. ej. msp_readonly).",
-    )
-  }
+  rejectStrapiAppUser("DATABASE_USER_STRAPI", user)
 
   return {
     host: required.DATABASE_HOST_STRAPI!.trim(),

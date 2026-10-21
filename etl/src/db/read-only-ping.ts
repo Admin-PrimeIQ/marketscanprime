@@ -17,9 +17,17 @@ function privilegesOf(grant: string): string[] {
 }
 
 export interface PingSample {
+  /** Tabla o `base.tabla`. */
   table: string
   /** Conteo del manual, solo de referencia. */
-  expected: number
+  expected?: number
+}
+
+function quoteTable(table: string): string {
+  return table
+    .split(".")
+    .map((part) => `\`${part}\``)
+    .join(".")
 }
 
 export async function pingReadOnly(connectionConfig: ConnectionConfig, sample: PingSample): Promise<boolean> {
@@ -48,8 +56,9 @@ export async function pingReadOnly(connectionConfig: ConnectionConfig, sample: P
     }
 
     try {
-      const [row] = await conn.query(`SELECT COUNT(*) AS n FROM \`${sample.table}\``)
-      console.log(`\nprueba de lectura: ${sample.table} = ${Number(row.n)} filas (manual: ${sample.expected.toLocaleString("en-US")})`)
+      const [row] = await conn.query(`SELECT COUNT(*) AS n FROM ${quoteTable(sample.table)}`)
+      const reference = sample.expected === undefined ? "" : ` (manual: ${sample.expected.toLocaleString("en-US")})`
+      console.log(`\nprueba de lectura: ${sample.table} = ${Number(row.n)} filas${reference}`)
     } catch (error) {
       console.log(`\nprueba de lectura: no se pudo contar ${sample.table} (${(error as Error).message.split("\n")[0]})`)
     }

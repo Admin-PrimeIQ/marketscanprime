@@ -3,14 +3,13 @@ import { resolve } from "node:path"
 import { blockFormulaContext, unitVatRates, type BlockFormulaContext, type BlockFormulaInput } from "../../../lib/domain/units/context.ts"
 import { ensureUnitFormulasSynced, RECONCILED_FORMULA_FIELDS } from "../../../lib/domain/units/formulas.ts"
 import { UNDEFINED_PROJECT } from "./model"
-import { numeric } from "./normalize"
 import { REPORTS_DIR } from "./report"
 import type { AppData, AppRow } from "./specs"
 
 /**
  * Fórmulas de unidad: recalcula cada unidad con el mismo motor de la hoja de unidades
- * (`lib/domain/units/`), cuenta dónde lo guardado no coincide y, en la carga, escribe en las filas
- * de `msp_app` el valor recalculado. No abre conexiones ni escribe en ninguna base.
+ * (`lib/domain/units/`) y cuenta dónde lo guardado no coincide. Solo reporta: la carga copia a
+ * `msp_app` los valores tal cual vienen de Strapi. No abre conexiones ni escribe en ninguna base.
  *
  * La diferencia es la misma que la hoja pinta de amarillo al abrir un bloque: más de 0.01 entre lo
  * guardado y lo recalculado. Un campo vacío cuenta como 0, igual que en la hoja.
@@ -201,39 +200,19 @@ export function checkUnits(data: AppData): UnitCheck[] {
   })
 }
 
-export interface FormulaApplied {
-  /** Unidades con al menos un campo reemplazado. */
+export interface FormulaDiffs {
+  /** Unidades con al menos un campo distinto del motor (lo que la hoja pinta de amarillo). */
   units: number
-  /** Valores reemplazados por el recalculado, por campo. */
-  replaced: Partial<Record<FormulaField, number>>
-  /** Diferencias que se dejaron vacías porque Strapi no traía el valor. */
-  keptNull: Partial<Record<FormulaField, number>>
+  /** Unidades con diferencia, por campo (incluye las que Strapi trae vacías). */
+  byField: Partial<Record<FormulaField, number>>
 }
 
-/**
- * Escribe en las filas de `unit` (las mismas de `AppData`, se modifican en su lugar) el valor
- * recalculado de cada campo con diferencia, redondeado a la escala de su columna para que la
- * verificación compare lo mismo que guarda Postgres. Lo que Strapi trae vacío se deja vacío.
- * El valor original queda en el reporte de fórmulas (`stored` en el CSV).
- */
-export function applyFormulas(checks: UnitCheck[]): FormulaApplied {
-  const applied: FormulaApplied = { units: 0, replaced: {}, keptNull: {} }
-  for (const check of checks) {
-    let touched = false
-    for (const d of check.diffs) {
-      const field = d.field as FormulaField
-      if (d.storedNull) {
-        applied.keptNull[field] = (applied.keptNull[field] ?? 0) + 1
-        continue
-      }
-      const { column, scale } = FORMULA_COLUMNS[field]
-      check.unit[column] = numeric(d.expected.toFixed(scale))
-      applied.replaced[field] = (applied.replaced[field] ?? 0) + 1
-      touched = true
-    }
-    if (touched) applied.units++
+export function formulaDiffs(report: FormulaReport): FormulaDiffs {
+  const byField: FormulaDiffs["byField"] = {}
+  for (const [field, stats] of Object.entries(report.byField) as [FormulaField, FieldStats][]) {
+    if (stats.units > 0) byField[field] = stats.units
   }
-  return applied
+  return { units: report.units.withDiffs, byField }
 }
 
 function emptyGroup(): GroupStats {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 import { draft, fixture, published } from "./fixtures"
-import { applyFormulas, checkUnits, FORMULA_COLUMNS, formulaCsv, summarizeFormulas, type FormulaField, type UnitCheck } from "./formulas"
+import { checkUnits, FORMULA_COLUMNS, formulaCsv, formulaDiffs, summarizeFormulas, type FormulaField, type UnitCheck } from "./formulas"
 import { cents, date, float, numeric, timestamp } from "./normalize"
 import { snapshotCountMismatches, STRAPI_TABLES } from "./snapshot"
 import { SPECS, type AppTable } from "./specs"
@@ -333,27 +333,22 @@ describe("reporte de fórmulas", () => {
     assert.deepEqual(checkUnits(data).flatMap((c) => c.diffs), [])
   })
 
-  test("la carga reemplaza lo que difiere, redondeado a la escala de la columna, y deja vacío lo que Strapi no trae", () => {
+  test("comparar no modifica las filas: la carga copia lo que trae Strapi", () => {
     const data = appData()
     const unit = data.unit.find((u) => u.public_id === "unit-1")!
     unit.price_without_vat_usd = "1"
     unit.installment_usd = "1"
-    unit.parking_spaces = "1"
-    unit.parking_size_m2 = "3.3"
+    const before = structuredClone(data.unit)
+
     const checks = checkUnits(data)
-    const before = unitCheck(checks, "unit-1").diffs.find((d) => d.field === "priceWithoutVATUSD")!
+    const fields = unitCheck(checks, "unit-1").diffs.map((d) => d.field)
+    assert.ok(fields.includes("priceWithoutVATUSD") && fields.includes("installmentUSD"))
+    assert.deepEqual(data.unit, before)
 
-    const applied = applyFormulas(checks)
-    assert.equal(unit.price_without_vat_usd, before.expected.toFixed(2).replace(/0+$/, "").replace(/\.$/, ""))
-    assert.equal(unit.parking_size_m2, "12.5")
-    assert.equal(unit.total_size_m2, null)
-    assert.equal(applied.replaced.priceWithoutVATUSD, 1)
-    assert.equal(applied.replaced.installmentUSD, 1)
-    assert.ok((applied.keptNull.totalSizeM2 ?? 0) >= 1)
-    assert.equal(applied.units, 1)
-
-    const again = checkUnits(data).flatMap((c) => c.diffs)
-    assert.ok(again.every((d) => d.storedNull), "solo quedan las diferencias contra vacíos")
+    const diffs = formulaDiffs(summarizeFormulas(checks, "prueba"))
+    assert.ok(diffs.units >= 1)
+    assert.ok((diffs.byField.priceWithoutVATUSD ?? 0) >= 1)
+    assert.ok((diffs.byField.installmentUSD ?? 0) >= 1)
   })
 
   test("vertical suma el balcón de la fila hija al habitable", () => {
