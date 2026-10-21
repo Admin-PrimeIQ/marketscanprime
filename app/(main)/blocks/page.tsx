@@ -17,7 +17,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { TourGuide } from "@/components/tour/tour-guide"
 import { useTour } from "@/hooks/use-tour"
 import { getBlocksTourSteps } from "@/components/tour/tour-steps"

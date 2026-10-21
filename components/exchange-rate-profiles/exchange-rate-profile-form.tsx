@@ -23,7 +23,7 @@ import {
   type StrapiProject,
   type BlockDomain,
 } from "@/lib/api/strapi"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { CurrenciesTab } from "@/components/projects/form-tabs/currencies-tab"
 import { CountryPill } from "@/components/ui/country-pill"
 import { toast } from "@/hooks/use-toast"

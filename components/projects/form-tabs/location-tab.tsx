@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/command"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { departmentsForIso, municipalitiesForIso } from "@/lib/geo"
+import { departmentsForIso, municipalitiesForIso } from "@/lib/domain/geo"
 
 interface LocationTabProps {
   initialData?: Partial<StrapiProject>

@@ -380,7 +380,7 @@ model UnitTopography {
   @@map("unit_topography")
 }
 
-/// Venta / Renta de la unidad: decide el IVA (lib/units/formulas.ts).
+/// Venta / Renta de la unidad: decide el IVA (lib/domain/units/formulas.ts).
 model UnitUsage {
   id          Int      @id @default(autoincrement())
   publicId    String   @unique @default(cuid()) @map("public_id")

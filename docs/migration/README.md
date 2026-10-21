@@ -20,9 +20,9 @@ Reglas que aplican siempre:
 
 ---
 
-Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 y 16 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
+Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 19 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Para retomar rápido:** lee la sección 0, luego la §6 (estado), la §11 (el Postgres de staging, donde ocurre todo lo nuevo) y la §8 (próximos pasos). Después corre, desde `etl/`, los chequeos de solo lectura de la §6.1 para confirmar que el estado sigue igual.
+**Para retomar rápido:** lee la sección 0, luego la §6 (estado), la §12 (el ETL Strapi → `msp_app`, lo último que se hizo), la §11 (el Postgres de staging, donde ocurre todo lo nuevo) y la §8 (próximos pasos). Después corre, desde `etl/`, los chequeos de solo lectura de la §6.1 para confirmar que el estado sigue igual.
 
 ---
 
@@ -42,7 +42,7 @@ El sistema completo está documentado en [`docs/manual-del-sistema.md`](../manua
 | Reglas de negocio | 7802–7842 |
 | Variables de entorno | 7843–7890 |
 
-También: [`CLAUDE.md`](../../CLAUDE.md) (arquitectura del backoffice) y [`.migration/README.md`](../../.migration/README.md) (CLI que recalcula fórmulas de unidades vía API de Strapi).
+También: [`CLAUDE.md`](../../CLAUDE.md) (arquitectura del backoffice) y [`.migration/README.md`](../../.migration/README.md) (CLI que recalculaba fórmulas de unidades vía API de Strapi; congelado desde el 11 sep 2026, su copia del motor es vieja y ya no es contrato de paridad).
 
 ---
 
@@ -132,7 +132,7 @@ Inventario completo con columnas y tipos en el manual (líneas 1571–1662). Con
 - **`document_id`** es el identificador estable. **Conservarlo:** los bloques creados en el backoffice se enlazan con el warehouse por `cod_proyecto = documentId`; los que vinieron del warehouse, por `cod_proyecto = legacyId`. Las unidades se enlazan por `legacyId = housing_units.id`.
 - `uid` (`code`) no tiene índice único en MySQL; los enums se guardan como `varchar`.
 - Verificar **draft & publish**: si alguna colección lo tiene activo, un documento puede tener dos filas (borrador y publicado). Filtrar por `published_at IS NOT NULL` y comprobar unicidad de `document_id`.
-- Datos huérfanos conocidos: ~673 unidades sin bloque (238,177 vs 237,504 vínculos), 2 proyectos sin país (las fórmulas usan GT por defecto), solo ~130 mil unidades con `unitType`.
+- Datos huérfanos conocidos: ~673 unidades sin bloque según el manual (238,177 vs 237,504 vínculos), 2 proyectos sin país (las fórmulas usan GT por defecto), solo ~130 mil unidades con `unitType`. Conteo real del ETL sobre filas publicadas (snapshot del 16 oct): **620 unidades sin bloque, 2 bloques sin proyecto, 42 unidades con `code` repetido** (§12.5).
 
 ---
 
@@ -162,7 +162,7 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 
 ## 6. Estado actual del trabajo
 
-Al 16 oct 2026. Todo está commiteado en `main` (último commit `d7045a6`). **No se ha hecho `git push`** de este trabajo por parte del agente; no hacerlo sin pedido explícito.
+Al 19 oct 2026. Todo está commiteado en `main` y `main` coincide con `origin/main` (último commit `fa54fe4`, subido por el usuario). El agente **no hace `git push`** sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -173,7 +173,7 @@ Al 16 oct 2026. Todo está commiteado en `main` (último commit `d7045a6`). **No
 | Conexión al Postgres de staging | TLS 1.3 con la raíz de Railway fijada en `etl/certs/dbo-stage-ca.pem`; sesión de solo lectura para `dbo_stage`. Ver §11.1. |
 | **Fase 2: esquema de la app** | `prisma/schema.prisma` (29 modelos, 30 tablas con `_prisma_migrations`) y la migración `prisma/migrations/20261015210000_init`, aplicada en `msp_app` el 15 oct 2026. `migrate status`: al día; `migrate diff` contra la base: sin diferencias. Tablas vacías. Se opera desde `etl/` con `npm run app:*` (ver `etl/README.md`). |
 | Revisión del warehouse en Postgres | 15–16 oct: comparadas las tablas del push de n8n contra el servidor de staging. Resultado en §11.3 y §11.4. |
-| **Fase 3: ETL Strapi → `msp_app`** | 16 oct: escrito en `etl/src/load/` (`npm run load:validate` / `load` / `load:verify`; ver `etl/README.md` → «Carga Strapi → msp_app»). Fuente: el RDS (`strapi`), solo lectura. Política acordada con el usuario: ante cualquier incidencia no se escribe nada y se reporta qué y por qué; si algo falla durante la carga o la verificación, ROLLBACK completo. `--allow <categoría>` excluye las filas afectadas y sus dependientes. Decisión del usuario (19 oct): unidades sin bloque y bloques sin proyecto van a un padre «No definido» y los `code` repetidos se cargan vacíos, todo reportado como advertencia. 33 pruebas con snapshot sintético pasan. Snapshot completo del RDS leído (16 oct): 664 advertencias, 0 bloqueantes; dry-run sin `--allow` con verificación 25/25 tablas, 19/19 relaciones, 1/1 agregados y ROLLBACK. **19 oct: primera carga real (COMMIT) en `msp_app` con el snapshot del 16 oct**: 1,135 proyectos, 1,688 bloques, 238,226 unidades, 17 usuarios (incluye los padres «No definido»); `load:verify` posterior OK. Migración `20261016120000_etl_run` aplicada (bitácora en `msp_app.etl_run`). |
+| **Fase 3: ETL Strapi → `msp_app`** | **Carga inicial hecha** (19 oct, COMMIT) con el snapshot del RDS del 16 oct 22:21: 1,135 proyectos, 1,688 bloques, 238,226 unidades, 17 usuarios, catálogos, perfiles, financiamiento y tasas (los totales incluyen los padres «No definido»). Verificación antes del COMMIT y `load:verify` posterior: 25/25 tablas, 19/19 relaciones, 1/1 agregados. 0 filas excluidas; 664 advertencias. Migración `20261016120000_etl_run` aplicada (bitácora en `msp_app.etl_run`). Idempotencia comprobada el 19 oct: un `--dry-run` con el mismo snapshot dio 0 filas nuevas, 0 cambiadas y 0 borradas en las 25 tablas. Reporte de diferencias de fórmulas hecho el 19 oct (§12.8): 52 % de las unidades difiere del motor en al menos un campo, casi todo por reglas distintas en períodos viejos. Desde el 19 oct la carga guarda el valor recalculado (123,442 unidades cambiadas, COMMIT y `load:verify` 25/25). Falta refrescar con un snapshot nuevo. Detalle completo en la §12. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -182,10 +182,12 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | Comando | Qué debe dar hoy |
 |---|---|
 | `npm run strapi:check` | 52 modelos sin ERROR, 0 borradores. Correr fuera de horas pico si es posible (lee la base de producción, pool ≤ 2). |
-| `npm run stage:ping` | Usuario `j_stage_admin`; esquemas `dbo` (11 tablas, sin acceso), `dbo_stage` (16 tablas, lectura y escritura), `msp_app` (30, dueño), `public` (0); las 11 tablas del push presentes en `dbo` y `dbo_stage`. |
+| `npm run stage:ping` | Usuario `j_stage_admin`; esquemas `dbo` (11 tablas, sin acceso), `dbo_stage` (16 tablas, lectura y escritura), `msp_app` (31 con `etl_run`, dueño), `public` (0); las 11 tablas del push presentes en `dbo` y `dbo_stage`. |
 | `npm run stage:describe` | Estructura de `dbo_stage`; `-- --schema dbo` para el otro esquema. Las 11 tablas del warehouse con `vivas≈0 insertadas=0`. |
-| `npm run app:status` | "Database schema is up to date!" |
-| `npm run app:ping` | `current_schema = msp_app`, conteos en 0 (hasta que empiece la Fase 3). |
+| `npm run app:status` | "Database schema is up to date!" (2 migraciones: `init` y `etl_run`). |
+| `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 19 oct (unidades 238,226, bloques 1,688, proyectos 1,135, usuarios 17). |
+| `npm test` | 48 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre las del motor de fórmulas en `lib/domain/`. |
+| `npm run load:verify -- --snapshot 20261016-222126-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
 
 ---
 
@@ -217,13 +219,13 @@ Reglas:
 
 El plan completo por fases (decisiones, esquema nuevo, carga, push, app, workers, corte y limpieza) está en [`ROADMAP.md`](./ROADMAP.md). Sus casillas de la Fase 1 siguen sin marcar aunque la fase está terminada (ver §6); la Fase 2 sí está marcada.
 
-Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3).
+Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3), ~~carga inicial Strapi → `msp_app`~~ (Fase 3, §12), ~~`lib/domain/` con el motor de fórmulas y su contexto de bloque~~ (19 oct), ~~reporte de diferencias de fórmulas~~ (§12.8).
 
 Lo inmediato:
 
-1. **Aclarar con el usuario** (16 oct dijo: "ya tengo la base de strapi en mi db"). En el catálogo verificado solo aparecen las 11 tablas del warehouse **vacías** en `dbo_stage` y `dbo`; no se ve una copia de las tablas de Strapi en el servidor de staging. Preguntar dónde quedó esa base (¿otro servidor o base?, ¿qué variable del `.env`?) y si reemplaza a la lectura del RDS para la Fase 3. **No leer el `.env` para averiguarlo**: preguntar.
-2. **Confirmar el destino de escritura** (decisión 9): si el ETL/push nuevo escribe en `dbo_stage` de staging y con qué usuario. Si sí, crear su cliente Prisma **sin migraciones** (introspección con `db pull --print` y esquema a mano, como el de Strapi; nunca `migrate`/`db push` sobre `dbo_stage`), con una conexión de escritura separada de la de solo lectura.
-3. **Fase 3, refrescar la carga** (primera carga hecha el 19 oct con el snapshot del 16 oct, ver §6). Fuera de 7:00–19:00 (UTC-6): `npm run load` (lee un snapshot nuevo y carga en espejo), o `npm run load -- --dry-run` primero. Pendiente de la Fase 3: el reporte de diferencias de fórmulas (recalcular con `lib/domain` y comparar con lo guardado).
+1. **Refrescar la carga de la Fase 3.** `msp_app` refleja Strapi al 16 oct 22:21. Desde `etl/`, **fuera de 7:00–19:00 (UTC-6)**: `npm run load -- --dry-run` (lee un snapshot nuevo del RDS, carga y hace ROLLBACK), y si cuadra, `npm run load -- --snapshot <el que acaba de crear>` para el COMMIT sin volver a leer el RDS. Es idempotente: solo inserta, actualiza o borra lo que cambió. El usuario ya autorizó esta carga en espejo hacia `msp_app`; avisarle del resultado.
+2. **Confirmar en el warehouse el origen de las diferencias de fórmulas** (§12.8). El warehouse MySQL está en el mismo RDS que `strapi` (bases `dbo_stage` y `dbo`), pero `j_stage_admin` solo tiene `SELECT` sobre `strapi`. Hace falta que un administrador ejecute `GRANT SELECT, SHOW VIEW ON dbo_stage.* TO j_stage_admin` (no lo hace el agente). Con eso: correr `strapi:ping` para confirmar que sigue siendo solo lectura, y comparar `housing_units.cuota` de unos bloques de Interior 2026 y lotes 2024–2025 contra lo que tenía Strapi.
+3. **Confirmar el destino de escritura** (decisión 9): si el ETL/push nuevo escribe en `dbo_stage` de staging y con qué usuario. Si sí, crear su cliente Prisma **sin migraciones** (introspección con `db pull --print` y esquema a mano, como el de Strapi; nunca `migrate`/`db push` sobre `dbo_stage`), con una conexión de escritura separada de la de solo lectura.
 4. Revisar en el repo `n8n-manager` el workflow **Sync Block Worker** (`yBuM3XVk36DwRgbs`): cómo inserta en `housing_units`, si manda `id` explícito (choca con `IDENTITY ALWAYS`, §11.4) y si devuelve el ID nuevo a Strapi. Define cómo asignar `legacyId` a unidades nuevas.
 5. **Fase 4:** mapeador puro bloque + unidades → filas del warehouse, con prueba de paridad contra lo que n8n dejó en el `dbo_stage` de MySQL (requiere una forma de leerlo: hoy no hay conexión a MySQL `dbo_stage`).
 6. Workers BullMQ en Railway: contadores de bloque (debounce por `jobId`), tipo de cambio Banguat (repetitivo cada 6 h), sincronización hacia `dbo_stage`.
@@ -232,7 +234,8 @@ Lo inmediato:
 
 ## 9. Preguntas abiertas
 
-- ¿Dónde está "la base de Strapi en mi db" que mencionó el usuario el 16 oct, y se usa como fuente de la Fase 3 en lugar del RDS?
+- ~~¿Dónde está "la base de Strapi en mi db" (16 oct) y se usa como fuente de la Fase 3?~~ Resuelto el 16 oct: el usuario eligió el **RDS** (`strapi`, solo lectura) como fuente del ETL.
+- ¿Quién corrige en Strapi los datos que el ETL cargó con parche (§12.5): las 620 unidades sin bloque, los 2 bloques de El Paraíso Fase 2 sin proyecto y las 42 unidades con `code` repetido? ¿Y qué hace la app nueva con los padres «No definido» (ocultarlos, una pantalla para reasignar)? Mientras no se corrija en Strapi, cada carga los vuelve a dejar igual.
 - ¿El `dbo_stage` del Postgres de staging es el destino del ETL/push nuevo? ¿Para qué es el esquema `dbo` de ese mismo servidor (sin acceso para `j_stage_admin`)? ¿Las 5 tablas `sec_*` (mercado secundario) entran al alcance de la migración?
 - `dbo_stage` de staging no tiene las 3 llaves foráneas unidades → universo que sí tiene `dbo` (§11.4). ¿Es intencional?
 - ¿`dbo` en MySQL y `dbo` en Postgres de producción son realmente idénticos? ¿Y el `dbo_stage` de MySQL tiene la misma estructura que `dbo`?
@@ -246,7 +249,7 @@ Lo inmediato:
 
 ## 10. Hallazgos a tener en cuenta
 
-- **IVA "Venta" (0.916):** el manual dice "dividir entre 0.916", pero el código **multiplica** cuando la tasa es menor que 1 (`lib/units/formulas.ts`, `removeVat`). Desde v1.25.0 la tasa depende de la operación: venta 0.916, renta ÷1.12, mantenimiento sigue al uso.
+- **IVA "Venta" (0.916):** el manual dice "dividir entre 0.916", pero el código **multiplica** cuando la tasa es menor que 1 (`lib/domain/units/formulas.ts`, `removeVat`). Desde v1.25.0 la tasa depende de la operación: venta 0.916, renta ÷1.12, mantenimiento sigue al uso.
 - Webhooks de n8n sin autenticación: Block Edit Queue, Chat Sessions API y el Chat Trigger del Copilot.
 - La conexión de Strapi a MySQL usa SSL sin validar el certificado (`DATABASE_SSL_REJECT_UNAUTHORIZED=false`).
 - El pull de n8n no tiene reversa y borra del CRM las unidades que no estén en el warehouse.
@@ -272,12 +275,12 @@ Servidor de la migración. Base `railway`, Postgres 18.6. Conexión `DATABASE_UR
 
 | Esquema | Dueño | Contenido | `j_stage_admin` |
 |---|---|---|---|
-| `msp_app` | `j_stage_admin` | App nueva: 29 modelos + `_prisma_migrations`, vacías. **Único destino de migraciones de Prisma.** | Dueño |
+| `msp_app` | `j_stage_admin` | App nueva: 30 modelos (incluye `etl_run`) + `_prisma_migrations`, con los datos de la carga del 19 oct (§12). **Único destino de migraciones de Prisma.** | Dueño |
 | `dbo_stage` | `postgres` | 5 tablas `sec_*` (mercado secundario, con datos) + 11 tablas del warehouse (vacías) | Lectura y escritura |
 | `dbo` | `postgres` | 11 tablas del warehouse (vacías) | Sin acceso (ni `USAGE`) |
 | `public` | `pg_database_owner` | Vacío | Uso |
 
-El agente **no creó ningún esquema**: `msp_app` lo creó el usuario/administrador, y las tablas de `dbo` y del warehouse en `dbo_stage` también. El agente solo creó las tablas de `msp_app` con la migración de Prisma.
+El agente **no creó ningún esquema**: `msp_app` lo creó el usuario/administrador, y las tablas de `dbo` y del warehouse en `dbo_stage` también. El agente solo creó las tablas de `msp_app` con las migraciones de Prisma (`init` el 15 oct, `etl_run` el 19 oct) y las llenó con el ETL.
 
 ### 11.3 Tablas del push de n8n: están todas
 
@@ -313,3 +316,94 @@ Valores reales de Strapi usados para los enums de `msp_app` (leídos el 15 oct c
 - Migraciones de Prisma **solo** en `msp_app` (`npm run app:deploy`). El SQL de una migración nueva no debe mencionar `dbo_stage` ni `dbo` ni crear esquemas.
 - `dbo_stage` y `dbo`: no crear, alterar ni borrar nada desde el agente. Escribir datos en `dbo_stage` solo cuando el usuario lo confirme (decisión 9).
 - Nunca `migrate reset`, `db push` ni `db pull` sin `--print` contra este servidor.
+
+---
+
+## 12. Fase 3: el ETL Strapi → `msp_app` (para retomar)
+
+Código en `etl/src/load/`; uso detallado en [`etl/README.md`](../../etl/README.md) → «Carga Strapi → msp_app». Se escribió el 16 oct y se ajustó hasta la carga real del 19 oct. El usuario pidió que fuera **mantenible porque se seguirá actualizando**, y que se cuidaran en especial las relaciones: que lo insertado tenga sentido con lo que hay en Strapi.
+
+### 12.1 Decisiones del usuario (no cambiarlas sin preguntarle)
+
+| Fecha | Decisión | Cómo quedó en el código |
+|---|---|---|
+| 16 oct | Fuente: el **RDS** (`strapi`), solo lectura. | `extract.ts` con el cliente de solo lectura de la §7. |
+| 16 oct | Ante conflictos: *"crealo como un trigger que si falla venga y me reporte el error y porque y quite los datos que ya se transfirieron esto para que la transferencia sea limpia y que las relaciones sean claras"*. | Una sola transacción. Si hay una incidencia fatal, no se escribe nada; si algo falla al escribir o verificar, ROLLBACK completo. El motivo queda en consola, en el reporte JSON y en `etl_run`. |
+| 19 oct | Permitir la lectura del RDS en horario laboral cuando él lo decida. | Flag `--allow-business-hours` (más lento: 500 ms entre lotes). Sin el flag, la lectura completa entre 7:00 y 19:00 se rechaza. |
+| 19 oct | *"a los que no tienen relacion pero es obligatorio crea un campo llamado no definido, y con codigo repetido Cargar con el código vacío y reportar"*. | Unidad sin bloque → bloque «No definido» de su tipo; bloque sin proyecto → proyecto «No definido»; `code` repetido → NULL en **todas** las copias. Las tres son advertencias (no bloquean) y quedan en el reporte. |
+| 19 oct | Carga real ya con el snapshot del 16 oct, refrescar después con uno nuevo leído de noche. | Hecho; el refresco está pendiente (§8). |
+| 19 oct | Campos de fórmula: cargar en `msp_app` el valor recalculado con la fórmula de la hoja y dejar el original de Strapi en el reporte. Lo que Strapi no trae (vacío) queda vacío. | `applyFormulas()` en `formulas.ts`, en `validate`, `run` y `verify`. Solo reemplaza lo que la hoja marcaría en amarillo (diferencia > 0.01). Originales en `etl/reports/formulas-<fecha>.csv` (columna `_stored`). Cargado con COMMIT el 19 oct: 123,442 unidades cambiadas. |
+
+### 12.2 Cómo se corre
+
+Siempre desde `etl/` (desde la raíz el script no existe):
+
+| Comando | Qué hace |
+|---|---|
+| `npm run load:validate` | Extrae y valida; no escribe en `msp_app`. |
+| `npm run load -- --dry-run` | Extrae, valida, escribe, verifica y hace ROLLBACK. |
+| `npm run load` | Igual, pero con COMMIT si todo cuadra. |
+| `npm run load:verify` | Compara `msp_app` contra Strapi sin escribir. |
+| `npm run load:formulas -- --snapshot <nombre>` | Recalcula las unidades con el motor de la hoja y reporta diferencias (§12.8). No abre conexión a `msp_app`. |
+| `npm test` | 48 pruebas con snapshot sintético (`fixtures.ts`). |
+
+Flags: `--snapshot <nombre>` reusa `etl/.snapshots/<nombre>` y **no lee el RDS** (vale a cualquier hora); `--sample <doc,doc>` solo esos bloques y sus unidades (siempre dry-run); `--allow <cat,cat>` acepta categorías fatales excluyendo la fila y sus dependientes; `--dry-run`; `--allow-business-hours`; `--allow-mass-delete` (ver el freno en §12.3, paso 4). **Sin `--snapshot`, cualquiera de los comandos lee las 52 tablas del RDS de producción** (~12 min): hacerlo de noche.
+
+Snapshot actual: `20261016-222126-full` (solo en la máquina del usuario). Los reportes quedan en `etl/reports/<fecha>-<id>.json` con cada incidencia (tabla, id, `document_id`, motivo).
+
+### 12.3 Cómo funciona
+
+1. **Extracción** (`extract.ts`, `snapshot.ts`): 52 tablas por lotes de 2,000 con cursor por `id`, pool ≤ 2, a NDJSON en `etl/.snapshots/`.
+2. **Validación** (`validate.ts`, categorías en `model.ts` → `CATEGORIES` / `WARNING_CATEGORIES`): elige la única fila publicada de cada `document_id` (draft & publish) y resuelve cada `_lnk` y `_cmps`. Fatales: `documento-sin-id`, `documento-duplicado`, `sin-publicar`, `campo-obligatorio-vacio`, `enum-desconocido`, `iso-duplicado`, `usuario-duplicado`, `relacion-ambigua`, `relacion-rota`, `rol-invalido`, `componente-desconocido`, `tipo-unidad-multiple`, `tipo-unidad-roto`, `financiamiento-multiple`, `financiamiento-roto`, `moneda-rota`. Advertencias: `unidad-sin-bloque`, `bloque-sin-proyecto`, `codigo-duplicado` (decisión del 19 oct), `tipo-unidad-distinto-al-bloque` y `componente-compartido`.
+3. **Transformación** (`transform/*.ts`): funciones puras por dominio que devuelven filas con los nombres de columna de `msp_app` (`specs.ts` define las 25 tablas, columnas, tipos, clave y únicos). Las relaciones se expresan por `public_id` (= `document_id` de Strapi) del padre, nunca por `id` numérico. Después, los campos de fórmula de cada unidad se recalculan con el motor de la hoja y el valor recalculado reemplaza al de Strapi cuando difiere (decisión del 19 oct, §12.8).
+4. **Escritura** (`write.ts`): una transacción con `pg_try_advisory_xact_lock` (no corren dos cargas a la vez), upsert por `public_id` en orden de dependencias y lotes de 2,000, liberación previa de únicos (`code`, `username`, `email`) para permitir intercambios, reemplazo de hijas (financiamiento, tasas, monedas, tipos de unidad, amenidades, servicios) y **prune espejo**: lo que ya no está publicado en Strapi se borra de `msp_app`. **Freno** (19 oct, `massDeletions()`): si una tabla quedaría vacía o perdería más del 5 % y más de 50 filas, ROLLBACK salvo `--allow-mass-delete`. Además, `readSnapshot` rechaza un snapshot cuyas filas no coincidan con los conteos de su `meta.json`.
+5. **Verificación** (`verify.ts`), antes del COMMIT: cada tabla columna por columna contra la transformación; las 19 relaciones recalculadas **por separado** desde el snapshot crudo (no reusa la lógica de `validate.ts`) y comparadas con JOINs en `msp_app`; por bloque, número de unidades y suma de `total_price_usd` en centavos. Cualquier diferencia → ROLLBACK.
+6. **Reporte** (`report.ts`): consola, JSON en `etl/reports/` y fila en `msp_app.etl_run` por una conexión aparte (sobrevive al ROLLBACK). Estados: `running`, `validated`, `committed`, `rolled_back`, `aborted`, `failed`.
+
+### 12.4 Los padres «No definido» y los códigos vacíos
+
+- Proyecto `public_id = 'etl-no-definido'` y bloques `etl-no-definido-housing|office|industrial` (`model.ts`: `UNDEFINED_PROJECT`, `undefinedBlock()`), todos con `name = 'No definido'` y el resto de columnas en NULL. Una unidad sin `unitType` va al de `housing`. Solo se crean si hay huérfanos; con los datos actuales existen el proyecto y el bloque `housing`.
+- `verify.ts` calcula por su cuenta, desde el snapshot crudo, qué filas deben caer en ellos (`undefinedParents()`), así que una asignación equivocada hace fallar la carga.
+- Si en Strapi se corrige un huérfano, la siguiente carga lo mueve a su padre real; si un «No definido» queda sin hijos, el prune lo borra.
+- El `code` repetido se vacía en todas las copias porque no hay forma confiable de saber cuál es la buena. Cuando en Strapi deje de repetirse, la siguiente carga lo llena.
+
+### 12.5 Datos reales (snapshot del 16 oct)
+
+664 advertencias, 0 fatales, 0 filas excluidas:
+
+- **620 unidades sin bloque:** sin ningún vínculo en `units_block_lnk`. Por proyecto de origen (según su `code`): Vía al Valle 114, Castitell Torre 2 98, Terra Alta 70, El Paraíso Fase 2 53, Bella Fe 27, y otros. Parecen restos de reimportaciones.
+- **2 bloques sin proyecto:** El Paraíso Fase 2 Sector 1 (id 3529, 53 unidades) y Sector 2 (id 3548, 82 unidades), editados en octubre.
+- **42 unidades con `code` repetido:** copias exactas (Cittah, La Cascada, San Andrés, Camantulul, Puerta del Istmo) y oficinas distintas con el mismo código (Petapolis Oficinas Torre C).
+
+### 12.6 Para extender el ETL
+
+- **Columna nueva:** agregarla a `prisma/schema.prisma` y crear la migración (receta en `etl/README.md`; aplicar con `npm run app:deploy` solo en `msp_app` y con confirmación del usuario), luego a `specs.ts` y al mapeador de `transform/`. La verificación por tabla la cubre sola.
+- **Relación nueva:** además, agregarla a `LINKS` o `SET_LINKS` en `verify.ts` para que se compare contra el `_lnk` crudo.
+- **Categoría de incidencia nueva:** `model.ts` (`CATEGORIES`, y `WARNING_CATEGORIES` si no debe bloquear) y una prueba en `load.test.ts`.
+- Después: `npm test`, `npx tsc --noEmit`, `npm run load -- --snapshot <nombre> --dry-run` y `graphify update .` desde la raíz.
+
+### 12.7 Trampas conocidas
+
+- `prisma migrate diff` no imprime nada en PowerShell: correrlo con `cmd /c` y `--config prisma.app.config.ts`, redirigiendo la salida con `>` (no `Out-File`, que cambia la codificación).
+- El revisor automático bloquea comandos que combinan `Remove-Item -Recurse -Force` con otros: borrar carpetas temporales en un comando aparte.
+- `npm` muestra el aviso `Unknown env config "devdir"`: es del entorno del usuario, no afecta.
+- `lib/domain/` se importa desde `etl/` con extensión `.ts` (`allowImportingTsExtensions` en `etl/tsconfig.json`). Esos archivos no pueden usar alias `@/` ni importar React: el ETL no los resolvería.
+- La Fase 1 contó 238,880 unidades (15 oct, §6) y el ETL cargó 238,226. No es pérdida del ETL: el snapshot guarda la tabla `units` completa, sin filtrar, y el 16 oct tenía 238,226 filas, todas publicadas. La diferencia (654) ocurrió en Strapi entre las dos lecturas (probablemente borrados por reimportación). Si importa, confirmarlo con un conteo nuevo.
+
+### 12.8 Reporte de diferencias de fórmulas (19 oct)
+
+`npm run load:formulas -- --snapshot <nombre>` (`etl/src/load/formulas.ts`) genera solo el reporte, sin conectarse a `msp_app`; `validate`, `run` y `verify` lo generan también y además aplican el recálculo. Toma la transformación de la carga, arma cada unidad como la ve la hoja (contexto del bloque con `lib/domain/units/context.ts`: categoría, trimestre, ISO del país, fechas y uso de la unidad) y corre `ensureUnitFormulasSynced`. Una diferencia es lo mismo que la hoja pinta de amarillo al abrir el bloque: más de 0.01 en un campo de `RECONCILED_FORMULA_FIELDS`. Las unidades de padres «No definido» no tienen contexto y se cuentan aparte. Salida: `etl/reports/formulas-<fecha>.json` (totales, por campo con ejemplos, por período y dominio, los 20 bloques con más diferencias) y `.csv` (una fila por unidad con diferencias, guardado y esperado por campo).
+
+Con el snapshot del 16 oct: **237,471 unidades revisadas** (755 sin contexto, 0 sin categoría), **123,446 con diferencias (52 %)**, 114,025 limpias.
+
+| Campo | Unidades | Lo que muestra el CSV |
+|---|---:|---|
+| `incomeUSD` / `installmentUSD` | 97,799 / 91,919 | Interior 2026 (S1, S2): razón fija 0.664 en ~85 mil unidades. Es exacto PMT(7.5 %, 20 años) ÷ PMT(8 %, 10 años), ambos al 90 %: los datos se calcularon con **8 % a 10 años** y la hoja usa 7.5 % a 20. En 2026 T1–T2, razón 0.993. En oficinas e industrial nunca se calculó (vacía). |
+| `maintenancePricePerM2USD` | 37,840 | Razones dispersas (0.90–0.94) en períodos viejos; ya documentado en `formulas.ts`: hasta 2026 2T la captura no seguía una fórmula. 2026 T3 vivienda: 97 % coincide. |
+| `absorptionPerM2` / `unitAbsorption` | 24,911 / 6,984 | Dispersas: dependen de las fechas del bloque (si cambiaron después de calcular) y del tamaño usado. |
+| `priceWithoutVATUSD` / `pricePerM2USD` | 7,689 / 5,855 | 2024–2025 S vivienda: razón fija 0.975 = guardado ×0.916 contra ÷1.12 de la hoja (regla «Interior + Lote → 1.12»). Del resto, la mayoría es redondeo (razón 1.000). |
+| `totalSizeM2`, `habitableConstructionM2`, `unitSizeM2`, `parkingSizeM2`, `rentalPriceWithoutVATUSD` | < 1,500 cada uno | Casos sueltos; la mitad, campos vacíos en la base. |
+
+**De dónde vienen las dos diferencias grandes** (cruzado con `legacy_id` y `updated_at` en el snapshot): las 85,176 cuotas con razón 0.664 son **todas** unidades con `legacy_id`, es decir, importadas del warehouse MySQL. Todas tienen `updated_at` de octubre 2026. Eso coincide con una corrida del pull (workflow «Sync Pull Block Worker», que copia `cuota`/`ingresos` tal cual, §5), pero es una inferencia: el snapshot no dice qué proceso las tocó. Las unidades de Interior 2026 nacidas en el admin coinciden con la hoja en el 99 %. Los lotes de Interior 2024–2025 son todos «Lotes para vivienda», también legacy, con IVA 0.916 y cuota 8 %/10 años (razón 0.647 = 0.975 × 0.664). O sea: el warehouse calculaba Interior con 8 % a 10 años y los lotes con 0.916; el admin (desde junio 2026 como mínimo, ver `CHANGELOG.md` y `.migration/`) usa 7.5 % a 20 años y 1.12, y nunca recalculó lo importado. Falta confirmarlo leyendo `housing_units` del warehouse.
+
+Por período: 2026 T3 vivienda 25 % con diferencias, 2026 S1 vivienda 71 % (la cuota), 2026 T4 oficinas 0 %. **Decisión del usuario (19 oct):** la carga guarda en `msp_app` el valor recalculado y deja el original en el reporte (§12.1). La carga real con COMMIT cambió 123,442 unidades: cuota 91,558, ingreso 97,438, mantenimiento por m² 37,020, absorción por m² 24,904, precio sin IVA 7,684 y el resto en menor número. 2,771 diferencias contra campos vacíos se dejaron vacías. Strapi no cambia: la hoja del admin seguirá marcando esas celdas en amarillo hasta que alguien guarde los bloques.

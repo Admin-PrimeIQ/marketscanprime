@@ -6,6 +6,19 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Las reglas de unidad viven en `lib/domain/` y el ETL las usa para medir diferencias (v1.28.1)
+
+_2026-10-19_
+
+- **Una sola copia del motor de fórmulas**: se movieron a [lib/domain/](lib/domain/) el motor ([formulas.ts](lib/domain/units/formulas.ts)), las varas ([varas.ts](lib/domain/units/varas.ts)), la región GAM / Interior ([region.ts](lib/domain/region.ts)) y los departamentos ([geo.ts](lib/domain/geo.ts)). [lib/constants.ts](lib/constants.ts) y [lib/region.ts](lib/region.ts) los reexportan, así que sus importadores no cambian.
+- **Contexto de bloque compartido**: [context.ts](lib/domain/units/context.ts) decide vertical / lote / tipo industrial por la categoría y las tasas de IVA por uso. Antes esa lógica estaba copiada tres veces (la [página de unidades](app/(main)/units/list/[id]/page.tsx) y dos lugares de la [hoja](components/units/datasheet-units-table.tsx)); ahora las tres llaman a las mismas funciones. Con pruebas.
+- **Renombre**: el antiguo `lib/domain.ts` (etiquetas y colores de dominio para la UI) pasó a [lib/block-domain-ui.ts](lib/block-domain-ui.ts) para no chocar con la carpeta. Se actualizaron sus 6 importadores.
+- **No cambia ningún número**: las fórmulas son las mismas, solo cambian de lugar.
+- **`npm test` en la raíz corre en Windows**: las comillas simples del script llegaban literales a `cmd` y no encontraba ninguna prueba. Ahora corre 74, incluidas las de `lib/domain/units/`.
+- **ETL (`etl/`)**: comando nuevo `npm run load:formulas -- --snapshot <nombre>`, que recalcula cada unidad con este mismo motor y reporta qué campos guardados no coinciden. No toca ninguna base. Con el snapshot del 16 oct, el 52 % de las unidades difiere en al menos un campo; el detalle está en `docs/migration/README.md` §12.8. La carga a `msp_app` (staging) guarda el valor recalculado cuando difiere, y el original queda en el reporte. Strapi no cambia, así que la hoja del admin sigue marcando esas celdas en amarillo. Además, la carga se frena si el espejo fuera a borrar en masa, y rechaza snapshots incompletos.
+- **Documentación**: [CLAUDE.md](CLAUDE.md) ya no describe a `.migration/` como contrato de paridad (está congelado desde el 2026-09-11).
+- **Sin verificar**: el `tsc` de la app no se pudo correr porque la raíz no tiene `node_modules`. `lib/domain/` sí compila en modo estricto.
+
 ## El bloque tiene uso: Venta o Renta (v1.28.0)
 
 _2026-10-14_

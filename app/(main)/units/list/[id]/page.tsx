@@ -21,8 +21,9 @@ import { TourGuide } from "@/components/tour/tour-guide"
 import { useTour } from "@/hooks/use-tour"
 import { getUnitsTableTourSteps } from "@/components/tour/tour-steps"
 import { getBlockRegion, REGION_BADGE_CLASS } from "@/lib/region"
-import { DOMAIN_PILL_CLASS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_PILL_CLASS, domainLabelKey } from "@/lib/block-domain-ui"
 import { BEHAVIOR_BADGE_CLASS, blockBehavior } from "@/lib/block-category"
+import { isLoteCategory, isVerticalCategory } from "@/lib/domain/units/context.ts"
 import { CountryPill } from "@/components/ui/country-pill"
 
 export default function UnitsByBlockPage() {
@@ -68,9 +69,9 @@ export default function UnitsByBlockPage() {
     loadUnits()
   }, [currentBlock])
 
-  const blockCatStr = `${currentBlockInfo?.blockCategory?.name || ""} ${currentBlockInfo?.blockCategory?.code || ""}`.toLowerCase()
-  const blockIsVertical = currentBlockInfo ? (blockCatStr.includes("vertical") || blockCatStr.includes("vert")) : undefined
-  const blockIsLote = currentBlockInfo ? (blockCatStr.includes("lote") || blockCatStr.includes("lot")) : undefined
+  const category = currentBlockInfo?.blockCategory
+  const blockIsVertical = currentBlockInfo ? isVerticalCategory(category?.name, category?.code) : undefined
+  const blockIsLote = currentBlockInfo ? isLoteCategory(category?.name, category?.code) : undefined
 
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">

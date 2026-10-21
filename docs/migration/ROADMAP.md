@@ -61,7 +61,7 @@ n8n solo para el Copilot (mientras se decide su futuro)
 ## 2. Principios para que el repo quede simple
 
 1. **Una sola capa de datos.** Toda lectura/escritura pasa por `lib/db/<dominio>.ts` (Prisma). Nada de `fetch` a APIs propias desde componentes de servidor.
-2. **Reglas de negocio puras y probadas.** Fórmulas, IVA, cuota, varas, región: funciones sin I/O en `lib/domain/`, con pruebas. Una sola copia en todo el repo (hoy hay dos: app y `.migration/`).
+2. **Reglas de negocio puras y probadas.** Fórmulas, IVA, cuota, varas, región: funciones sin I/O en `lib/domain/`, con pruebas. Una sola copia en todo el repo: desde el 19 oct la importan la hoja de unidades y el ETL; `.migration/` queda congelado con una copia vieja que nadie importa.
 3. **Un worker solo si hace falta.** Si algo se puede hacer en la transacción del guardado en menos de un segundo, se hace ahí. Los workers son para trabajo lento, programado o que habla con sistemas externos.
 4. **Escritura validada en el servidor.** Server Actions / Route Handlers con Zod y verificación de sesión y rol en cada uno (no basta el layout).
 5. **El esquema es la documentación.** Llaves foráneas reales, enums de Postgres, índices únicos donde hay unicidad de negocio (`code`, `document_id`).
@@ -145,8 +145,8 @@ Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert
 - [x] Solo filas publicadas. Unidades sin bloque (620) y bloques sin proyecto (2) se cargan en un padre «No definido» (`etl-no-definido`, `etl-no-definido-<domain>`); los `code` repetidos (42) se cargan vacíos. Las tres quedan como advertencias en el reporte.
 - [x] Unidades paginadas por cursor (`id > último`, lotes de ~2,000, pausa entre lotes, pool ≤ 2 conexiones). `units_cmps` se resuelve según `component_type`.
 - [x] Cargas completas **fuera de horario laboral** (la extracción completa se rechaza entre 7:00 y 19:00): la base `strapi` es la misma que usa Strapi en producción.
-- [ ] Al cargar cada unidad, **recalcular** los campos de fórmula con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hoy se copian tal cual.
-- [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados (falta la parte de fórmulas).
+- [x] **Recalcular** los campos de fórmula de cada unidad con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hecho el 19 oct: la carga guarda el valor recalculado cuando difiere (decisión del usuario) y el original de Strapi queda en `etl/reports/formulas-*.csv`; `npm run load:formulas` da solo el reporte. Resultado en `README.md` §12.8.
+- [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados. Las fórmulas van en su propio reporte (`etl/reports/formulas-*.json` y `.csv`) y el resumen de lo reemplazado queda en `etl_run.counts`.
 - [x] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`. Hecho el 19 oct con el snapshot del 16 oct; falta refrescar con un snapshot nuevo leído de noche.
 
 **Hecho cuando:** dos corridas seguidas dejan la base idéntica y los conteos cuadran con `strapi:check`.
@@ -177,7 +177,7 @@ El detalle de **qué cambia en cada módulo** y qué funciones deben seguir func
 Una variable `DATA_BACKEND=strapi|prisma` elige la implementación **para toda la app a la vez** (no por módulo: mezclar dejaría dos fuentes de verdad). Producción sigue en `strapi` hasta el corte; staging corre en `prisma`. Así los componentes casi no cambian durante la migración y se simplifican después, con la app ya estable.
 
 1. [ ] **Limpieza previa** (se puede hacer ya, sin esperar nada): borrar el código muerto de la sección 4.1.
-2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/` (mover ahí `lib/units/formulas.ts`, `lib/region.ts`, `lib/geo.ts`, `lib/constants.ts`); tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/domain.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`).
+2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/`; tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/block-domain-ui.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`). `lib/domain/` ya existe (19 oct): `units/formulas.ts`, `units/varas.ts`, `units/context.ts` (contexto de bloque para el motor), `region.ts` y `geo.ts`, con pruebas en `npm test`. `lib/constants.ts` y `lib/region.ts` quedan como reexportaciones más lo de UI; el antiguo `lib/domain.ts` (etiquetas de UI) pasó a `lib/block-domain-ui.ts`.
 3. [ ] **Fachada** `lib/api/client.ts` con la implementación `strapi`; cambiar los imports de la UI de `strapiClient` a la fachada. Producción no nota nada.
 4. [ ] Implementación `prisma`, módulo por módulo, en el orden de la sección 4: auth → catálogos → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
 5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `DATA_BACKEND=prisma`.
@@ -350,7 +350,7 @@ A revisar con negocio:
 ### 4.8 Hoja de unidades (el módulo más crítico)
 
 - **Pantallas:** `units/list/[id]`.
-- **Archivos:** `datasheet-units-table.tsx` (~7,800 líneas), `datasheet-units-table-config.ts`, `lib/units/formulas.ts`, `lib/units/unit-type-dynamic-columns.ts`, `lib/units/unit-type-zone.ts`, `lib/constants.ts`, `lib/region.ts`.
+- **Archivos:** `datasheet-units-table.tsx` (~7,800 líneas), `datasheet-units-table-config.ts`, `lib/domain/units/formulas.ts`, `lib/domain/units/context.ts`, `lib/units/unit-type-dynamic-columns.ts`, `lib/units/unit-type-zone.ts`, `lib/constants.ts`, `lib/region.ts`.
 - **Métodos:** `getUnitsAllPages`, `updateUnit` (3 lugares), `updateUnitBatch`, `createUnit`, `getBlockById`, `getProjectById`, `getCatalogList` ×3.
 - **Llamadas externas:** `/api/units/generate-code` (login de admin en Strapi, igual que bloques) y el webhook de n8n `block-counter-update` (`NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL`).
 - **Lo que Strapi hace hoy y hay que construir:**

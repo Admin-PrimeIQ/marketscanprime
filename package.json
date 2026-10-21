@@ -1,6 +1,6 @@
 {
   "name": "market-scan-back-office",
-  "version": "1.28.0",
+  "version": "1.28.1",
   "private": true,
   "description": "Prime IQ web back office for real-estate market scan: projects, blocks, units datasheet, exchange rates, and Strapi-backed catalogs (Next.js, ES/EN).",
   "keywords": [
@@ -29,7 +29,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "test": "node --test 'lib/*.test.ts' 'lib/copilot/*.test.ts' 'lib/units/*.test.ts' 'components/units/*.test.ts'",
+    "test": "node --test \"lib/*.test.ts\" \"lib/copilot/*.test.ts\" \"lib/domain/units/*.test.ts\" \"components/units/*.test.ts\"",
     "postinstall": "patch-package",
     "start": "next start"
   },

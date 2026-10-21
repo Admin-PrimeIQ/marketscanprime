@@ -11,7 +11,7 @@ import { AdvancedFilters, ActiveFilters, getFieldDefinitions, getOperatorLabel, 
 import { Plus, Search, X } from "lucide-react"
 import Link from "next/link"
 import { strapiClient, type StrapiProject, type BlockDomain } from "@/lib/api/strapi"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { useTranslations } from "next-intl"
 import {
   Breadcrumb,

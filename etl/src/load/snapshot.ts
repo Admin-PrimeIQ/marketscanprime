@@ -124,6 +124,22 @@ export async function writeSnapshot(snapshot: Snapshot): Promise<string> {
   return dir
 }
 
+/**
+ * Diferencias entre las filas del snapshot y los conteos que `extract` dejó en `meta.json`. Un
+ * `.ndjson` truncado o editado pasaría la validación y el prune espejo borraría en msp_app lo que
+ * falte, así que cualquier diferencia invalida el snapshot.
+ */
+export function snapshotCountMismatches(snapshot: Snapshot): string[] {
+  const mismatches: string[] = []
+  for (const table of STRAPI_TABLES) {
+    const expected = snapshot.meta.counts[table]
+    const actual = snapshot.tables[table].length
+    if (expected === undefined) mismatches.push(`${table}: meta.json no registra su conteo (hay ${actual} filas)`)
+    else if (expected !== actual) mismatches.push(`${table}: meta.json dice ${expected} filas y el archivo tiene ${actual}`)
+  }
+  return mismatches
+}
+
 export async function readSnapshot(name: string): Promise<Snapshot> {
   const dir = resolve(SNAPSHOTS_DIR, name)
   const metaFile = resolve(dir, "meta.json")
@@ -136,5 +152,8 @@ export async function readSnapshot(name: string): Promise<Snapshot> {
     const lines = createInterface({ input: createReadStream(file, "utf8"), crlfDelay: Infinity })
     for await (const line of lines) if (line) tables[table].push(JSON.parse(line) as RawRow)
   }
-  return { meta, tables }
+  const snapshot = { meta, tables }
+  const mismatches = snapshotCountMismatches(snapshot)
+  if (mismatches.length > 0) throw new Error(`Snapshot ${name} incompleto o alterado; no se usa:\n  ${mismatches.join("\n  ")}`)
+  return snapshot
 }

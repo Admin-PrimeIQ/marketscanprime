@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 import pg from "pg"
 import { appPoolConfig } from "../app/connection"
 import { ETL_ROOT } from "../db/env"
+import type { FormulaApplied } from "./formulas"
 import { describeCategory, type ValidationResult } from "./validate"
 import type { Check, VerifyResult } from "./verify"
 import type { TableStats } from "./write"
@@ -19,6 +20,7 @@ export interface RunReport {
   dryRun: boolean
   snapshot: string | null
   allowed: string[]
+  allowMassDelete: boolean
   status: RunStatus
   startedAt: string
   finishedAt: string | null
@@ -34,6 +36,8 @@ export interface RunReport {
   } | null
   write: Record<string, TableStats> | null
   verify: VerifyResult | null
+  /** Campos de fórmula reemplazados por el recalculado; los originales quedan en `csv`. */
+  formulas: (FormulaApplied & { report: string; csv: string }) | null
 }
 
 export function summarizeValidation(result: ValidationResult, allowed: ReadonlySet<string>): NonNullable<RunReport["validation"]> {
@@ -136,7 +140,11 @@ export class RunLog {
           report.status,
           report.snapshot,
           report.allowed,
-          JSON.stringify({ write: report.write, verify: report.verify && { ok: report.verify.ok } }),
+          JSON.stringify({
+            write: report.write,
+            verify: report.verify && { ok: report.verify.ok },
+            formulas: report.formulas && { units: report.formulas.units, replaced: report.formulas.replaced, keptNull: report.formulas.keptNull },
+          }),
           JSON.stringify(report.validation),
           report.error,
           report.startedAt,

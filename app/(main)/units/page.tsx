@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Loader2, Check, ChevronsUpDown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { strapiClient, type StrapiBlock, type BlockDomain } from "@/lib/api/strapi"
-import { departmentsForIso } from "@/lib/geo"
+import { departmentsForIso } from "@/lib/domain/geo"
 import { useTranslations } from "next-intl"
 import {
   Breadcrumb,
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { getBlockRegion, REGION_BADGE_CLASS } from "@/lib/region"
-import { DOMAIN_BADGE_CLASS, DOMAIN_PILL_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, DOMAIN_PILL_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { CountryPill } from "@/components/ui/country-pill"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 

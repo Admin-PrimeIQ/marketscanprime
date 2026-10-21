@@ -19,15 +19,11 @@ pnpm build            # next build
 pnpm start            # next start
 ```
 
-**There is no app test suite and no working linter.** `pnpm lint` runs `eslint .`, but eslint is neither a dependency nor installed — the script fails. Don't cite it as a check.
+**There is no working linter.** `pnpm lint` runs `eslint .`, but eslint is neither a dependency nor installed — the script fails. Don't cite it as a check.
 
 Type checking: `npx tsc --noEmit`. Note `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so **a green build does not mean the types are clean**. The baseline is noisy — filter output to files you touched.
 
-The only automated test in the repo is the formula parity test for the migration CLI:
-
-```bash
-cd .migration && npm install && npm run test:parity   # prints "parity OK"
-```
+Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine and block context in `lib/domain/units/`, plus `lib/*.test.ts`, `lib/copilot/` and `components/units/`. The ETL in `etl/` has its own `npm test`.
 
 ## Environment
 
@@ -96,13 +92,13 @@ Behavior keys off `block.project.country.isoCode2` (fallback `code`), so blocks/
 - **VAT** (`getVatRate` inside the datasheet): `SV` → `1.0` (0%, placeholder until a rate is approved); otherwise `1.12`, except usage "Venta" → `0.916`; Interior (`S1`/`S2`) + Lote → `1.12`.
 - **Installment** (`INSTALLMENT_BY_ISO`): GT (default) 7.5% / 20y / 90% LTV; SV 8% / 25y / 85%. Unknown ISO falls back to GT.
 - **Sizes**: `totalSizeM2 = habitableConstructionM2 + (isVertical ? parkingSizeM2 : 0)`; habitable = unitSize (+ balcony when vertical), or land area for lotes. Parking size = `parkingSpaces × 12.5` m².
-- **Region** GAM vs Interior is derived from `quarter` (`T1–T4` vs `S1/S2`) — see [`lib/region.ts`](lib/region.ts). Departments/municipalities per ISO live in [`lib/geo.ts`](lib/geo.ts) (`GEO_BY_ISO`; a former `lib/departments.ts` was consolidated into it).
+- **Region** GAM vs Interior is derived from `quarter` (`T1–T4` vs `S1/S2`) — see [`lib/domain/region.ts`](lib/domain/region.ts) (re-exported with the badge colors by [`lib/region.ts`](lib/region.ts)). Departments/municipalities per ISO live in [`lib/domain/geo.ts`](lib/domain/geo.ts) (`GEO_BY_ISO`; a former `lib/departments.ts` was consolidated into it).
 
-### Formula parity contract with `.migration/`
+### Pure business rules — `lib/domain/`
 
-[`.migration/`](.migration/) is a self-contained oclif CLI (own `package.json`/`node_modules`, gitignored) that back-fills computed unit fields into Strapi block by block, with dry-run, per-block JSONL snapshots, checkpoint/resume, and rollback. It imports **nothing** from the app — it **copies** the pure formula functions into `.migration/src/core/formulas.js`.
+The formula engine ([`lib/domain/units/formulas.ts`](lib/domain/units/formulas.ts)), the varas factors (`varas.ts`) and the block context that feeds the engine ([`lib/domain/units/context.ts`](lib/domain/units/context.ts): vertical / lote / industrial kind from the category, VAT rates, country ISO) are the **single copy** of these rules. The grid, the units page and the ETL formula report (`etl/`, `npm run load:formulas`) all import them. Files there import nothing from React or `@/` aliases and use relative `.ts` imports, so they run under `node --test` and `tsx`. UI bits (badge colors, labels) stay outside: `lib/region.ts`, `lib/block-domain-ui.ts`, `lib/block-category.ts`.
 
-**Any change to a unit formula must be mirrored there**, and `npm run test:parity` must still pass. Divergence means the grid and the migrated data disagree, which surfaces to users as permanent yellow cells. Read `.migration/README.md` before running anything against a real Strapi.
+[`.migration/`](.migration/) has a **frozen** copy of an older engine (June 2026, before VAT-by-operation and industrial sizes). Nothing imports it and it is no longer a parity contract; don't mirror changes there. Read `.migration/README.md` before running anything against a real Strapi.
 
 ### Sibling repo — `../../scripts/sync-database`
 

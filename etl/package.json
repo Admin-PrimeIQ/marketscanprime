@@ -25,6 +25,7 @@
     "load": "tsx src/load/index.ts run",
     "load:validate": "tsx src/load/index.ts validate",
     "load:verify": "tsx src/load/index.ts verify",
+    "load:formulas": "tsx src/load/index.ts formulas",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },

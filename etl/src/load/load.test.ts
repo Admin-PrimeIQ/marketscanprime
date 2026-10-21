@@ -1,9 +1,13 @@
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 import { draft, fixture, published } from "./fixtures"
+import { applyFormulas, checkUnits, FORMULA_COLUMNS, formulaCsv, summarizeFormulas, type FormulaField, type UnitCheck } from "./formulas"
 import { cents, date, float, numeric, timestamp } from "./normalize"
+import { snapshotCountMismatches, STRAPI_TABLES } from "./snapshot"
+import { SPECS, type AppTable } from "./specs"
 import { transform } from "./transform"
 import { validate } from "./validate"
+import { massDeletions, type TableStats } from "./write"
 
 const categories = (snapshot = fixture(), allowed: string[] = []) => validate(snapshot, new Set(allowed)).issues.map((i) => i.category)
 
@@ -251,5 +255,151 @@ describe("incidencias", () => {
     const s = fixture()
     s.tables.blocks_cmps.push({ id: 2, entity_id: 30, cmp_id: 1, component_type: "otro.componente", field: "x", order: 2 })
     assert.deepEqual(categories(s), ["componente-desconocido"])
+  })
+})
+
+describe("integridad del snapshot", () => {
+  const withCounts = () => {
+    const s = fixture()
+    s.meta.counts = Object.fromEntries(STRAPI_TABLES.map((t) => [t, s.tables[t].length]))
+    return s
+  }
+  test("conteos de meta.json iguales a las filas", () => {
+    assert.deepEqual(snapshotCountMismatches(withCounts()), [])
+  })
+  test("archivo truncado", () => {
+    const s = withCounts()
+    s.tables.units.pop()
+    assert.deepEqual(snapshotCountMismatches(s), ["units: meta.json dice 2 filas y el archivo tiene 1"])
+  })
+  test("tabla sin conteo en meta.json", () => {
+    const s = withCounts()
+    delete s.meta.counts.countries
+    assert.deepEqual(snapshotCountMismatches(s), ["countries: meta.json no registra su conteo (hay 1 filas)"])
+  })
+})
+
+describe("freno al borrado masivo", () => {
+  const stats = (overrides: Partial<Record<AppTable, Partial<TableStats>>>) =>
+    Object.fromEntries(
+      SPECS.map((s) => [s.table, { expected: 0, inserted: 0, updated: 0, deleted: 0, ...overrides[s.table] }]),
+    ) as Record<AppTable, TableStats>
+
+  test("refresco normal: unos cientos de unidades borradas no frenan", () => {
+    assert.deepEqual(massDeletions(stats({ unit: { expected: 238_000, inserted: 300, deleted: 654 } })), [])
+  })
+  test("más del 5 % y más de 50 filas frena", () => {
+    assert.deepEqual(massDeletions(stats({ unit: { expected: 200_000, deleted: 38_000 } })), [
+      { table: "unit", before: 238_000, deleted: 38_000 },
+    ])
+  })
+  test("tabla pequeña: pocas filas borradas no frenan aunque sean más del 5 %", () => {
+    assert.deepEqual(massDeletions(stats({ amenity: { expected: 80, deleted: 5 } })), [])
+  })
+  test("tabla que queda vacía frena aunque sea pequeña", () => {
+    assert.deepEqual(massDeletions(stats({ country: { expected: 0, deleted: 2 } })), [
+      { table: "country", before: 2, deleted: 2 },
+    ])
+  })
+  test("primera carga sobre msp_app vacía no frena", () => {
+    assert.deepEqual(massDeletions(stats({ unit: { expected: 238_000, inserted: 238_000 } })), [])
+  })
+})
+
+describe("reporte de fórmulas", () => {
+  const appData = (snapshot = fixture()) => transform(validate(snapshot).resolved)
+  const unitCheck = (checks: UnitCheck[], publicId: string) => checks.find((c) => c.unit.public_id === publicId)!
+  const expected = (check: UnitCheck, field: string) => check.diffs.find((d) => d.field === field)?.expected
+  const column = (field: string) => FORMULA_COLUMNS[field as FormulaField].column
+  const withCategory = (data: ReturnType<typeof appData>, name: string) => {
+    data.block_category.push({ public_id: "cat-1", code: null, name, description: null, created_at: null, updated_at: null })
+    data.block[0].category_id = "cat-1"
+    return data
+  }
+
+  test("nada calculado: el precio sin IVA sale como diferencia desde vacío", () => {
+    const check = unitCheck(checkUnits(appData()), "unit-1")
+    const diff = check.diffs.find((d) => d.field === "priceWithoutVATUSD")!
+    assert.equal(diff.storedNull, true)
+    assert.equal(diff.stored, 0)
+    assert.ok(diff.expected > 0)
+  })
+
+  test("guardar lo recalculado deja la unidad limpia: las columnas mapean ida y vuelta", () => {
+    const data = appData()
+    for (const check of checkUnits(data)) {
+      for (const d of check.diffs) check.unit[column(d.field)] = String(d.expected)
+    }
+    assert.deepEqual(checkUnits(data).flatMap((c) => c.diffs), [])
+  })
+
+  test("la carga reemplaza lo que difiere, redondeado a la escala de la columna, y deja vacío lo que Strapi no trae", () => {
+    const data = appData()
+    const unit = data.unit.find((u) => u.public_id === "unit-1")!
+    unit.price_without_vat_usd = "1"
+    unit.installment_usd = "1"
+    unit.parking_spaces = "1"
+    unit.parking_size_m2 = "3.3"
+    const checks = checkUnits(data)
+    const before = unitCheck(checks, "unit-1").diffs.find((d) => d.field === "priceWithoutVATUSD")!
+
+    const applied = applyFormulas(checks)
+    assert.equal(unit.price_without_vat_usd, before.expected.toFixed(2).replace(/0+$/, "").replace(/\.$/, ""))
+    assert.equal(unit.parking_size_m2, "12.5")
+    assert.equal(unit.total_size_m2, null)
+    assert.equal(applied.replaced.priceWithoutVATUSD, 1)
+    assert.equal(applied.replaced.installmentUSD, 1)
+    assert.ok((applied.keptNull.totalSizeM2 ?? 0) >= 1)
+    assert.equal(applied.units, 1)
+
+    const again = checkUnits(data).flatMap((c) => c.diffs)
+    assert.ok(again.every((d) => d.storedNull), "solo quedan las diferencias contra vacíos")
+  })
+
+  test("vertical suma el balcón de la fila hija al habitable", () => {
+    assert.equal(expected(unitCheck(checkUnits(appData()), "unit-1"), "habitableConstructionM2"), 85.5)
+    const vertical = unitCheck(checkUnits(withCategory(appData(), "Vivienda Vertical")), "unit-1")
+    assert.equal(vertical.context?.isVertical, true)
+    assert.equal(expected(vertical, "habitableConstructionM2"), 91)
+  })
+
+  test("bodegas: el tamaño es bodega + oficina + mezzanine", () => {
+    const data = withCategory(appData(), "Bodegas")
+    data.unit_housing = []
+    data.unit_industrial.push({ unit_id: "unit-1", warehouse_storage_size_m2: "100", office_size_m2: "20", mezzanine_size_m2: "10" })
+    const check = unitCheck(checkUnits(data), "unit-1")
+    assert.equal(check.context?.industrialKind, "bodegas")
+    assert.equal(expected(check, "unitSizeM2"), 130)
+  })
+
+  test("unidad en el bloque «No definido» queda sin contexto y no se compara", () => {
+    const snapshot = fixture()
+    snapshot.tables.units_block_lnk = snapshot.tables.units_block_lnk.filter((l) => l.unit_id !== 41)
+    const checks = checkUnits(appData(snapshot))
+    assert.equal(unitCheck(checks, "unit-2").context, null)
+    assert.deepEqual(unitCheck(checks, "unit-2").diffs, [])
+    const report = summarizeFormulas(checks, "fixture")
+    assert.equal(report.units.withoutContext, 1)
+    assert.equal(report.units.checked, 1)
+  })
+
+  test("resumen por campo, período y bloque; CSV con una fila por unidad con diferencias", () => {
+    const checks = checkUnits(appData())
+    const report = summarizeFormulas(checks, "fixture")
+    assert.equal(report.units.checked, 2)
+    assert.equal(report.units.withoutCategory, 2)
+    assert.equal(report.units.withDiffs, 2)
+    assert.equal(report.byField.priceWithoutVATUSD.units, 2)
+    assert.equal(report.byField.priceWithoutVATUSD.examples[0].unitCode, "U-002")
+    assert.deepEqual(
+      report.byPeriod.map((p) => [p.period, p.domain, p.units, p.withDiffs]),
+      [["T1", "housing", 2, 2]],
+    )
+    assert.equal(report.topBlocks[0].code, "B-001")
+
+    const lines = formulaCsv(checks).trim().split("\n")
+    assert.equal(lines.length, 3)
+    assert.ok(lines[0].startsWith("unit,unit_code,block,block_code,period,domain,category,fields,"))
+    assert.ok(lines[1].startsWith("unit-1,U-001,block-1,B-001,T1,housing,,"))
   })
 })

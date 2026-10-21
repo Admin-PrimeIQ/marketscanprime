@@ -23,6 +23,34 @@ export interface TableStats {
 
 const BATCH = 2_000
 
+/** Tope del prune espejo por tabla: más de esto (y más de `MASS_DELETE_MIN_ROWS`) detiene la carga. */
+export const MASS_DELETE_RATIO = 0.05
+export const MASS_DELETE_MIN_ROWS = 50
+
+export interface MassDeletion {
+  table: AppTable
+  before: number
+  deleted: number
+}
+
+/**
+ * Tablas cuyo borrado parece un vaciado y no un cambio normal de Strapi: quedarían en 0 filas, o
+ * perderían más del 5 % y más de 50 filas. Es el equivalente al `failed_sanity` del push de n8n.
+ * Solo aplica a `full`: en `sample` no hay prune. `before` se deduce de las estadísticas: toda fila
+ * esperada que no se insertó ya existía.
+ */
+export function massDeletions(stats: Record<AppTable, TableStats>): MassDeletion[] {
+  const found: MassDeletion[] = []
+  for (const [table, s] of Object.entries(stats) as [AppTable, TableStats][]) {
+    const before = s.expected - s.inserted + s.deleted
+    if (before === 0 || s.deleted === 0) continue
+    const emptied = s.expected === 0
+    const tooMany = s.deleted > MASS_DELETE_MIN_ROWS && s.deleted > before * MASS_DELETE_RATIO
+    if (emptied || tooMany) found.push({ table, before, deleted: s.deleted })
+  }
+  return found
+}
+
 /** Error con el paso en que ocurrió, para que el reporte diga dónde y por qué. */
 export class StepError extends Error {
   constructor(
