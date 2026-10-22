@@ -40,7 +40,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { strapiClient, type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { type StrapiExchangeRateProfile } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
@@ -204,7 +205,7 @@ export function ExchangeRateProfilesTable({
     if (id === undefined || id === null) return
     setIsDeleting(true)
     try {
-      await strapiClient.deleteExchangeRateProfile(id)
+      await dataClient.deleteExchangeRateProfile(id)
       toast({ title: t("success"), description: t("deleteExchangeRateProfileSuccess") })
       setDeleteTarget(null)
       onDeleted?.()

@@ -6,6 +6,46 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Los catálogos ya pueden leerse y escribirse en la base nueva (v1.29.0)
+
+_2026-10-21_
+
+Primer módulo de la implementación `prisma` de la fachada (fase 5 de `docs/migration/ROADMAP.md`). **Producción no cambia**: sigue en `NEXT_PUBLIC_DATA_BACKEND=strapi`, y todo lo nuevo se niega a responder fuera de `next dev`.
+
+- **Prisma en la app** (decisión 10 del README de migración): `@prisma/client`, `@prisma/adapter-pg` y `pg` en la raíz, con `prisma` como dependencia de desarrollo, en las mismas versiones que `etl/`. [prisma/schema.prisma](prisma/schema.prisma) tiene un segundo generador, `app`, que escribe en `lib/db/generated/` (ignorado por git). Lo regeneran `postinstall` y `pnpm db:generate`. `npm run app:generate` en `etl/` ahora genera solo su propio cliente.
+- **`lib/db/`**: [connection.ts](lib/db/connection.ts) se conecta a `msp_app` solo con `DATABASE_URL_APP`, sin respaldo a otras URL, con la raíz TLS de Railway y un pool de 2. [client.ts](lib/db/client.ts) es el cliente `server-only`. [catalogs.ts](lib/db/catalogs.ts) es un repositorio genérico de los 12 catálogos, y [catalog-mapping.ts](lib/db/catalog-mapping.ts) tiene sus reglas puras: el modelo de cada endpoint, paginación, `sort` y búsqueda como en Strapi, `documentId` = `publicId`, validación y errores de Prisma traducidos ("está en uso", "debe ser único"). Las Server Actions están en [catalog-actions.ts](lib/db/catalog-actions.ts).
+- **Fachada**: [lib/api/prisma-client.ts](lib/api/prisma-client.ts) implementa `DataClient`. Los 5 métodos de catálogo son reales, y los demás fallan con "todavía no está migrado". `resolveDataBackend` pasó a [lib/api/data-backend.ts](lib/api/data-backend.ts).
+- **Login sobre la base nueva, sin sesión de servidor todavía** (llega con Auth.js): [guard.ts](lib/db/guard.ts) hace que las Server Actions solo respondan en `next dev` con el backend `prisma`. El login de ese backend ([auth-actions.ts](lib/db/auth-actions.ts)) valida correo o usuario y clave contra la tabla `user` de `msp_app`, con los hashes bcrypt copiados de Strapi (decisión 13), y nunca llama a Strapi. Responde con el mismo mensaje de Strapi si falla. El usuario y su rol real quedan en `localStorage`. Dependencia nueva: `bcryptjs`.
+- **`pnpm dev:staging`** ([scripts/dev-staging.mjs](scripts/dev-staging.mjs)): corre la app en modo `prisma` con las variables de `.env.staging.local` (plantilla en [.env.staging.example](.env.staging.example)), sin cargar el `.env` de producción y con sus claves vaciadas. El lanzador se niega a arrancar si `.env.staging.local` trae credenciales de Strapi.
+- **pnpm fijado en 10.34.7** (`packageManager` en [package.json](package.json)): corepack usaba su versión por defecto (9.15.4), que no entiende el `allowBuilds` de [pnpm-workspace.yaml](pnpm-workspace.yaml) y abortaba cualquier comando (`pnpm run build`, incluso `pnpm --version`) con "packages field missing or empty". El lockfile sigue en el formato 9.0.
+- **Hallazgo**: en los datos, `isoCode` de los países es alfa-3 (`GTM`) e `isoCode2` alfa-2 (`GT`). El formulario de catálogos valida al revés, así que hoy no deja guardar un país existente, tampoco con Strapi. El servidor nuevo no impone largo. Queda anotado en `ROADMAP.md` §4.4 para decidir con negocio.
+- **Verificación**: lectura de los 12 catálogos contra `msp_app` en una sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id, búsqueda). `npm test` 86/86, con 12 pruebas nuevas en `lib/db/`. `tsc --noEmit` da 38 errores, los mismos de antes, ninguno en archivos nuevos. `next build` sin `.env` compila. Falta recorrer en el navegador la lista "debe seguir funcionando" de catálogos.
+
+## La UI pide los datos a una fachada, no a Strapi; fuera el código muerto (v1.28.2)
+
+_2026-10-21_
+
+Primer paso de la fase 5 de la migración (`docs/migration/ROADMAP.md`): que la UI no sepa de qué backend vienen los datos.
+
+- **Fachada de datos**: [lib/api/client.ts](lib/api/client.ts) exporta `dataClient` y el tipo `DataClient`, con los 31 métodos que la UI usa hoy. Detrás está el mismo `strapiClient` de siempre: no cambia ninguna petición, ni el proxy `/api/strapi`, ni la forma de los datos. `NEXT_PUBLIC_DATA_BACKEND` elige la implementación (`strapi` por defecto; `prisma` todavía no existe y falla con un mensaje claro).
+- **33 archivos** (páginas, formularios, la hoja de unidades, `AuthContext` y `lib/auth/auth.ts`) importan `dataClient` en vez de `strapiClient`. Fuera de `lib/api/` ya nadie importa el cliente de Strapi. Los tipos `Strapi*` y los helpers puros (`getRelationDocumentId`, `localCurrencyUnitsPerOneUsd`, `CATALOG_TYPES`, …) se siguen importando de [lib/api/strapi.ts](lib/api/strapi.ts); pasan a tipos de dominio en un paso aparte.
+- **Código muerto borrado** (nada lo importaba ni lo enlazaba desde una pantalla viva): las tablas alternativas de unidades `editable-units-table`, `luckysheet-units-table`, `univer-units-table` y `units-table`; `projects-table-old` y `projects-table-advanced`; y las rutas huérfanas `projects/[id]`, `projects/[id]/edit` y `blocks/[id]/edit`. Esas tres URL ahora dan 404; las vivas son `projects/view|edit/[documentId]` y `blocks/view|edit/[id]`.
+- **Dependencias sin quitar todavía**: `@univerjs/*` y `luckysheet` ya no las usa ningún archivo, pero siguen en `package.json` para no cambiar el lockfile en este paso.
+- **Verificación**: la fachada compila en modo estricto junto con `strapi.ts`; los 31 métodos llamados coinciden uno a uno con el contrato; `npm test` 74/74. El `tsc` de toda la app no se pudo correr porque la raíz no tiene `node_modules`.
+
+## Las reglas de unidad viven en `lib/domain/` y el ETL las usa para medir diferencias (v1.28.1)
+
+_2026-10-19_
+
+- **Una sola copia del motor de fórmulas**: se movieron a [lib/domain/](lib/domain/) el motor ([formulas.ts](lib/domain/units/formulas.ts)), las varas ([varas.ts](lib/domain/units/varas.ts)), la región GAM / Interior ([region.ts](lib/domain/region.ts)) y los departamentos ([geo.ts](lib/domain/geo.ts)). [lib/constants.ts](lib/constants.ts) y [lib/region.ts](lib/region.ts) los reexportan, así que sus importadores no cambian.
+- **Contexto de bloque compartido**: [context.ts](lib/domain/units/context.ts) decide vertical / lote / tipo industrial por la categoría y las tasas de IVA por uso. Antes esa lógica estaba copiada tres veces (la [página de unidades](app/(main)/units/list/[id]/page.tsx) y dos lugares de la [hoja](components/units/datasheet-units-table.tsx)); ahora las tres llaman a las mismas funciones. Con pruebas.
+- **Renombre**: el antiguo `lib/domain.ts` (etiquetas y colores de dominio para la UI) pasó a [lib/block-domain-ui.ts](lib/block-domain-ui.ts) para no chocar con la carpeta. Se actualizaron sus 6 importadores.
+- **No cambia ningún número**: las fórmulas son las mismas, solo cambian de lugar.
+- **`npm test` en la raíz corre en Windows**: las comillas simples del script llegaban literales a `cmd` y no encontraba ninguna prueba. Ahora corre 74, incluidas las de `lib/domain/units/`.
+- **ETL (`etl/`)**: comando nuevo `npm run load:formulas -- --snapshot <nombre>`, que recalcula cada unidad con este mismo motor y reporta qué campos guardados no coinciden. No toca ninguna base. Con el snapshot del 16 oct, el 52 % de las unidades difiere en al menos un campo; el detalle está en `docs/migration/README.md` §12.8. La carga a `msp_app` (staging) guarda el valor recalculado cuando difiere, y el original queda en el reporte. Strapi no cambia, así que la hoja del admin sigue marcando esas celdas en amarillo. Además, la carga se frena si el espejo fuera a borrar en masa, y rechaza snapshots incompletos.
+- **Documentación**: [CLAUDE.md](CLAUDE.md) ya no describe a `.migration/` como contrato de paridad (está congelado desde el 2026-09-11).
+- **Sin verificar**: el `tsc` de la app no se pudo correr porque la raíz no tiene `node_modules`. `lib/domain/` sí compila en modo estricto.
+
 ## El bloque tiene uso: Venta o Renta (v1.28.0)
 
 _2026-10-14_

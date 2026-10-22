@@ -61,13 +61,13 @@ n8n solo para el Copilot (mientras se decide su futuro)
 ## 2. Principios para que el repo quede simple
 
 1. **Una sola capa de datos.** Toda lectura/escritura pasa por `lib/db/<dominio>.ts` (Prisma). Nada de `fetch` a APIs propias desde componentes de servidor.
-2. **Reglas de negocio puras y probadas.** Fórmulas, IVA, cuota, varas, región: funciones sin I/O en `lib/domain/`, con pruebas. Una sola copia en todo el repo (hoy hay dos: app y `.migration/`).
+2. **Reglas de negocio puras y probadas.** Fórmulas, IVA, cuota, varas, región: funciones sin I/O en `lib/domain/`, con pruebas. Una sola copia en todo el repo: desde el 19 oct la importan la hoja de unidades y el ETL; `.migration/` queda congelado con una copia vieja que nadie importa.
 3. **Un worker solo si hace falta.** Si algo se puede hacer en la transacción del guardado en menos de un segundo, se hace ahí. Los workers son para trabajo lento, programado o que habla con sistemas externos.
 4. **Escritura validada en el servidor.** Server Actions / Route Handlers con Zod y verificación de sesión y rol en cada uno (no basta el layout).
 5. **El esquema es la documentación.** Llaves foráneas reales, enums de Postgres, índices únicos donde hay unicidad de negocio (`code`, `document_id`).
 6. **Mismo repo, dos procesos.** La app (Vercel) y los workers (Railway) comparten `lib/` y el cliente Prisma; se despliegan desde el mismo repositorio con entradas distintas.
 7. **Cada fase es reversible hasta el corte.** Strapi sigue siendo la fuente de verdad hasta la fase 7; todo lo anterior se puede tirar y repetir.
-8. **Paralelo, nunca encima.** Cada pieza nueva escribe en recursos propios (Postgres y Redis nuevos en Railway, copias locales del warehouse) y se valida comparándose contra producción en modo **sombra**. Producción solo se lee, con usuario de solo `SELECT`.
+8. **Paralelo, nunca encima.** Cada pieza nueva escribe en recursos propios (el esquema `msp_app` del Postgres de staging, un Redis propio, copias sombra del warehouse) y se valida comparándose contra producción en modo **sombra**. Producción solo se lee, con usuario de solo `SELECT`.
 
 ### Estructura propuesta de la app nueva
 
@@ -97,22 +97,22 @@ Son preguntas de negocio/infraestructura; sin respuesta, el código posterior se
 - [ ] **El pull (warehouse → CRM).** ¿Sigue existiendo cuando la app sea la fuente de verdad? Propuesta: **eliminarlo**; si el equipo carga datos al warehouse por otra vía, se reemplaza por un importador explícito con vista previa, no por un pull que borra unidades.
 - [ ] **Quién lee cada `dbo`** y si otros proyectos **escriben** en las tablas de Market Scan (`housing_*`, `office_*`, `industrial_*`, `banking_info`).
 - [ ] **Red:** confirmar que Railway (y la máquina que corra el ETL) puede llegar al RDS MySQL; si no, IP de salida fija o túnel.
-- [ ] **Usuarios:** migrar `up_users` con su hash bcrypt (nadie cambia contraseña) o forzar restablecimiento.
+- [ ] **Usuarios:** migrar `up_users` con su hash bcrypt (nadie cambia contraseña) o forzar restablecimiento. Hoy el ETL ya copia el hash a `user.password_hash`; falta la confirmación del usuario.
 - [ ] **Dónde vive la app nueva:** este repo (`Admin-PrimeIQ/marketscanprime`), que es una copia paralela del backoffice. **Confirmar en Vercel que ningún proyecto de producción despliega desde este repo**; hasta entonces, `main` se trata como producción y no se hace `push` sin aprobación.
-- [ ] **Infraestructura nueva:** crear un proyecto de Railway propio (p. ej. `marketscan-next`) con su Postgres y su Redis, separado del Postgres `dbo` que ya existe (ese es producción y lo usan otros proyectos).
+- [ ] **Infraestructura nueva:** Postgres y Redis propios, separados del Postgres `dbo` que ya existe (ese es producción y lo usan otros proyectos). Postgres resuelto: por decisión del usuario (`README.md` §3, decisiones 8 y 9) la migración usa el servidor de staging de Railway (base `railway`, esquema `msp_app`) en lugar de un proyecto nuevo. Faltan el Redis y el servicio de workers.
 
 **Hecho cuando:** cada punto tiene una respuesta escrita en `README.md` §9.
 
-### Fase 1 — Leer Strapi con Prisma (en curso)
+### Fase 1 — Leer Strapi con Prisma (terminada el 15 oct)
 
-Paquete `etl/` ya creado (ver `README.md` §7).
+Paquete `etl/` (ver `README.md` §7).
 
-- [ ] Agregar `STRAPI_DATABASE_URL` (usuario **solo `SELECT`**) al `.env` y correr `cd etl && npm run strapi:check`.
-- [ ] Comparar el esquema contra `npm run strapi:pull:print` y corregir diferencias (columnas que sobran o faltan, tipos).
-- [ ] Ampliar `check.ts`: unidades con más de un vínculo a bloque, unidades con más de una entrada `unitType` en `units_cmps`, vínculos que apuntan a filas inexistentes.
-- [ ] Defensa adicional: extensión de Prisma que lance error ante `create`/`update`/`delete`/`upsert`.
-- [ ] Conexión con SSL validando el certificado de RDS (no copiar el `rejectUnauthorized=false` de Strapi).
-- [ ] Resolver el `.env` relativo al archivo, no al directorio de trabajo.
+- [x] Credenciales de solo `SELECT` en el `.env` y `cd etl && npm run strapi:check` sin errores (15 oct). Son las variables `DATABASE_*_STRAPI`; `STRAPI_DATABASE_URL` ya no se usa.
+- [ ] Comparar el esquema contra `npm run strapi:pull:print` y corregir diferencias. No bloquea: `strapi:check` lee una fila completa de cada modelo (una columna faltante en la base fallaría), pero no detecta columnas que existan en la base y no en el esquema.
+- [x] Unidades con más de un vínculo a bloque, con más de una entrada `unitType` en `units_cmps` y vínculos a filas inexistentes. Quedó en `etl/src/load/validate.ts` (categorías `relacion-ambigua`, `tipo-unidad-multiple`, `relacion-rota`, `tipo-unidad-roto`), no en `check.ts`.
+- [x] Defensa adicional: extensión de Prisma que lanza error ante cualquier escritura (`etl/src/strapi/client.ts`).
+- [x] Conexión con SSL validando el certificado de RDS (`etl/certs/rds-global-bundle.pem`).
+- [x] `.env` resuelto relativo al archivo, no al directorio de trabajo (`etl/src/db/env.ts`).
 
 **Hecho cuando:** `strapi:check` pasa sin `ERROR`, y se conoce el número real de borradores/duplicados y huérfanos.
 
@@ -145,8 +145,8 @@ Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert
 - [x] Solo filas publicadas. Unidades sin bloque (620) y bloques sin proyecto (2) se cargan en un padre «No definido» (`etl-no-definido`, `etl-no-definido-<domain>`); los `code` repetidos (42) se cargan vacíos. Las tres quedan como advertencias en el reporte.
 - [x] Unidades paginadas por cursor (`id > último`, lotes de ~2,000, pausa entre lotes, pool ≤ 2 conexiones). `units_cmps` se resuelve según `component_type`.
 - [x] Cargas completas **fuera de horario laboral** (la extracción completa se rechaza entre 7:00 y 19:00): la base `strapi` es la misma que usa Strapi en producción.
-- [ ] Al cargar cada unidad, **recalcular** los campos de fórmula con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hoy se copian tal cual.
-- [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados (falta la parte de fórmulas).
+- [x] **Recalcular** los campos de fórmula de cada unidad con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hecho el 19 oct; resultado en `README.md` §12.8. Desde el 21 oct (decisión del usuario) la carga copia los valores tal cual vienen de Strapi y el recálculo queda solo como reporte (`etl/reports/formulas-*`); el recálculo se aplicará cuando negocio confirme las reglas de Interior.
+- [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados. Las fórmulas van en su propio reporte (`etl/reports/formulas-*.json` y `.csv`) y el resumen de lo reemplazado queda en `etl_run.counts`.
 - [x] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`. Hecho el 19 oct con el snapshot del 16 oct; falta refrescar con un snapshot nuevo leído de noche.
 
 **Hecho cuando:** dos corridas seguidas dejan la base idéntica y los conteos cuadran con `strapi:check`.
@@ -155,10 +155,10 @@ Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert
 
 Mientras Strapi siga vivo, el push lee de Strapi; después del corte, de Postgres. La lógica de mapeo es la misma (`README.md` §5).
 
-El push nuevo **nunca escribe en `dbo_stage` ni en `dbo`** antes del corte. Escribe en una **copia sombra** y se compara contra lo que n8n deja en el `dbo_stage` real.
+El push nuevo **nunca escribe en el `dbo_stage` ni en el `dbo` de producción (MySQL, y el `dbo` de Postgres)** antes del corte. Escribe en una **copia sombra** (el `dbo_stage` del Postgres de staging) y se compara contra lo que n8n deja en el `dbo_stage` real.
 
-- [ ] Cliente Prisma de `dbo_stage` en `etl/prisma/stage/` con `db pull`, **solo lectura** (usuario `SELECT`).
-- [ ] Copia sombra: MySQL local (Docker) o en el Railway propio, con el mismo esquema que `dbo_stage`, sin datos de producción salvo los que el propio push escriba.
+- [ ] Lectura del `dbo_stage` real (MySQL, instancia RDS del warehouse, distinta de la de `strapi` según el manual) para la prueba de paridad, **solo lectura**. La conexión ya está en `etl/src/warehouse/`; falta confirmar el acceso con `npm run warehouse:ping` (`README.md` §13.3). Esquema escrito a mano con introspección `db pull --print` (nunca `db pull` sin `--print`, `migrate` ni `db push`).
+- [x] Copia sombra: el esquema `dbo_stage` del Postgres de staging (`README.md` §3, decisión 9, y §11), que ya tiene las 11 tablas del push vacías. Confirmado por el usuario el 21 oct: se escribe con `j_stage_admin`, solo en esas 11 tablas, nunca en las `sec_*`. El SQL del push debe adaptarse a Postgres (`README.md` §11.4: `IDENTITY ALWAYS`, columnas con eñe entre comillas, amenidades `boolean`, industrial con `char(64)` y `real`).
 - [ ] Mapeador puro `lib/domain/warehouse-mapper.ts`: bloque + unidades → filas `housing_universe`, `housing_units`, `housing_amenities`, `banking_info` (y equivalentes de oficinas/industrial).
 - [ ] **Prueba de paridad:** para N bloques, la salida del mapeador debe coincidir celda por celda con lo que n8n ya dejó en `dbo_stage`. Atención a redondeo de `Decimal`, textos recortados a 50/20 y `NULL` en columnas `_qtz`.
 - [ ] Escritura por bloque en una transacción en la copia sombra (borrar e insertar unidades, como hoy).
@@ -174,16 +174,18 @@ El detalle de **qué cambia en cada módulo** y qué funciones deben seguir func
 - `strapi`: la actual, sin cambios.
 - `prisma`: llama a Server Actions / Route Handlers que usan `lib/db/*` y convierten filas de Postgres a esa misma forma (DTO).
 
-Una variable `DATA_BACKEND=strapi|prisma` elige la implementación **para toda la app a la vez** (no por módulo: mezclar dejaría dos fuentes de verdad). Producción sigue en `strapi` hasta el corte; staging corre en `prisma`. Así los componentes casi no cambian durante la migración y se simplifican después, con la app ya estable.
+Una variable `NEXT_PUBLIC_DATA_BACKEND=strapi|prisma` elige la implementación **para toda la app a la vez** (no por módulo: mezclar dejaría dos fuentes de verdad). Producción sigue en `strapi` hasta el corte; staging corre en `prisma`. Así los componentes casi no cambian durante la migración y se simplifican después, con la app ya estable.
 
-1. [ ] **Limpieza previa** (se puede hacer ya, sin esperar nada): borrar el código muerto de la sección 4.1.
-2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/` (mover ahí `lib/units/formulas.ts`, `lib/region.ts`, `lib/geo.ts`, `lib/constants.ts`); tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/domain.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`).
-3. [ ] **Fachada** `lib/api/client.ts` con la implementación `strapi`; cambiar los imports de la UI de `strapiClient` a la fachada. Producción no nota nada.
-4. [ ] Implementación `prisma`, módulo por módulo, en el orden de la sección 4: auth → catálogos → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
-5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `DATA_BACKEND=prisma`.
+1. [x] **Limpieza previa**: borrado el código muerto de la sección 4.1 (21 oct, v1.28.2, rama `feat/data-facade`). Quedan en `package.json` las dependencias `@univerjs/*` y `luckysheet`, ya sin uso.
+2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/`; tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/block-domain-ui.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`). `lib/domain/` ya existe (19 oct): `units/formulas.ts`, `units/varas.ts`, `units/context.ts` (contexto de bloque para el motor), `region.ts` y `geo.ts`, con pruebas en `npm test`. `lib/constants.ts` y `lib/region.ts` quedan como reexportaciones más lo de UI; el antiguo `lib/domain.ts` (etiquetas de UI) pasó a `lib/block-domain-ui.ts`. Cliente Prisma de la app hecho el 21 oct (v1.29.0): generador `app` → `lib/db/generated`, `lib/db/connection.ts` (solo `DATABASE_URL_APP`, `search_path=msp_app`) y `lib/db/client.ts` (`server-only`). Falta el renombre de tipos.
+3. [x] **Fachada** `lib/api/client.ts` con la implementación `strapi`; los imports de la UI pasaron de `strapiClient` a `dataClient` (21 oct, v1.28.2, rama `feat/data-facade`). El contrato es el tipo `DataClient` (31 métodos) y el backend lo elige `NEXT_PUBLIC_DATA_BACKEND` (tiene que ser `NEXT_PUBLIC_` porque la UI lo lee en el navegador). Fuera de `lib/api/` nadie importa `strapiClient`; los tipos `Strapi*` y los helpers puros siguen saliendo de `strapi.ts` hasta el paso 2.
+4. [ ] Implementación `prisma`, módulo por módulo. Orden (decisión 11 del README): catálogos → auth → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
+   - [x] Catálogos (21 oct, v1.29.0): `lib/db/catalogs.ts` + `lib/db/catalog-actions.ts`, y `lib/api/prisma-client.ts` en la fachada. Hasta que llegue auth, las Server Actions solo responden en `next dev` con el backend `prisma`, y la sesión es local. Se corre con `pnpm dev:staging` (`.env.staging.local`, sin el `.env` de producción).
+   - [ ] Auth (Auth.js, hashes bcrypt reutilizados: decisiones 12 y 13). Reemplaza la sesión local y la guarda de solo desarrollo.
+5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
 6. [ ] Linter funcionando (`eslint` instalado) y `tsc --noEmit` limpio en los archivos nuevos; quitar `ignoreBuildErrors`.
 
-**Hecho cuando:** todas las listas "debe seguir funcionando" pasan en staging con `DATA_BACKEND=prisma` y ninguna petición sale hacia Strapi.
+**Hecho cuando:** todas las listas "debe seguir funcionando" pasan en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma` y ninguna petición sale hacia Strapi.
 
 Después del corte (fase 8) se borra la implementación `strapi` y, ya sin presión, se simplifica la forma de los datos (quitar `documentId` duplicado, arreglo `unitType`, etc.).
 
@@ -231,7 +233,7 @@ Es la **única** fase que cambia producción. La ejecuta una persona con acceso,
 ### Fase 8 — Limpieza
 
 - [ ] (Persona con acceso) Apagar Strapi (App Runner) y archivar un respaldo final de la base `strapi`.
-- [ ] Borrar `etl/` (o dejar solo el mapeador si vive en `lib/domain`), `.migration/`, `lib/api/strapi.ts`, la implementación `strapi` de la fachada, el proxy `app/api/strapi/`, las rutas `generate-code`, `lib/sync/runs-api.ts`, `lib/server-logger.ts` (parte de `/users/me`), `lib/auth/is-strapi-super-admin.ts`, `verify-strapi-bearer.ts` y la variable `DATA_BACKEND`.
+- [ ] Borrar `etl/` (o dejar solo el mapeador si vive en `lib/domain`), `.migration/`, `lib/api/strapi.ts`, la implementación `strapi` de la fachada, el proxy `app/api/strapi/`, las rutas `generate-code`, `lib/sync/runs-api.ts`, `lib/server-logger.ts` (parte de `/users/me`), `lib/auth/is-strapi-super-admin.ts`, `verify-strapi-bearer.ts` y la variable `NEXT_PUBLIC_DATA_BACKEND`.
 - [ ] Quitar las variables de entorno de la sección 4.13.
 - [ ] Retirar de Supabase las tablas de sync (si el Copilot ya no las usa).
 - [ ] Revisar el repo hermano `scripts/sync-database`: también habla con Strapi; retirarlo o apuntarlo a Postgres.
@@ -243,13 +245,13 @@ Es la **única** fase que cambia producción. La ejecuta una persona con acceso,
 
 ## 4. Inventario: qué cambia en cada módulo para dejar Strapi
 
-Medido sobre el código el 15 oct 2026. **53 archivos** importan `lib/api/strapi.ts`; además hay **11 Route Handlers** (todos dependen de Strapi o de n8n) y **4 integraciones** directas con n8n (sync, tipo de cambio, contadores de bloque y Copilot). Ninguna pantalla habla con MySQL: todo pasa por la API REST de Strapi, así que el cambio se concentra en la capa de datos y en la autenticación. Los componentes visuales (`components/ui/`, i18n en `messages/*.json`, tema, tours) **no cambian**.
+Medido sobre el código el 15 oct 2026 (conteo de archivos actualizado el 21 oct). **52 archivos** importan `lib/api/strapi.ts`; además hay **11 Route Handlers** (todos dependen de Strapi o de n8n) y **4 integraciones** directas con n8n (sync, tipo de cambio, contadores de bloque y Copilot). Ninguna pantalla habla con MySQL: todo pasa por la API REST de Strapi, así que el cambio se concentra en la capa de datos y en la autenticación. Los componentes visuales (`components/ui/`, i18n en `messages/*.json`, tema, tours) **no cambian**.
 
 Para cada módulo: qué pantallas y archivos toca, qué métodos de `strapiClient` usa, qué hace Strapi hoy "gratis" y hay que construir, y la lista de funciones que **deben seguir funcionando** (criterio de aceptación de la fase 5).
 
 ### 4.1 Código muerto (borrar antes de empezar)
 
-Nada lo importa ni lo enlaza desde una pantalla viva. Borrarlo reduce el alcance de la migración de 53 a 44 archivos.
+Nada lo importa ni lo enlaza desde una pantalla viva. Borrarlo reduce el alcance de la migración de 52 a 43 archivos.
 
 | Archivo | Motivo |
 |---|---|
@@ -301,10 +303,12 @@ A revisar con negocio:
 - **Métodos:** `getCatalogList`, `getCatalogItem`, `createCatalogItem`, `updateCatalogItem`, `deleteCatalogItem`. También los usan los formularios de proyectos, bloques y la hoja de unidades.
 - **Catálogos:** amenidades, países, desarrolladores, NSE, tipos de seguridad, servicios, categorías / enfoques / estados de bloque, tipos de parqueo, topografías, usos de unidad.
 - **Lo que Strapi hace hoy y hay que construir:** CRUD genérico por *endpoint* → un mapa `clave de catálogo → modelo Prisma` con un repositorio genérico. Al borrar, Strapi deja vínculos `_lnk` huérfanos; con llaves foráneas hay que **decidir**: impedir el borrado si está en uso (propuesta) o desvincular.
+- **Hecho (21 oct):** mapa `CATALOG_MODELS` y repositorio en `lib/db/`. Borrar un catálogo en uso **se impide** (la llave foránea es `Restrict`; la UI muestra "está en uso"). `block-types` está en `CATALOG_TYPES` pero no tiene tabla: la pantalla muestra el error. Tope de 1,000 filas por página.
+- **A revisar con negocio:** en los datos, `isoCode` de los países es alfa-3 (`GTM`) e `isoCode2` alfa-2 (`GT`), y las reglas leen `isoCode2`. El formulario de `catalog-table.tsx` valida al revés (2 letras en `isoCode`, 3 en `isoCode2`), así que hoy no deja guardar un país existente sin cambiarle los códigos, tampoco en Strapi. El servidor nuevo no valida el largo.
 - **Debe seguir funcionando:**
   - [ ] Listar, buscar, paginar, crear, editar y borrar en cada catálogo.
   - [ ] Los selectores de proyectos, bloques y unidades cargan las opciones (hasta 200 por catálogo).
-  - [ ] Países con `isoCode2`/`code`: de ellos dependen IVA, cuota y departamentos (`lib/geo.ts`).
+  - [ ] Países con `isoCode2`/`code`: de ellos dependen IVA, cuota y departamentos (`lib/domain/geo.ts`).
 
 ### 4.5 Perfiles de tipo de cambio
 
@@ -335,7 +339,7 @@ A revisar con negocio:
 ### 4.7 Bloques
 
 - **Pantallas:** `blocks` (lista), `new`, `view/[id]`, `edit/[id]`, `clone/[id]`; `units` (selector de bloque para abrir la hoja).
-- **Archivos:** `blocks-table.tsx`, `block-form.tsx`, `block-financing-card.tsx`, `lib/financing.ts`, `lib/domain.ts` (`BlockDomain`), `lib/block-name.ts`.
+- **Archivos:** `blocks-table.tsx`, `block-form.tsx`, `block-financing-card.tsx`, `lib/financing.ts`, `lib/block-domain-ui.ts` (`BlockDomain`), `lib/block-name.ts`.
 - **Métodos:** `getBlocks`, `getBlockById` (también la hoja), `createBlock`, `updateBlock`, `getBlocksLite` (sync), `getProjects`, `getProjectById`, catálogos de bloque.
 - **Route Handler:** `app/api/blocks/generate-code/route.ts` hace **login de administrador en Strapi** y llama a `/content-manager/uid/generate` para obtener un código único.
 - **Lo que Strapi hace hoy y hay que construir:**
@@ -350,7 +354,7 @@ A revisar con negocio:
 ### 4.8 Hoja de unidades (el módulo más crítico)
 
 - **Pantallas:** `units/list/[id]`.
-- **Archivos:** `datasheet-units-table.tsx` (~7,800 líneas), `datasheet-units-table-config.ts`, `lib/units/formulas.ts`, `lib/units/unit-type-dynamic-columns.ts`, `lib/units/unit-type-zone.ts`, `lib/constants.ts`, `lib/region.ts`.
+- **Archivos:** `datasheet-units-table.tsx` (~7,800 líneas), `datasheet-units-table-config.ts`, `lib/domain/units/formulas.ts`, `lib/domain/units/context.ts`, `lib/units/unit-type-dynamic-columns.ts`, `lib/units/unit-type-zone.ts`, `lib/constants.ts`, `lib/region.ts`.
 - **Métodos:** `getUnitsAllPages`, `updateUnit` (3 lugares), `updateUnitBatch`, `createUnit`, `getBlockById`, `getProjectById`, `getCatalogList` ×3.
 - **Llamadas externas:** `/api/units/generate-code` (login de admin en Strapi, igual que bloques) y el webhook de n8n `block-counter-update` (`NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL`).
 - **Lo que Strapi hace hoy y hay que construir:**
@@ -419,7 +423,7 @@ A revisar con negocio:
 | `SYNC_API_URL`, `SYNC_API_KEY` | `AUTH_SECRET` (sesiones) |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Llave del proveedor de correo (Resend o SES) |
 | — | `STAGE_DATABASE_URL` (solo workers: `dbo_stage`) |
-| — | `DATA_BACKEND` (solo durante la migración) |
+| — | `NEXT_PUBLIC_DATA_BACKEND` (solo durante la migración) |
 
 Se quedan mientras el Copilot siga en n8n: `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` / `N8N_CHAT_WEBHOOK_UPSTREAM_URL`.
 
@@ -453,7 +457,8 @@ Se quedan mientras el Copilot siga en n8n: `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` / 
 
 ## 6. Orden inmediato
 
+Las fases 1, 2 y 3 están hechas (`README.md` §6). Los pendientes concretos de la migración están en `README.md` §8; en este plan:
+
 1. Responder la fase 0 (al menos identidad de filas, pull y red) y los puntos "a revisar con negocio" de la sección 4.1.
-2. Borrar el código muerto de la sección 4.1 en este repo (no afecta producción) y reportar al responsable del backoffice el hueco de las rutas `generate-code`.
-3. Cerrar la fase 1 con `strapi:check`.
-4. Diseñar el esquema nuevo (fase 2) en paralelo con el cliente de `dbo_stage` (fase 4, primer punto).
+2. ~~Borrar el código muerto de la sección 4.1~~ (hecho el 21 oct, con la fachada de la fase 5). Falta reportar al responsable del backoffice el hueco de las rutas `generate-code`.
+3. Preparar la fase 4: acceso de solo lectura al `dbo_stage` de MySQL (`README.md` §13.3). El destino de la copia sombra ya está confirmado (decisión 9, 21 oct).

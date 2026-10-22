@@ -39,10 +39,10 @@ import {
   StrapiUnit,
   type StrapiError,
   type CatalogItem,
-  strapiClient,
   localCurrencyUnitsPerOneUsd,
   getStrapiPublicBaseUrl,
 } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useAuth } from "@/context/AuthContext"
 import { blockBehavior } from "@/lib/block-category"
 import { isStrapiSuperAdmin } from "@/lib/auth/is-strapi-super-admin"
@@ -100,9 +100,14 @@ import {
   type IndustrialKind,
   ensureUnitFormulasSynced,
   getVatRate,
-  vatRatesFor,
   type VatRates,
-} from "@/lib/units/formulas.ts"
+} from "@/lib/domain/units/formulas.ts"
+import {
+  isLoteCategory,
+  isVerticalCategory,
+  unitVatRates as blockUnitVatRates,
+  type BlockFormulaInput,
+} from "@/lib/domain/units/context.ts"
 import { useOverflowGroups } from "@/hooks/use-overflow-groups"
 import { countryFlag } from "@/lib/region"
 
@@ -893,17 +898,18 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
   //   El Salvador (SV) → 1.0 (0%, sin tasa aprobada aún: precio sin IVA = total)
   //   Guatemala/otros → 1.12 (12%) salvo "Uso Venta" → 0.916 (Interior+Lote y Renta también 1.12)
   //
-  // La regla vive en lib/units/formulas.ts, donde se puede ejecutar. Acá sólo se
-  // le pasa el contexto del bloque.
+  // La regla vive en lib/domain/units/ (formulas.ts y context.ts), donde se puede
+  // ejecutar. Acá sólo se le pasa el contexto del bloque.
   const blockIso = () => blockCountry?.isoCode2 || blockCountry?.code
+  const blockFormulaInput = (): BlockFormulaInput => ({
+    categoryName: blockCategory,
+    categoryCode: blockCategoryCode,
+    quarter: blockQuarter,
+    countryIso: blockIso(),
+  })
   /** Las tres tasas de la unidad: venta, renta y mantenimiento, cada una la suya. */
   const unitVatRates = (unit: Record<string, unknown>): VatRates =>
-    vatRatesFor({
-      quarter: blockQuarter,
-      category: blockCategory,
-      usageName: (unit as any).unitUsage?.name,
-      iso: blockIso(),
-    })
+    blockUnitVatRates(blockFormulaInput(), (unit as any).unitUsage?.name)
   /**
    * La tasa que se MUESTRA en la columna de IVA.
    *
@@ -915,26 +921,17 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
   const unitDisplayVatRate = (unit: Record<string, unknown>): number =>
     getVatRate(blockQuarter, blockCategory, (unit as any).unitUsage?.name, blockIso())
 
-  const vatRatesRef = useRef<VatRates>(vatRatesFor({ quarter: blockQuarter, category: blockCategory, iso: blockIso() }))
+  const vatRatesRef = useRef<VatRates>(blockUnitVatRates(blockFormulaInput()))
   useEffect(() => {
-    vatRatesRef.current = vatRatesFor({
-      quarter: blockQuarter,
-      category: blockCategory,
-      iso: blockCountry?.isoCode2 || blockCountry?.code,
-    })
+    vatRatesRef.current = blockUnitVatRates(blockFormulaInput())
   }, [blockQuarter, blockCategory, blockCountry])
 
-  const blockCatStr = `${blockCategory || ""} ${blockCategoryCode || ""}`.toLowerCase()
   const resolveIsVertical = () =>
-    blockIsVertical !== undefined
-      ? blockIsVertical
-      : !!(blockCatStr.includes('vertical') || blockCatStr.includes('vert'))
+    blockIsVertical !== undefined ? blockIsVertical : isVerticalCategory(blockCategory, blockCategoryCode)
   const resolveIsLote = () =>
-    blockIsLote !== undefined
-      ? blockIsLote
-      : !!(blockCatStr.includes('lote') || blockCatStr.includes('lot'))
+    blockIsLote !== undefined ? blockIsLote : isLoteCategory(blockCategory, blockCategoryCode)
 
-  // El tipo industrial del bloque: la regla vive en lib/units/formulas.ts.
+  // El tipo industrial del bloque: la regla vive en lib/domain/units/formulas.ts.
   const industrialKindRef = useRef<IndustrialKind>(industrialKindOf(blockCategory, blockCategoryCode))
   useEffect(() => {
     industrialKindRef.current = industrialKindOf(blockCategory, blockCategoryCode)
@@ -942,18 +939,12 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
 
   const isVerticalRef = useRef(resolveIsVertical())
   useEffect(() => {
-    const s = `${blockCategory || ""} ${blockCategoryCode || ""}`.toLowerCase()
-    isVerticalRef.current = blockIsVertical !== undefined
-      ? blockIsVertical
-      : !!(s.includes('vertical') || s.includes('vert'))
+    isVerticalRef.current = resolveIsVertical()
   }, [blockCategory, blockCategoryCode, blockIsVertical])
 
   const isLoteRef = useRef(resolveIsLote())
   useEffect(() => {
-    const s = `${blockCategory || ""} ${blockCategoryCode || ""}`.toLowerCase()
-    isLoteRef.current = blockIsLote !== undefined
-      ? blockIsLote
-      : !!(s.includes('lote') || s.includes('lot'))
+    isLoteRef.current = resolveIsLote()
   }, [blockCategory, blockCategoryCode, blockIsLote])
 
   const countryIsoRef = useRef<string | undefined>(blockCountry?.isoCode2 || blockCountry?.code || undefined)
@@ -1244,7 +1235,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           firstUnit.block.project.documentId || firstUnit.block.project.id
       } else if (blockId) {
         try {
-          const block = await strapiClient.getBlockById(blockId)
+          const block = await dataClient.getBlockById(blockId)
           const p = block.project
           if (!p || typeof p !== 'object') {
             setProjectWithCurrencies(null)
@@ -1267,7 +1258,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
       }
 
       try {
-        const project = await strapiClient.getProjectById(projectId)
+        const project = await dataClient.getProjectById(projectId)
         setProjectWithCurrencies(project)
       } catch (error) {
         console.error('Error loading project with currencies:', error)
@@ -1620,9 +1611,9 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
     const loadCatalogs = async () => {
       try {
         const [parkingTypesRes, unitUsagesRes, topographiesRes] = await Promise.all([
-          strapiClient.getCatalogList('unit-parking-types', { pageSize: 200 }),
-          strapiClient.getCatalogList('unit-usages', { pageSize: 200 }),
-          strapiClient.getCatalogList('unit-topographies', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-parking-types', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-usages', { pageSize: 200 }),
+          dataClient.getCatalogList('unit-topographies', { pageSize: 200 }),
         ])
         setParkingTypes(parkingTypesRes.data || [])
         setUnitUsages(unitUsagesRes.data || [])
@@ -1645,9 +1636,8 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
     // Sync refs from current blockCategory before computing formulas — avoids stale ref if
     // this effect runs before the blockCategory-only effects (React does not guarantee order
     // between effects that share the same deps-change trigger).
-    const s = `${blockCategory || ""} ${blockCategoryCode || ""}`.toLowerCase()
-    isVerticalRef.current = blockIsVertical !== undefined ? blockIsVertical : !!(s.includes('vertical') || s.includes('vert'))
-    isLoteRef.current = blockIsLote !== undefined ? blockIsLote : !!(s.includes('lote') || s.includes('lot'))
+    isVerticalRef.current = resolveIsVertical()
+    isLoteRef.current = resolveIsLote()
 
     const previousLength = dataRef.current.length
     if (units.length === 0 && blockId) {
@@ -2656,7 +2646,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           markCellSaving(row, col)
         }
         
-        return strapiClient.updateUnit(unitId, field, value, blockDocumentId)
+        return dataClient.updateUnit(unitId, field, value, blockDocumentId)
           .then(() => {
             if (process.env.NODE_ENV === "development") {
               console.log(`[Undo/Redo] Updated unit ${unitId}, field: ${field}`)
@@ -2888,7 +2878,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
           let codeAttempts = 0
           while (true) {
             try {
-              await strapiClient.updateUnitBatch(unitId, updates, blockDocumentId)
+              await dataClient.updateUnitBatch(unitId, updates, blockDocumentId)
               break
             } catch (writeErr) {
               if (isUnitCodeConflict(writeErr) && codeAttempts < 5) {
@@ -3094,7 +3084,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
         let createCodeAttempts = 0
         while (true) {
           try {
-            createdUnit = await strapiClient.createUnit(unitData)
+            createdUnit = await dataClient.createUnit(unitData)
             break
           } catch (createErr) {
             if (isUnitCodeConflict(createErr) && createCodeAttempts < 5) {
@@ -3394,7 +3384,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
     if (blockId) {
       try {
         // Load units from API (same as when block changes)
-        const unitsRes = await strapiClient.getUnitsAllPages({
+        const unitsRes = await dataClient.getUnitsAllPages({
           blockDocumentId: String(blockId),
           pageSize: 200,
         })
@@ -4945,7 +4935,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
       })
       setTotalUpdates((prev) => prev + 1)
 
-      strapiClient.updateUnit(unitId, fieldDz, convertedValueDz, blockDocumentIdDz)
+      dataClient.updateUnit(unitId, fieldDz, convertedValueDz, blockDocumentIdDz)
         .then(() => {
           if (process.env.NODE_ENV === "development") {
             console.log(`Updated unit ${unitId}, field: ${fieldDz}`)
@@ -5313,7 +5303,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
 
     // Update in Strapi (without forcing grid refresh)
     // Pass block to avoid GET request
-    strapiClient.updateUnit(unitId, field, convertedValue, blockDocumentId)
+    dataClient.updateUnit(unitId, field, convertedValue, blockDocumentId)
       .then(() => {
         if (process.env.NODE_ENV === "development") {
           console.log(`Updated unit ${unitId}, field: ${field}`)

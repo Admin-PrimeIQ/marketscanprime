@@ -3,7 +3,8 @@
  * Funciones auxiliares para manejar la autenticación y sesiones
  */
 
-import { strapiClient, type StrapiUser, type StrapiAuthResponse } from '@/lib/api/strapi'
+import { type StrapiUser, type StrapiAuthResponse } from '@/lib/api/strapi'
+import { dataClient } from '@/lib/api/client'
 
 export interface AuthSession {
   user: StrapiUser
@@ -82,7 +83,7 @@ export function clearSession(): void {
 
   localStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(USER_KEY)
-  strapiClient.logout()
+  dataClient.logout()
 }
 
 /**
@@ -92,7 +93,7 @@ export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false
 
   const session = getSession()
-  return !!session && strapiClient.isAuthenticated()
+  return !!session && dataClient.isAuthenticated()
 }
 
 /**

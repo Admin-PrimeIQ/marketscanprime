@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/command"
 import { Filter, X, Plus, Edit2, Calendar } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { strapiClient } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -204,7 +204,7 @@ export const AdvancedFilters = forwardRef<AdvancedFiltersRef, AdvancedFiltersPro
     
     setIsLoadingRelations(true)
     try {
-      const response = await strapiClient.getCatalogList(selectedFieldDef.relationEndpoint, {
+      const response = await dataClient.getCatalogList(selectedFieldDef.relationEndpoint, {
         page: 1,
         pageSize: 100,
         search: searchTerm || undefined,
@@ -279,7 +279,7 @@ export const AdvancedFilters = forwardRef<AdvancedFiltersRef, AdvancedFiltersPro
           !relationOptions.find(opt => opt.id === filterValue)) {
         try {
           // Intentar obtener el item específico por ID
-          const item = await strapiClient.getCatalogItem(selectedFieldDef.relationEndpoint, filterValue)
+          const item = await dataClient.getCatalogItem(selectedFieldDef.relationEndpoint, filterValue)
           if (item) {
             const name = item[selectedFieldDef.relationDisplayField || 'name'] || item.code || String(item.id)
             // Agregar a las opciones si no existe
@@ -386,7 +386,7 @@ export const AdvancedFilters = forwardRef<AdvancedFiltersRef, AdvancedFiltersPro
     const fieldDef = fieldDefinitions.find(f => f.key === filter.field)
     if (fieldDef?.type === 'relation' && fieldDef.relationEndpoint && filter.value) {
       try {
-        const item = await strapiClient.getCatalogItem(fieldDef.relationEndpoint, filter.value)
+        const item = await dataClient.getCatalogItem(fieldDef.relationEndpoint, filter.value)
         if (item) {
           const name = item[fieldDef.relationDisplayField || 'name'] || item.code || String(item.id)
           setRelationOptions([{ id: filter.value, name }])

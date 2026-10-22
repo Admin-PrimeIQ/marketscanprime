@@ -13,8 +13,9 @@
     "strapi:pull:print": "prisma db pull --print --config prisma.strapi.config.ts",
     "strapi:ping": "tsx src/strapi/ping.ts",
     "strapi:check": "tsx src/strapi/check.ts",
+    "warehouse:ping": "tsx src/warehouse/ping.ts",
     "app:validate": "prisma validate --config prisma.app.config.ts",
-    "app:generate": "prisma generate --config prisma.app.config.ts",
+    "app:generate": "prisma generate --config prisma.app.config.ts --generator client",
     "app:ping": "tsx src/app/ping.ts",
     "app:status": "tsx src/app/prisma-cli.ts migrate status",
     "app:deploy": "tsx src/app/prisma-cli.ts migrate deploy",
@@ -25,6 +26,7 @@
     "load": "tsx src/load/index.ts run",
     "load:validate": "tsx src/load/index.ts validate",
     "load:verify": "tsx src/load/index.ts verify",
+    "load:formulas": "tsx src/load/index.ts formulas",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },

@@ -16,7 +16,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { User, Bell, Database, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, Globe, Palette, PlayCircle, Server, ExternalLink, Tag, ScrollText } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-import { getStrapiPublicBaseUrl, strapiClient } from "@/lib/api/strapi"
+import { getStrapiPublicBaseUrl } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useLocale } from "@/lib/i18n/client"
 import { useTranslations } from "next-intl"
 import { useTheme } from "next-themes"
@@ -74,7 +75,7 @@ export default function SettingsPage() {
     setMessage(null)
 
     try {
-      await strapiClient.updateMe({
+      await dataClient.updateMe({
         username,
         email,
       })
@@ -107,7 +108,7 @@ export default function SettingsPage() {
     setIsChangingPassword(true)
 
     try {
-      await strapiClient.changePassword(currentPassword, newPassword)
+      await dataClient.changePassword(currentPassword, newPassword)
       setMessage({ type: 'success', text: tSettings('password.passwordChanged') })
       
       // Limpiar formulario

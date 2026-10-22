@@ -38,7 +38,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { strapiClient, CatalogItem, CatalogRequest } from "@/lib/api/strapi"
+import { CatalogItem, CatalogRequest } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { toast } from "@/hooks/use-toast"
 import { useTranslations } from "next-intl"
 import { EmptyState, LoadingState } from "@/components/empty-state"
@@ -192,7 +193,7 @@ export function CatalogTable({ catalogName, catalogDisplayName, endpoint, type, 
   const loadItems = async () => {
     try {
       setLoading(true)
-      const response = await strapiClient.getCatalogList(endpoint, {
+      const response = await dataClient.getCatalogList(endpoint, {
         page: currentPage,
         pageSize: pageSize,
         search: debouncedSearchQuery || undefined,
@@ -383,7 +384,7 @@ export function CatalogTable({ catalogName, catalogDisplayName, endpoint, type, 
         if (!id) {
           throw new Error("ID no válido")
         }
-        await strapiClient.updateCatalogItem(endpoint, id, dataToSend)
+        await dataClient.updateCatalogItem(endpoint, id, dataToSend)
         toast({
           title: tCommon('success'),
           description: t('itemUpdated'),
@@ -392,7 +393,7 @@ export function CatalogTable({ catalogName, catalogDisplayName, endpoint, type, 
         })
       } else {
         // Crear
-        await strapiClient.createCatalogItem(endpoint, dataToSend)
+        await dataClient.createCatalogItem(endpoint, dataToSend)
         toast({
           title: tCommon('success'),
           description: t('itemCreated'),
@@ -474,7 +475,7 @@ export function CatalogTable({ catalogName, catalogDisplayName, endpoint, type, 
       if (!id) {
         throw new Error("ID no válido")
       }
-      await strapiClient.deleteCatalogItem(endpoint, id)
+      await dataClient.deleteCatalogItem(endpoint, id)
       toast({
         title: tCommon('success'),
         description: t('itemDeleted'),

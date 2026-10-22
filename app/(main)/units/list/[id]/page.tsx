@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Monitor, X } from "lucide-react"
 import { DatasheetUnitsTable } from "@/components/units/datasheet-units-table"
-import { strapiClient, type StrapiUnit, type StrapiBlock } from "@/lib/api/strapi"
+import { type StrapiUnit, type StrapiBlock } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -21,8 +22,9 @@ import { TourGuide } from "@/components/tour/tour-guide"
 import { useTour } from "@/hooks/use-tour"
 import { getUnitsTableTourSteps } from "@/components/tour/tour-steps"
 import { getBlockRegion, REGION_BADGE_CLASS } from "@/lib/region"
-import { DOMAIN_PILL_CLASS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_PILL_CLASS, domainLabelKey } from "@/lib/block-domain-ui"
 import { BEHAVIOR_BADGE_CLASS, blockBehavior } from "@/lib/block-category"
+import { isLoteCategory, isVerticalCategory } from "@/lib/domain/units/context.ts"
 import { CountryPill } from "@/components/ui/country-pill"
 
 export default function UnitsByBlockPage() {
@@ -50,8 +52,8 @@ export default function UnitsByBlockPage() {
         setError(null)
         if (currentBlock) {
           const [blockData, unitsRes] = await Promise.all([
-            strapiClient.getBlockById(currentBlock).catch(() => null),
-            strapiClient.getUnitsAllPages({ blockDocumentId: currentBlock, pageSize: 200 })
+            dataClient.getBlockById(currentBlock).catch(() => null),
+            dataClient.getUnitsAllPages({ blockDocumentId: currentBlock, pageSize: 200 })
           ])
           if (blockData) setCurrentBlockInfo(blockData)
           setUnits(unitsRes.data || [])
@@ -68,9 +70,9 @@ export default function UnitsByBlockPage() {
     loadUnits()
   }, [currentBlock])
 
-  const blockCatStr = `${currentBlockInfo?.blockCategory?.name || ""} ${currentBlockInfo?.blockCategory?.code || ""}`.toLowerCase()
-  const blockIsVertical = currentBlockInfo ? (blockCatStr.includes("vertical") || blockCatStr.includes("vert")) : undefined
-  const blockIsLote = currentBlockInfo ? (blockCatStr.includes("lote") || blockCatStr.includes("lot")) : undefined
+  const category = currentBlockInfo?.blockCategory
+  const blockIsVertical = currentBlockInfo ? isVerticalCategory(category?.name, category?.code) : undefined
+  const blockIsLote = currentBlockInfo ? isLoteCategory(category?.name, category?.code) : undefined
 
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
@@ -201,7 +203,7 @@ export default function UnitsByBlockPage() {
             try {
               setIsLoading(true)
               if (currentBlock) {
-                const unitsRes = await strapiClient.getUnitsAllPages({
+                const unitsRes = await dataClient.getUnitsAllPages({
                   blockDocumentId: currentBlock,
                   pageSize: 200,
                 })

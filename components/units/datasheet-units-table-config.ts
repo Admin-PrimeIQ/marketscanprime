@@ -800,7 +800,7 @@ export const DATASHEET_CONFIG = {
        *   • los tres precios por m² y la absorción por m²
        *
        * La suma va a `unitSizeM2`, NO a `totalSizeM2`: ver el porqué en
-       * `industrialUnitSizeM2` de lib/units/formulas.ts — `totalSizeM2` viaja a
+       * `industrialUnitSizeM2` de lib/domain/units/formulas.ts — `totalSizeM2` viaja a
        * una columna del warehouse que incluye el parqueo.
        */
       medidas_industrial: {

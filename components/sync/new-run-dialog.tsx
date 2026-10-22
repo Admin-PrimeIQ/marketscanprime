@@ -38,7 +38,7 @@ import { useAuth } from "@/context/AuthContext"
 import { isStrapiSuperAdmin } from "@/lib/auth/is-strapi-super-admin"
 import { getSession } from "@/lib/auth/auth"
 import type { SqlProjectsPage } from "@/lib/sync/runs-api"
-import { strapiClient } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import {
   countryFlag,
   getBlockRegion,
@@ -218,7 +218,7 @@ export function NewRunDialog({
 
   useEffect(() => {
     if (!open) return
-    strapiClient
+    dataClient
       .getCatalogList("countries", { pageSize: 100, sort: "name:asc" })
       .then((res) =>
         setCountries(
@@ -365,7 +365,7 @@ export function NewRunDialog({
         // El dominio va SIEMPRE: el backend acota los objetivos por dominio, así
         // que ofrecer bloques de otro tipo mostraría opciones que la corrida
         // después ignora sin decir nada.
-        const res = await strapiClient.getBlocksLite({ page, pageSize: BLOCK_PAGE_SIZE, region, country, domain })
+        const res = await dataClient.getBlocksLite({ page, pageSize: BLOCK_PAGE_SIZE, region, country, domain })
         acc.push(...(res?.data ?? []))
         const total = res?.meta?.pagination?.total ?? acc.length
         if (acc.length >= total) return { blocks: acc, truncated: false }

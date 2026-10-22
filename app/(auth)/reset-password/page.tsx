@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Building2, ArrowLeft, CheckCircle2, Eye, EyeOff, AlertCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { strapiClient } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { Skeleton } from "@/components/ui/skeleton"
 
 // Forzar renderizado dinámico debido al uso de cookies en i18n
@@ -66,7 +66,7 @@ function ResetPasswordForm() {
     }
 
     try {
-      await strapiClient.resetPassword(code, password, passwordConfirmation)
+      await dataClient.resetPassword(code, password, passwordConfirmation)
       setIsSubmitted(true)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('resetPassword.error')

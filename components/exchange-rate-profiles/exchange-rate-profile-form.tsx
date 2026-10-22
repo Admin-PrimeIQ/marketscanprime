@@ -17,13 +17,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
-  strapiClient,
   type StrapiCurrenciesComponent,
   type StrapiExchangeRateProfile,
   type StrapiProject,
   type BlockDomain,
 } from "@/lib/api/strapi"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { dataClient } from "@/lib/api/client"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { CurrenciesTab } from "@/components/projects/form-tabs/currencies-tab"
 import { CountryPill } from "@/components/ui/country-pill"
 import { toast } from "@/hooks/use-toast"
@@ -62,7 +62,7 @@ async function fetchAllProjects(): Promise<StrapiProject[]> {
   let page = 1
   let pageCount = 1
   do {
-    const res = await strapiClient.getProjects({ page, pageSize, sort: "name:asc" })
+    const res = await dataClient.getProjects({ page, pageSize, sort: "name:asc" })
     if (Array.isArray(res.data)) all.push(...res.data)
     pageCount = res.meta?.pagination?.pageCount ?? 1
     page += 1
@@ -357,7 +357,7 @@ export function ExchangeRateProfileForm({
         const connect = [...nextIds].filter(id => !prevIds.has(id))
         const disconnect = [...prevIds].filter(id => !nextIds.has(id))
 
-        await strapiClient.updateExchangeRateProfile(initialData.documentId, {
+        await dataClient.updateExchangeRateProfile(initialData.documentId, {
           name: trimmedName,
           code: code.trim() || undefined,
           description: description.trim() || undefined,
@@ -369,7 +369,7 @@ export function ExchangeRateProfileForm({
         toast({ title: t("success"), description: tForm("updated") })
         router.refresh()
       } else {
-        const created = await strapiClient.createExchangeRateProfile({
+        const created = await dataClient.createExchangeRateProfile({
           name: trimmedName,
           code: code.trim() || undefined,
           description: description.trim() || undefined,

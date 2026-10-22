@@ -37,13 +37,13 @@ import {
 import { Save, Loader2, Check, ChevronsUpDown, Info, Calendar, Tag, Layers, DollarSign, Car } from "lucide-react"
 import { useRouter } from "next/navigation"
 import {
-  strapiClient,
   type StrapiBlock,
   type BlockDomain,
   type StrapiProject,
   type CatalogItem,
   localCurrencyUnitsPerOneUsd,
 } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { toast } from "@/hooks/use-toast"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
@@ -219,9 +219,9 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       try {
         setIsLoading(true)
         const [categoriesRes, focusesRes, statusesRes] = await Promise.all([
-          strapiClient.getCatalogList('block-categories', { pageSize: 200 }),
-          strapiClient.getCatalogList('block-focuses', { pageSize: 200 }),
-          strapiClient.getCatalogList('block-statuses', { pageSize: 200 }),
+          dataClient.getCatalogList('block-categories', { pageSize: 200 }),
+          dataClient.getCatalogList('block-focuses', { pageSize: 200 }),
+          dataClient.getCatalogList('block-statuses', { pageSize: 200 }),
         ])
         
         setBlockCategories(categoriesRes.data || [])
@@ -248,7 +248,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       if (initialData?.project?.documentId && projects.length === 0 && !openProject) {
         try {
           const projectId = initialData.project?.documentId || String(initialData.project?.id)
-          const project = await strapiClient.getProjectById(projectId)
+          const project = await dataClient.getProjectById(projectId)
           if (project) {
             setProjects([project])
             setProjectWithCurrencies(project)
@@ -271,7 +271,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       if (formData.project?.documentId) {
         try {
           const projectId = formData.project.documentId
-          const project = await strapiClient.getProjectById(projectId)
+          const project = await dataClient.getProjectById(projectId)
           if (project) {
             setProjectWithCurrencies(project)
           }
@@ -293,7 +293,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       
       setIsLoadingProjects(true)
       try {
-        const response = await strapiClient.getProjects({
+        const response = await dataClient.getProjects({
           page: 1,
           pageSize: 100,
           search: projectSearchQuery || undefined,
@@ -538,7 +538,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       }
 
       if (mode === 'edit' && initialData?.documentId) {
-        await strapiClient.updateBlock(initialData.documentId, dataToSend)
+        await dataClient.updateBlock(initialData.documentId, dataToSend)
         toast({
           title: t('success'),
           description: tForm('blockUpdated'),
@@ -547,7 +547,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
         router.refresh()
       } else {
         // Modo create (incluye clone)
-        const newBlock = await strapiClient.createBlock(dataToSend)
+        const newBlock = await dataClient.createBlock(dataToSend)
         toast({
           title: t('success'),
           description: tForm('blockCreated'),

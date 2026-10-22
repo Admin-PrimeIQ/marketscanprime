@@ -10,24 +10,22 @@ There is no local backend in this repo — Strapi is a remote service configured
 
 ## Commands
 
-Package manager is **pnpm** (`pnpm-workspace.yaml`; a stale `package-lock.json` is also present — ignore it). Node from `.nvmrc` (24.14.1; `engines` requires ≥20).
+Package manager is **pnpm**, pinned by `packageManager` in `package.json` (10.34.7; corepack picks it up — pnpm 9 aborts on the `allowBuilds` key of `pnpm-workspace.yaml`). A stale `package-lock.json` is also present — ignore it. Node from `.nvmrc` (24.14.1; `engines` requires ≥20).
 
 ```bash
-pnpm install          # postinstall runs patch-package (patches/)
+pnpm install          # postinstall runs patch-package (patches/) and prisma generate --generator app
 pnpm dev              # next dev
+pnpm dev:staging      # next dev on the prisma backend, from .env.staging.local only (see below)
+pnpm db:generate      # regenerate the app's Prisma client into lib/db/generated (gitignored)
 pnpm build            # next build
 pnpm start            # next start
 ```
 
-**There is no app test suite and no working linter.** `pnpm lint` runs `eslint .`, but eslint is neither a dependency nor installed — the script fails. Don't cite it as a check.
+**There is no working linter.** `pnpm lint` runs `eslint .`, but eslint is neither a dependency nor installed — the script fails. Don't cite it as a check.
 
 Type checking: `npx tsc --noEmit`. Note `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so **a green build does not mean the types are clean**. The baseline is noisy — filter output to files you touched.
 
-The only automated test in the repo is the formula parity test for the migration CLI:
-
-```bash
-cd .migration && npm install && npm run test:parity   # prints "parity OK"
-```
+Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine and block context in `lib/domain/units/`, plus `lib/*.test.ts`, `lib/copilot/`, `lib/db/` (catalog mapping and guard) and `components/units/`. The ETL in `etl/` has its own `npm test`.
 
 ## Environment
 
@@ -40,12 +38,20 @@ cd .migration && npm install && npm run test:parity   # prints "parity OK"
 | `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` | n8n Chat Trigger for the Copilot (must end in `/chat`; `lib/copilot/constants.ts` appends it if missing). |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Override for the n8n exchange-rates feed. |
 | `NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL` | n8n webhook that recomputes block counters after a unit save. |
+| `NEXT_PUBLIC_DATA_BACKEND` | `strapi` (default) or `prisma`. Picks the `dataClient` implementation for the whole app. |
+| `DATABASE_URL_APP` | Postgres of the new app (schema `msp_app`), read by `lib/db/connection.ts`. Only in `.env.staging.local`. The Railway CA comes from `DATABASE_CA_APP` (PEM) or `DATABASE_CA_FILE_APP` (default `etl/certs/dbo-stage-ca.pem`). |
+
+`.env.staging.local` (gitignored, template in `.env.staging.example`) is the environment for the `prisma` backend. `pnpm dev:staging` ([`scripts/dev-staging.mjs`](scripts/dev-staging.mjs)) loads only that file and blanks every key of the regular `.env`, so the local app can't reach production Strapi or its credentials. Don't run the `prisma` backend any other way.
 
 ## Architecture
 
-### Data layer — everything goes through `lib/api/strapi.ts`
+### Data layer — the UI goes through `dataClient`, backed by `lib/api/strapi.ts`
 
 A single ~3k-line [`StrapiClient`](lib/api/strapi.ts) singleton (`strapiClient`) holds all API knowledge: entity interfaces (`StrapiProject`, `StrapiBlock`, `StrapiUnit`, `StrapiExchangeRateProfile`, `CatalogItem`), query-string building for Strapi v5 filters/populate/pagination, and every CRUD method. New backend calls belong here, not inline in components.
+
+Pages and components never import `strapiClient`: they call `dataClient` from the facade [`lib/api/client.ts`](lib/api/client.ts), whose `DataClient` type lists the methods the UI uses. `NEXT_PUBLIC_DATA_BACKEND` picks the implementation: `strapi` (the default, what production runs) or `prisma` ([`lib/api/prisma-client.ts`](lib/api/prisma-client.ts), being built module by module for the migration, see `docs/migration/ROADMAP.md` phase 5). A new method the UI needs goes in `strapi.ts`, in `DataClient` **and** in the `prisma` implementation (at least as a "not migrated" error). Types `Strapi*` and pure helpers are still imported from `strapi.ts`.
+
+The `prisma` side so far covers the catalogs: Server Actions in [`lib/db/catalog-actions.ts`](lib/db/catalog-actions.ts) → generic repository [`lib/db/catalogs.ts`](lib/db/catalogs.ts) (endpoint → model map and DTO rules in the pure `catalog-mapping.ts`, `documentId` = `publicId`) → Prisma client [`lib/db/client.ts`](lib/db/client.ts) (`server-only`, schema `msp_app`). There is no server-side auth yet, so every action calls `assertPrismaActionsAllowed()` ([`lib/db/guard.ts`](lib/db/guard.ts)): it only answers under `next dev` with the `prisma` backend. Login on that backend ([`lib/db/auth-actions.ts`](lib/db/auth-actions.ts)) checks email/username and password against `msp_app.user` with the bcrypt hashes copied from Strapi, never calls Strapi, and keeps the user in `localStorage`. Both the guard and that client-side session go away with Auth.js. The app's client is the `app` generator of `prisma/schema.prisma`; migrations are still applied only from `etl/`.
 
 **Base URL is environment-dependent** and this matters: in the browser the client points at `/api/strapi`; on the server it calls Strapi directly (avoids loopback). [`app/api/strapi/[...path]/route.ts`](app/api/strapi/[...path]/route.ts) is a transparent proxy whose sole purpose is **server-side logging** of every call (method, path, resolved user email, status, duration, body/summary) via [`lib/server-logger.ts`](lib/server-logger.ts) into Vercel Functions logs. Keep browser traffic flowing through it.
 
@@ -75,7 +81,7 @@ shadcn/ui "new-york" style in `components/ui/` (Radix + Tailwind v4 + `lucide-re
 
 ## The units datasheet — the core of the app
 
-[`components/units/datasheet-units-table.tsx`](components/units/datasheet-units-table.tsx) (~7.8k lines) is a Glide Data Grid spreadsheet at `/units/list/[id]` (units of one block) and the most business-dense file in the repo. Sibling implementations (`editable-units-table`, `luckysheet-units-table`, `univer-units-table`, `units-table`) are alternates/legacy — the datasheet is the live one.
+[`components/units/datasheet-units-table.tsx`](components/units/datasheet-units-table.tsx) (~7.8k lines) is a Glide Data Grid spreadsheet at `/units/list/[id]` (units of one block) and the most business-dense file in the repo. It is the only units grid: the old alternates (`editable-`, `luckysheet-`, `univer-units-table`, `units-table`) were deleted in v1.28.2.
 
 Declarative configuration is split out into [`datasheet-units-table-config.ts`](components/units/datasheet-units-table-config.ts) (`DATASHEET_CONFIG`: field labels, USD field lists, foreign-currency behavior, cascade rules). Its header documents the exact 7-step recipe for **adding a new field group** — follow it; runtime sync functions stay in the component and are wired by name through `syncFnRegistry`.
 
@@ -96,13 +102,13 @@ Behavior keys off `block.project.country.isoCode2` (fallback `code`), so blocks/
 - **VAT** (`getVatRate` inside the datasheet): `SV` → `1.0` (0%, placeholder until a rate is approved); otherwise `1.12`, except usage "Venta" → `0.916`; Interior (`S1`/`S2`) + Lote → `1.12`.
 - **Installment** (`INSTALLMENT_BY_ISO`): GT (default) 7.5% / 20y / 90% LTV; SV 8% / 25y / 85%. Unknown ISO falls back to GT.
 - **Sizes**: `totalSizeM2 = habitableConstructionM2 + (isVertical ? parkingSizeM2 : 0)`; habitable = unitSize (+ balcony when vertical), or land area for lotes. Parking size = `parkingSpaces × 12.5` m².
-- **Region** GAM vs Interior is derived from `quarter` (`T1–T4` vs `S1/S2`) — see [`lib/region.ts`](lib/region.ts). Departments/municipalities per ISO live in [`lib/geo.ts`](lib/geo.ts) (`GEO_BY_ISO`; a former `lib/departments.ts` was consolidated into it).
+- **Region** GAM vs Interior is derived from `quarter` (`T1–T4` vs `S1/S2`) — see [`lib/domain/region.ts`](lib/domain/region.ts) (re-exported with the badge colors by [`lib/region.ts`](lib/region.ts)). Departments/municipalities per ISO live in [`lib/domain/geo.ts`](lib/domain/geo.ts) (`GEO_BY_ISO`; a former `lib/departments.ts` was consolidated into it).
 
-### Formula parity contract with `.migration/`
+### Pure business rules — `lib/domain/`
 
-[`.migration/`](.migration/) is a self-contained oclif CLI (own `package.json`/`node_modules`, gitignored) that back-fills computed unit fields into Strapi block by block, with dry-run, per-block JSONL snapshots, checkpoint/resume, and rollback. It imports **nothing** from the app — it **copies** the pure formula functions into `.migration/src/core/formulas.js`.
+The formula engine ([`lib/domain/units/formulas.ts`](lib/domain/units/formulas.ts)), the varas factors (`varas.ts`) and the block context that feeds the engine ([`lib/domain/units/context.ts`](lib/domain/units/context.ts): vertical / lote / industrial kind from the category, VAT rates, country ISO) are the **single copy** of these rules. The grid, the units page and the ETL formula report (`etl/`, `npm run load:formulas`) all import them. Files there import nothing from React or `@/` aliases and use relative `.ts` imports, so they run under `node --test` and `tsx`. UI bits (badge colors, labels) stay outside: `lib/region.ts`, `lib/block-domain-ui.ts`, `lib/block-category.ts`.
 
-**Any change to a unit formula must be mirrored there**, and `npm run test:parity` must still pass. Divergence means the grid and the migrated data disagree, which surfaces to users as permanent yellow cells. Read `.migration/README.md` before running anything against a real Strapi.
+[`.migration/`](.migration/) has a **frozen** copy of an older engine (June 2026, before VAT-by-operation and industrial sizes). Nothing imports it and it is no longer a parity contract; don't mirror changes there. Read `.migration/README.md` before running anything against a real Strapi.
 
 ### Sibling repo — `../../scripts/sync-database`
 

@@ -13,7 +13,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { ProjectForm } from "@/components/projects/project-form"
-import { strapiClient, type StrapiProject } from "@/lib/api/strapi"
+import { type StrapiProject } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useParams, useRouter } from "next/navigation"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -41,7 +42,7 @@ export default function EditProjectPage() {
         }
         setIsLoading(true)
         setError(null)
-        const proj = await strapiClient.getProjectById(documentId)
+        const proj = await dataClient.getProjectById(documentId)
         setProject(proj)
       } catch (err) {
         const message = err instanceof Error ? err.message : "No se pudo cargar el proyecto"

@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Building2, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { strapiClient } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('common')
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
     setError(null)
 
     try {
-      await strapiClient.forgotPassword(email)
+      await dataClient.forgotPassword(email)
       setIsSubmitted(true)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('forgotPassword.error')

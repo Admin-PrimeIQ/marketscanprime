@@ -23,7 +23,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { strapiClient, type StrapiBlock } from "@/lib/api/strapi"
+import { type StrapiBlock } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { getBlockRegion, REGION_BADGE_CLASS } from "@/lib/region"
 import { CountryPill } from "@/components/ui/country-pill"
 import { useRouter, useParams } from "next/navigation"
@@ -83,7 +84,7 @@ export default function BlockViewPage() {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await strapiClient.getBlockById(blockId)
+        const data = await dataClient.getBlockById(blockId)
         setBlock(data)
         
         // Moneda por defecto GTQ (no se carga del proyecto)

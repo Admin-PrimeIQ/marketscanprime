@@ -27,6 +27,9 @@ npm 11 bloquea los scripts de instalación hasta aprobarlos; `package.json` → 
 | `DATABASE_PORT_STRAPI` | `3306` (por defecto). |
 | `DATABASE_NAME_STRAPI` | `strapi`. |
 | `DATABASE_USER_STRAPI` / `DATABASE_PASSWORD_STRAPI` | Usuario con **solo `SELECT`**. El cliente rechaza usuarios que empiecen con `adm` (el de Strapi). Si la contraseña tiene `#`, va entre comillas dobles. |
+| `DATABASE_HOST_WAREHOUSE` | Endpoint del warehouse MySQL (`prim….us-east-2.rds.amazonaws.com`, instancia distinta de la de Strapi). Bases `dbo_stage` y `dbo`, **solo lectura**. |
+| `DATABASE_PORT_WAREHOUSE` | Opcional, `3306` por defecto. |
+| `DATABASE_USER_WAREHOUSE` / `DATABASE_PASSWORD_WAREHOUSE` | Opcionales. Si faltan, se usan `DATABASE_USER_STRAPI` / `DATABASE_PASSWORD_STRAPI` (hoy es el mismo usuario de solo `SELECT`). |
 
 | `DATABASE_URL_DBO_STAGE` | Postgres de staging en Railway (`postgresql://…/railway`). El esquema `dbo_stage` se abre **solo en lectura** (`default_transaction_read_only=on`). |
 | `DATABASE_URL_APP` | Opcional. Postgres de la app (esquema `msp_app`). Si falta, se usan las credenciales de `DATABASE_URL_DBO_STAGE`: es el mismo servidor. |
@@ -44,6 +47,7 @@ Railway firma el certificado del Postgres con una raíz propia y lo emite para `
 | `strapi:pull:print` | Imprime el esquema introspectado de la base real, sin escribir archivos. | Sí |
 | `strapi:ping` | Prueba de conexión: usuario, SSL y permisos. Se detiene si el usuario tiene algo más que `SELECT`. | Sí |
 | `strapi:check` | Conteo y lectura de una fila por modelo, comparados con el inventario del manual; `document_id` repetidos. | Sí |
+| `warehouse:ping` | Igual que `strapi:ping` contra el warehouse MySQL (se detiene si hay algo más que `SELECT`), más las bases visibles y cuáles de las 11 tablas del push se ven en `dbo_stage` y `dbo`, con su estimación de filas. | Sí |
 | `stage:cert` | Guarda la raíz del certificado de Railway en `certs/dbo-stage-ca.pem`. | Solo TLS |
 | `stage:ping` | Permisos del usuario por esquema en el Postgres de staging (solo lectura). | Sí |
 | `stage:describe` | Columnas, identity, llaves, índices y actividad (filas vivas, inserts) de un esquema del Postgres de staging, desde `pg_catalog` (ve la estructura aunque no haya permiso de lectura). `-- --schema dbo` cambia de esquema (por defecto `dbo_stage`); `-- --values` agrega los valores más frecuentes de `dbo_stage.sec_*` (solo lectura). | Sí |
@@ -55,6 +59,7 @@ Railway firma el certificado del Postgres con una raíz propia y lo emite para `
 | `load:validate` | Extrae Strapi a un snapshot (o reusa uno), valida relaciones y transforma. No escribe en `msp_app`. | Strapi (lectura) |
 | `load` | Carga a `msp_app` en una sola transacción, verifica y hace COMMIT; si algo falla, ROLLBACK. | Strapi (lectura) + `msp_app`, **escribe** |
 | `load:verify` | Compara `msp_app` con un snapshot, en una transacción de solo lectura. | `msp_app` (lectura) |
+| `load:formulas` | Recalcula las unidades del snapshot con el motor de la hoja (`lib/domain/units/`) y reporta qué campos guardados no coinciden. | Strapi (lectura) si no se da `--snapshot`; con `--snapshot`, ninguna |
 | `test` | Pruebas de validación y transformación con un snapshot sintético. | No |
 | `typecheck` | `tsc --noEmit`. | No |
 
@@ -129,20 +134,23 @@ npm run load:validate -- --snapshot <nombre>           #    repetir sobre el mis
 npm run load -- --snapshot <nombre> --dry-run          # 2. carga completa y ROLLBACK al final
 npm run load -- --snapshot <nombre>                    # 3. carga real
 npm run load:verify -- --snapshot <nombre>             #    revisar después, en solo lectura
+npm run load:formulas -- --snapshot <nombre>           # diferencias de fórmulas; no toca msp_app
 npm run load -- --sample <docBloque1>,<docBloque2>     # prueba con pocos bloques (siempre --dry-run)
 ```
 
 Cómo funciona:
 
-1. **Extracción.** Lee las 52 tablas en lotes de 2,000 por cursor de `id`, con pausa entre lotes y pool ≤ 2, y guarda un snapshot en `etl/.snapshots/<fecha>-full|sample/`. La lectura completa del RDS se rechaza entre 7:00 y 19:00 (hora de Guatemala), salvo con `--allow-business-hours`: la decisión es del usuario y la lectura va más lenta (500 ms entre lotes). Con `--snapshot` no se toca el RDS y se puede correr a cualquier hora.
+1. **Extracción.** Lee las 52 tablas en lotes de 2,000 por cursor de `id`, con pausa entre lotes y pool ≤ 2, y guarda un snapshot en `etl/.snapshots/<fecha>-full|sample/`. La lectura completa del RDS se rechaza entre 7:00 y 19:00 (hora de Guatemala), salvo con `--allow-business-hours`: la decisión es del usuario y la lectura va más lenta (500 ms entre lotes). Con `--snapshot` no se toca el RDS y se puede correr a cualquier hora; al leerlo, cada tabla debe tener exactamente las filas que dice su `meta.json`, o el snapshot se rechaza (un `.ndjson` truncado haría que el espejo borrara lo que falta).
 2. **Validación.** Elige la única fila publicada de cada `document_id` y revisa cada relación (`_lnk`) y componente (`_cmps`). Cada incidencia tiene categoría y explicación (`model.ts` → `CATEGORIES`). Si hay alguna fatal, **no se escribe nada** y el reporte dice qué filas y por qué. `--allow cat1,cat2` acepta esas categorías: excluye la fila y, en cascada, lo que depende de ella (país → proyectos → bloques → unidades). Las advertencias (`model.ts` → `WARNING_CATEGORIES`) no bloquean y quedan en el reporte:
    - `unidad-sin-bloque` y `bloque-sin-proyecto`: la relación es obligatoria en el esquema nuevo, así que el hijo se carga en un padre «No definido» que crea el ETL: el proyecto `etl-no-definido` y un bloque `etl-no-definido-<domain>` por tipo de unidad (sin `unitType` → `housing`). Solo se crean si hay huérfanos, y se buscan por su `public_id` para reasignar.
    - `codigo-duplicado`: todas las copias del `code` repetido se cargan con `code` vacío (NULL) para corregirlas después.
    - `tipo-unidad-distinto-al-bloque`, `componente-compartido`.
-3. **Transformación.** Funciones puras. Las relaciones se resuelven por `document_id`, que en `msp_app` es `public_id`. Los campos de fórmula se copian tal cual, sin recalcular.
-4. **Escritura.** Todo en **una transacción** con candado (`pg_try_advisory_xact_lock`, una carga a la vez). Hace upsert por llave natural, así que los `id` se conservan entre corridas y una fila idéntica no se reescribe. En las tablas hijas se borra lo que ya no está en Strapi. En modo completo, `msp_app` queda como **espejo** de lo publicado: lo que ya no existe en Strapi se borra. En modo muestra no se borra nada fuera de la muestra.
+3. **Transformación.** Funciones puras. Las relaciones se resuelven por `document_id`, que en `msp_app` es `public_id`. Los campos de fórmula se copian tal cual de Strapi; el motor de la hoja solo los compara (ver «Fórmulas» abajo).
+4. **Escritura.** Todo en **una transacción** con candado (`pg_try_advisory_xact_lock`, una carga a la vez). Hace upsert por llave natural, así que los `id` se conservan entre corridas y una fila idéntica no se reescribe. En las tablas hijas se borra lo que ya no está en Strapi. En modo completo, `msp_app` queda como **espejo** de lo publicado: lo que ya no existe en Strapi se borra. En modo muestra no se borra nada fuera de la muestra. **Freno al borrado masivo** (`massDeletions()`): si una tabla quedaría vacía, o perdería más del 5 % y más de 50 filas, la carga hace ROLLBACK y lo reporta; si el borrado es real (una depuración en Strapi), se repite con `--allow-mass-delete`.
 5. **Verificación, antes del COMMIT.** Compara cada tabla columna por columna contra la transformación. Compara cada relación contra los pares sacados directo de las tablas `_lnk`/`_cmps` del snapshot crudo, sin pasar por la validación. Compara unidades y suma de `total_price_usd` por bloque. Si algo no cuadra, ROLLBACK: `msp_app` queda como estaba.
 6. **Reporte.** Resumen en consola y `etl/reports/<fecha>-<id>.json` (gitignored), con todas las incidencias y exclusiones. Cada `run` queda en `msp_app.etl_run` por una conexión aparte, incluso si terminó en ROLLBACK (requiere la migración `20261016120000_etl_run`).
+
+**Fórmulas** (`src/load/formulas.ts`). Solo reporte: la carga copia a `msp_app` los valores tal cual vienen de Strapi (decisión del 21 oct; del 19 al 21 oct la carga guardaba el valor recalculado). `validate`, `run` y `verify` generan el reporte en cada corrida y dejan el resumen en `etl_run.counts.formulas` (unidades con diferencia, por campo); `load:formulas` da solo el reporte, sin conectarse a `msp_app`. Para el reporte, se reusan la validación y la transformación, y por cada unidad se corre `ensureUnitFormulasSynced` de `lib/domain/units/formulas.ts` con el contexto de su bloque (`lib/domain/units/context.ts`), igual que la hoja al abrir un bloque. Cuenta como diferencia más de 0.01 en un campo de `RECONCILED_FORMULA_FIELDS`. Las unidades de padres «No definido» se cuentan aparte, sin comparar. Deja `etl/reports/formulas-<fecha>.json` (totales, por campo con ejemplos, por período y dominio, los 20 bloques con más diferencias) y `.csv` (una fila por unidad con diferencias). El reporte se escribe en cada corrida (el CSV pesa ~30 MB con los datos actuales). Los archivos de `lib/domain/` se importan con extensión `.ts` (`allowImportingTsExtensions`), así que no pueden usar alias `@/` ni React.
 
 Cada corrida es completa: vuelve a leer todo y escribe solo las diferencias. No hay modo incremental por `updated_at`, porque la validación necesita ver el grafo entero para saber si una relación quedó rota.
 

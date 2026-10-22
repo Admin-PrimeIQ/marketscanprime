@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { useTranslations } from "next-intl"
-import { type StrapiProject, type CatalogItem, strapiClient } from "@/lib/api/strapi"
+import { type StrapiProject, type CatalogItem } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import {
   Popover,
   PopoverContent,
@@ -57,7 +58,7 @@ export function FinancingTab({ initialData, disabled = false, onStateChange, onF
       
       setIsLoadingNses(true)
       try {
-        const response = await strapiClient.getCatalogList('nses', {
+        const response = await dataClient.getCatalogList('nses', {
           page: 1,
           pageSize: 1000,
           search: nseSearchQuery || undefined,

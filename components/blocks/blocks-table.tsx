@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select"
 import { type StrapiBlock } from "@/lib/api/strapi"
 import { getBlockRegion, REGION_BADGE_CLASS } from "@/lib/region"
-import { DOMAIN_BADGE_CLASS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, domainLabelKey } from "@/lib/block-domain-ui"
 import { CountryPill } from "@/components/ui/country-pill"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2 } from "lucide-react"

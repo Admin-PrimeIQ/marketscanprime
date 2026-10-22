@@ -10,8 +10,9 @@ import { ProjectsTable } from "@/components/projects/projects-table"
 import { AdvancedFilters, ActiveFilters, getFieldDefinitions, getOperatorLabel, type FilterCondition, type AdvancedFiltersRef } from "@/components/projects/advanced-filters"
 import { Plus, Search, X } from "lucide-react"
 import Link from "next/link"
-import { strapiClient, type StrapiProject, type BlockDomain } from "@/lib/api/strapi"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { type StrapiProject, type BlockDomain } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { useTranslations } from "next-intl"
 import {
   Breadcrumb,
@@ -82,7 +83,7 @@ export default function ProjectsPage() {
   // Cargar los países para el filtro rápido (una vez)
   useEffect(() => {
     let cancelled = false
-    strapiClient
+    dataClient
       .getCatalogList('countries', { pageSize: 100, sort: 'name:asc' })
       .then((res) => {
         if (cancelled) return
@@ -101,7 +102,7 @@ export default function ProjectsPage() {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await strapiClient.getProjects({
+      const response = await dataClient.getProjects({
         page: currentPage,
         pageSize: pageSize,
         sort: sort,

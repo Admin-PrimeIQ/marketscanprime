@@ -16,9 +16,9 @@ import {
   type StrapiProject,
   type StrapiExchangeRateProfile,
   type StrapiCurrenciesComponent,
-  strapiClient,
   getRelationDocumentId,
 } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useTranslations } from "next-intl"
@@ -73,7 +73,7 @@ export function ProjectForm({ mode = "create", initialData }: ProjectFormProps) 
   useEffect(() => {
     let cancelled = false
     setProfilesLoading(true)
-    strapiClient
+    dataClient
       .getExchangeRateProfiles({ pageSize: 500 })
       .then((res) => {
         if (!cancelled) setExchangeRateProfiles(res.data ?? [])
@@ -105,7 +105,7 @@ export function ProjectForm({ mode = "create", initialData }: ProjectFormProps) 
     let cancelled = false
     setProfileRatesLoading(true)
 
-    strapiClient
+    dataClient
       .getExchangeRateProfileById(selectedExchangeRateProfileId)
       .then((profile) => {
         if (!cancelled) {
@@ -269,7 +269,7 @@ export function ProjectForm({ mode = "create", initialData }: ProjectFormProps) 
         }
 
         // Crear nuevo proyecto
-        const newProject = await strapiClient.createProject(data)
+        const newProject = await dataClient.createProject(data)
         
         toast({
           title: tCommon('success'),
@@ -293,7 +293,7 @@ export function ProjectForm({ mode = "create", initialData }: ProjectFormProps) 
           return
         }
 
-        await strapiClient.updateProject(initialData.documentId, data)
+        await dataClient.updateProject(initialData.documentId, data)
         
         toast({
           title: tCommon('success'),

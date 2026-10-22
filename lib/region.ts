@@ -1,23 +1,9 @@
-export type BlockRegion = 'GAM' | 'Interior' | 'Desconocido'
+import type { BlockRegion } from './domain/region.ts'
 
-export const GAM_QUARTERS = ['T1', 'T2', 'T3', 'T4'] as const
-export const INTERIOR_QUARTERS = ['S1', 'S2'] as const
-
-export function getBlockRegion(quarter?: string | null): BlockRegion {
-  if (!quarter) return 'Desconocido'
-  if ((GAM_QUARTERS as readonly string[]).includes(quarter)) return 'GAM'
-  if ((INTERIOR_QUARTERS as readonly string[]).includes(quarter)) return 'Interior'
-  return 'Desconocido'
-}
-
-export function getProjectRegions(blocks?: Array<{ quarter?: string | null }>): BlockRegion[] {
-  if (!blocks || blocks.length === 0) return ['Desconocido']
-  const regions = new Set<BlockRegion>()
-  for (const block of blocks) {
-    regions.add(getBlockRegion(block.quarter))
-  }
-  return Array.from(regions)
-}
+// La regla GAM / Interior vive en lib/domain/region.ts (pura, sin UI); acá quedan
+// la bandera y los colores, y se reexporta la regla para no romper importadores.
+export { GAM_QUARTERS, INTERIOR_QUARTERS, getBlockRegion, getProjectRegions } from './domain/region.ts'
+export type { BlockRegion } from './domain/region.ts'
 
 /** Convierte un ISO 3166-1 alpha-2 (ej. "CR", "SV") a emoji de bandera. Vacío si no es válido. */
 export function countryFlag(iso2?: string | null): string {

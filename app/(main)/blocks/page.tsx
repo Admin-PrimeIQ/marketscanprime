@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, X } from "lucide-react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { strapiClient, type StrapiBlock, type BlockDomain } from "@/lib/api/strapi"
+import { type StrapiBlock, type BlockDomain } from "@/lib/api/strapi"
+import { dataClient } from "@/lib/api/client"
 import { useTranslations } from "next-intl"
 import { BlocksTable } from "@/components/blocks/blocks-table"
 import { AdvancedFilters, ActiveFilters, getOperatorLabel, type FilterCondition, type AdvancedFiltersRef, type FieldDefinition } from "@/components/projects/advanced-filters"
@@ -17,7 +18,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
-import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/domain"
+import { DOMAIN_BADGE_CLASS, DOMINIOS, domainLabelKey } from "@/lib/block-domain-ui"
 import { TourGuide } from "@/components/tour/tour-guide"
 import { useTour } from "@/hooks/use-tour"
 import { getBlocksTourSteps } from "@/components/tour/tour-steps"
@@ -68,7 +69,7 @@ export default function BlocksPage() {
   // Si viene ?project= en la URL, inyectar el nombre del proyecto en el buscador
   useEffect(() => {
     if (!projectParam) return
-    strapiClient.getProjectById(projectParam)
+    dataClient.getProjectById(projectParam)
       .then(p => { if (p?.name) setSearchQuery(p.name) })
       .catch(() => {})
   }, [projectParam])
@@ -98,7 +99,7 @@ export default function BlocksPage() {
   // Cargar los países para el filtro rápido (una vez)
   useEffect(() => {
     let cancelled = false
-    strapiClient
+    dataClient
       .getCatalogList('countries', { pageSize: 100, sort: 'name:asc' })
       .then((res) => {
         if (cancelled) return
@@ -117,7 +118,7 @@ export default function BlocksPage() {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await strapiClient.getBlocks({
+      const response = await dataClient.getBlocks({
         page: currentPage,
         pageSize: pageSize,
         sort: sort,
