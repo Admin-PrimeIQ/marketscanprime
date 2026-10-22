@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server"
+import { resolveDataBackend } from "@/lib/api/data-backend"
 import { isValidStrapiBearer } from "@/lib/auth/verify-strapi-bearer"
 import { logApi, userFromBearer } from "@/lib/server-logger"
 import {
@@ -12,12 +13,28 @@ import { loadExchangeRatesFromWebhook } from "@/lib/exchange-rates"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
+/**
+ * Quién llama. Backend `prisma`: el usuario de la sesión de Better Auth (cookie), cargado con
+ * `import()` para que el backend `strapi` nunca toque la base nueva. Si no, el bearer de Strapi.
+ */
+async function caller(request: NextRequest): Promise<{ ok: boolean; user: string }> {
+  if (resolveDataBackend() === "prisma") {
+    const { requireUser } = await import("@/lib/db/session")
+    try {
+      return { ok: true, user: (await requireUser()).email }
+    } catch {
+      return { ok: false, user: "anon" }
+    }
+  }
+  const authorization = request.headers.get("authorization")
+  return { ok: await isValidStrapiBearer(authorization), user: userFromBearer(authorization) }
+}
+
 export async function GET(request: NextRequest) {
   const t0   = Date.now()
-  const user = userFromBearer(request.headers.get("authorization"))
   const path = request.nextUrl.pathname
 
-  const ok = await isValidStrapiBearer(request.headers.get("authorization"))
+  const { ok, user } = await caller(request)
   if (!ok) {
     logApi({ tag: "route:GET", path, user, status: 401, durationMs: Date.now() - t0, error: "Unauthorized" })
     return Response.json(
@@ -61,10 +78,9 @@ export async function GET(request: NextRequest) {
 /** Vacía la caché en memoria del tipo de cambio (p. ej. al cerrar sesión). */
 export async function DELETE(request: NextRequest) {
   const t0   = Date.now()
-  const user = userFromBearer(request.headers.get("authorization"))
   const path = request.nextUrl.pathname
 
-  const ok = await isValidStrapiBearer(request.headers.get("authorization"))
+  const { ok, user } = await caller(request)
   if (!ok) {
     logApi({ tag: "route:DELETE", path, user, status: 401, durationMs: Date.now() - t0, error: "Unauthorized" })
     return Response.json(

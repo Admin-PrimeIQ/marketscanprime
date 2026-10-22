@@ -4,7 +4,7 @@ import { blockFinancing, blockRow } from "./blocks"
 import { CATALOG_SOURCES, catalogRow, profileCurrencies } from "./catalogs"
 import { projectLinks, projectRow } from "./projects"
 import { unitRow, unitTypes } from "./units"
-import { userRow } from "./users"
+import { credentialAccounts, userRow } from "./users"
 
 /**
  * Snapshot validado → filas de `msp_app`. Funciones puras: las relaciones ya vienen resueltas
@@ -36,6 +36,7 @@ export function transform(resolved: Resolved): AppData {
   data.unit_industrial = types.industrial
 
   data.user = [...present.up_users.values()].map((row) => userRow(resolved, row))
+  data.account = credentialAccounts(data.user)
   addUndefinedParents(data)
   return data
 }

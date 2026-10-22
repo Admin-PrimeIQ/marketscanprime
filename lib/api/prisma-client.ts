@@ -1,7 +1,7 @@
 import type { StrapiAuthResponse, StrapiUser } from "./strapi"
 import type { DataClient } from "./client"
 import type { ActionResult } from "@/lib/db/action-result"
-import { devLoginAction } from "@/lib/db/auth-actions"
+import { getMeAction, loginAction, logoutAction } from "@/lib/db/auth-actions"
 import {
   createCatalogItemAction,
   deleteCatalogItemAction,
@@ -13,27 +13,20 @@ import {
 /**
  * Implementación `prisma` de `dataClient` (`NEXT_PUBLIC_DATA_BACKEND=prisma`).
  *
- * - Catálogos: reales, contra `msp_app` vía Server Actions.
- * - Login: valida usuario y clave contra la tabla `user` de `msp_app` (hashes bcrypt de Strapi).
- *   Nunca llama a Strapi. La sesión vive en `localStorage` hasta que llegue Auth.js.
+ * - Catálogos: reales, contra `msp_app` vía Server Actions, con permiso por rol.
+ * - Sesión: Better Auth (`lib/auth/server.ts`) con cookie httpOnly; nunca llama a Strapi. El
+ *   navegador no ve la cookie: `getMe` la valida en el servidor.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
  *
  * Dónde se puede usar (`next dev` o un despliegue con `MSP_STAGING_DEPLOY=true`) lo decide la guarda
  * de las Server Actions (`lib/db/guard.ts`), no el navegador.
  */
 
-const DEV_SESSION_KEY = "msp_dev_session"
-const DEV_TOKEN = "dev-local"
-
-function readDevSession(): StrapiUser | null {
-  if (typeof window === "undefined") return null
-  try {
-    const user = JSON.parse(localStorage.getItem(DEV_SESSION_KEY) ?? "null") as StrapiUser | null
-    return user && typeof user.email === "string" ? user : null
-  } catch {
-    return null
-  }
-}
+/**
+ * Va en `jwt` porque `lib/auth/auth.ts` guarda la respuesta del login tal cual; no es una credencial
+ * (la sesión real viaja en la cookie).
+ */
+const COOKIE_SESSION = "cookie-session"
 
 function notMigrated(method: string): never {
   throw new Error(`"${method}" todavía no está migrado a la base nueva (NEXT_PUBLIC_DATA_BACKEND=prisma).`)
@@ -48,20 +41,17 @@ function unwrap<T>(result: ActionResult<T>): T {
 
 export const prismaDataClient: DataClient = {
   async login(identifier: string, password: string): Promise<StrapiAuthResponse> {
-    const user = unwrap(await devLoginAction(identifier, password))
-    localStorage.setItem(DEV_SESSION_KEY, JSON.stringify(user))
-    return { jwt: DEV_TOKEN, user }
+    const user = unwrap(await loginAction(identifier, password))
+    return { jwt: COOKIE_SESSION, user }
   },
   logout() {
-    if (typeof window !== "undefined") localStorage.removeItem(DEV_SESSION_KEY)
+    void logoutAction().catch(() => {})
   },
   isAuthenticated() {
-    return readDevSession() !== null
+    return true
   },
-  async getMe() {
-    const user = readDevSession()
-    if (!user) throw new Error("No hay sesión iniciada en la base nueva.")
-    return user
+  async getMe(): Promise<StrapiUser> {
+    return unwrap(await getMeAction())
   },
   async forgotPassword() {
     notMigrated("forgotPassword")

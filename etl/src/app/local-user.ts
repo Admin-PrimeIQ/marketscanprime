@@ -4,7 +4,8 @@ import { appPoolConfig } from "./connection"
 
 /**
  * Crea o actualiza en `msp_app.user` una cuenta propia de la app nueva (no viene de Strapi), con
- * `public_id` `app-<usuario>`: la carga espejo del ETL no la borra ni la verifica (`localPrefix`).
+ * `public_id` `app-<usuario>`, y su fila `account` (`credential`) para el login de Better Auth: la
+ * carga espejo del ETL no las borra ni las verifica (`localPrefix`).
  *
  * Toma el correo y el hash bcrypt de `DEV_LOGIN_EMAIL` / `DEV_LOGIN_PASSWORD_HASH` del `.env`, así
  * la clave en texto plano no pasa por aquí. Sin `--apply` solo muestra lo que haría.
@@ -62,6 +63,15 @@ async function main() {
          username = EXCLUDED.username, email = EXCLUDED.email, provider = 'local',
          password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, blocked = false, updated_at = now()`,
       [publicId, username, email, hash, role],
+    )
+    // Better Auth lee la clave de la cuenta `credential` (no de `user.password_hash`) y exige
+    // `account_id` = id del usuario.
+    await client.query(
+      `INSERT INTO account (user_id, account_id, provider_id, password, created_at, updated_at)
+       SELECT id, id::text, 'credential', $2, now(), now() FROM "user" WHERE public_id = $1
+       ON CONFLICT (user_id, provider_id) DO UPDATE SET
+         account_id = EXCLUDED.account_id, password = EXCLUDED.password, updated_at = now()`,
+      [publicId, hash],
     )
     await client.query("COMMIT")
     console.log("Listo.")

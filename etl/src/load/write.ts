@@ -1,5 +1,5 @@
 import type pg from "pg"
-import { mirroredRows, SPEC_BY_TABLE, SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
+import { mirroredRows, mirroredScope, SPEC_BY_TABLE, SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
 import { pgType, q } from "./sql"
 
 /**
@@ -167,6 +167,10 @@ async function deleteStaleChildren(client: pg.Client, spec: TableSpec, rows: App
   const unnest = spec.key.map((_, i) => `$${i + 1}::text[]`).join(", ")
   const params: unknown[] = spec.key.map((k) => rows.map((r) => r[k]))
   let sql = `DELETE FROM ${q(spec.table)} WHERE ${tuple} NOT IN (SELECT * FROM unnest(${unnest}))`
+  const parent = spec.columns.find((c) => c.name === spec.scope)!.ref!
+  if (SPEC_BY_TABLE[parent].localPrefix) {
+    sql += ` AND ${q(spec.scope!)} IN (SELECT id FROM ${q(parent)} WHERE ${mirroredScope(spec, "public_id")})`
+  }
   if (mode === "sample") {
     params.push(scopeIds)
     sql += ` AND ${q(spec.scope!)} = ANY($${params.length}::integer[])`

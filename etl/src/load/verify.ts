@@ -11,7 +11,7 @@ import {
 } from "./model"
 import { bool, cents, float, int, numeric, text, timestamp, type Value } from "./normalize"
 import type { Collection, RawRow, Snapshot, StrapiTable } from "./snapshot"
-import { mirroredRows, SPEC_BY_TABLE, SPECS, rowKey, type AppData, type AppRow, type AppTable, type Column, type TableSpec } from "./specs"
+import { mirroredRows, mirroredScope, SPEC_BY_TABLE, SPECS, rowKey, type AppData, type AppRow, type AppTable, type Column, type TableSpec } from "./specs"
 import { q } from "./sql"
 import type { Mode } from "./write"
 
@@ -95,14 +95,14 @@ function selectSql(spec: TableSpec, mode: Mode): string {
   const exprs = spec.columns.map((column, i) => {
     const c = q(column.name)
     if (column.kind === "ref") {
-      joins.push(`LEFT JOIN ${q(column.ref!)} j${i} ON j${i}.id = t.${c}`)
+      joins.push(`LEFT JOIN ${q(column.ref!)} j${i} ON ${column.textRef ? `j${i}.id::text` : `j${i}.id`} = t.${c}`)
       if (column.name === spec.scope) scopeExpr = `j${i}.public_id`
       return `j${i}.public_id AS ${c}`
     }
     if (column.kind === "timestamp") return `to_char(t.${c} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS ${c}`
     return `t.${c}::text AS ${c}`
   })
-  const where = [mode === "sample" ? `${scopeExpr} = ANY($1::text[])` : "TRUE", mirroredRows(spec, "t.public_id")]
+  const where = [mode === "sample" ? `${scopeExpr} = ANY($1::text[])` : "TRUE", mirroredScope(spec, scopeExpr)]
   return `SELECT ${exprs.join(", ")} FROM ${q(spec.table)} t ${joins.join(" ")} WHERE ${where.join(" AND ")}`
 }
 

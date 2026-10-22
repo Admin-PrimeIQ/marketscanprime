@@ -708,12 +708,16 @@ model UnitIndustrial {
 // Usuarios
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// `passwordHash` es el bcrypt de up_users, migrado tal cual (nadie cambia contraseña).
+/// `passwordHash` es el bcrypt de up_users, migrado tal cual (nadie cambia contraseña). El login
+/// (Better Auth, lib/auth/server.ts) lo lee de `account.password`; esta columna se quita después.
+/// `name` e `image` los pide Better Auth; `confirmed` hace de su `emailVerified`.
 model User {
   id                     Int       @id @default(autoincrement())
   publicId               String    @unique @default(cuid()) @map("public_id")
   username               String    @unique
   email                  String    @unique
+  name                   String?
+  image                  String?
   provider               String    @default("local")
   passwordHash           String?   @map("password_hash")
   role                   UserRole  @default(authenticated)
@@ -725,8 +729,64 @@ model User {
   updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   auditLogs AuditLog[]
+  sessions  Session[]
+  accounts  Account[]
 
   @@map("user")
+}
+
+/// Sesión de Better Auth. `token` es lo que viaja (firmado) en la cookie httpOnly.
+model Session {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+/// Cuenta de Better Auth. Las de `provider_id = 'credential'` llevan el hash bcrypt de Strapi en
+/// `password` y, como exige Better Auth, `account_id` = id del usuario en texto; las carga el ETL
+/// (una por usuario local con clave) y `app:local-user`.
+model Account {
+  id                    Int       @id @default(autoincrement())
+  userId                Int       @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  password              String?
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(6)
+  scope                 String?
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerId])
+  @@map("account")
+}
+
+/// Tokens de un solo uso de Better Auth (verificación, recuperación de clave).
+model Verification {
+  id         Int      @id @default(autoincrement())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([identifier])
+  @@map("verification")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

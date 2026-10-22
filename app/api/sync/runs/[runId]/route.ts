@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 import { isValidStrapiBearer } from "@/lib/auth/verify-strapi-bearer"
 import { logApi, userFromBearer } from "@/lib/server-logger"
+import { syncUnavailableInPrisma } from "@/lib/sync/prisma-unavailable"
 import { getRun, SyncApiError } from "@/lib/sync/runs-api"
 
 export const dynamic = "force-dynamic"
@@ -17,6 +18,8 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ runId: string }> }
 ) {
+  const unavailable = syncUnavailableInPrisma()
+  if (unavailable) return unavailable
   const t0 = Date.now()
   const user = userFromBearer(request.headers.get("authorization"))
   const path = request.nextUrl.pathname
