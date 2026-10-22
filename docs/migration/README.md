@@ -559,7 +559,7 @@ Proyecto de Vercel **nuevo**, no el de `admin.primeiqlatam.com`. La guarda (`lib
 | `NEXT_PUBLIC_DATA_BACKEND` | `prisma` |
 | `MSP_STAGING_DEPLOY` | `true` |
 | `DATABASE_URL_APP` | La misma del `.env` |
-| `DATABASE_CA_APP` | Contenido PEM de `etl/certs/dbo-stage-ca.pem` (el archivo está en `.gitignore`) |
+| `DATABASE_CA_APP` | `etl/certs/dbo-stage-ca.pem` (el archivo está en `.gitignore`) en base64, una sola línea. Se copia con `[Convert]::ToBase64String([IO.File]::ReadAllBytes("etl\certs\dbo-stage-ca.pem")) \| Set-Clipboard`. También acepta el PEM tal cual. |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1`, para que Vercel use el pnpm fijado en `package.json` |
 
 No poner en Vercel ninguna variable de Strapi, sync, n8n ni del ETL. `DEV_LOGIN_*` es opcional; sin ella solo entran los usuarios de `msp_app`.
