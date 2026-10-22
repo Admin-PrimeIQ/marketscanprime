@@ -11,7 +11,7 @@ import {
 } from "./model"
 import { bool, cents, float, int, numeric, text, timestamp, type Value } from "./normalize"
 import type { Collection, RawRow, Snapshot, StrapiTable } from "./snapshot"
-import { SPECS, rowKey, type AppData, type AppRow, type AppTable, type Column, type TableSpec } from "./specs"
+import { mirroredRows, SPEC_BY_TABLE, SPECS, rowKey, type AppData, type AppRow, type AppTable, type Column, type TableSpec } from "./specs"
 import { q } from "./sql"
 import type { Mode } from "./write"
 
@@ -102,8 +102,8 @@ function selectSql(spec: TableSpec, mode: Mode): string {
     if (column.kind === "timestamp") return `to_char(t.${c} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS ${c}`
     return `t.${c}::text AS ${c}`
   })
-  const where = mode === "sample" ? ` WHERE ${scopeExpr} = ANY($1::text[])` : ""
-  return `SELECT ${exprs.join(", ")} FROM ${q(spec.table)} t ${joins.join(" ")}${where}`
+  const where = [mode === "sample" ? `${scopeExpr} = ANY($1::text[])` : "TRUE", mirroredRows(spec, "t.public_id")]
+  return `SELECT ${exprs.join(", ")} FROM ${q(spec.table)} t ${joins.join(" ")} WHERE ${where.join(" AND ")}`
 }
 
 function scopeIds(spec: TableSpec, data: AppData): string[] {
@@ -287,7 +287,8 @@ async function verifyRelations(client: pg.Client, snapshot: Snapshot, present: P
       if (user && role) expected.set(user, role)
     }
     const { where, params } = scoped("up_users", "u")
-    const actual = await pairs(client, `SELECT u.public_id AS k, u.role::text AS v FROM "user" u${where}`, params)
+    const mirrored = mirroredRows(SPEC_BY_TABLE.user, "u.public_id")
+    const actual = await pairs(client, `SELECT u.public_id AS k, u.role::text AS v FROM "user" u${where ? `${where} AND` : " WHERE"} ${mirrored}`, params)
     checks.push(compareMaps("usuario → rol", expected, actual))
   }
 

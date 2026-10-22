@@ -1,5 +1,5 @@
 import type pg from "pg"
-import { SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
+import { mirroredRows, SPEC_BY_TABLE, SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
 import { pgType, q } from "./sql"
 
 /**
@@ -9,7 +9,8 @@ import { pgType, q } from "./sql"
  *   mantienen entre corridas y una fila idéntica no se reescribe (`IS DISTINCT FROM`).
  * - Tablas hijas: se borran las filas del padre que ya no existen en Strapi.
  * - Modo `full` (espejo): lo que ya no está en Strapi se borra; en `sample` solo se tocan las filas
- *   de la muestra y nunca se borra nada fuera de ella.
+ *   de la muestra y nunca se borra nada fuera de ella. Las filas propias de la app nueva
+ *   (`localPrefix`) no son espejo y quedan intactas en los dos modos.
  */
 
 export type Mode = "full" | "sample"
@@ -150,7 +151,8 @@ async function releaseUniques(client: pg.Client, spec: TableSpec, rows: AppRow[]
       )
       if (mode === "full") {
         await client.query(
-          `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder} WHERE t.${c} IS NOT NULL AND t.public_id NOT IN (SELECT unnest($1::text[]))`,
+          `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder}
+            WHERE t.${c} IS NOT NULL AND t.public_id NOT IN (SELECT unnest($1::text[])) AND ${mirroredRows(spec, "t.public_id")}`,
           [rows.map((r) => r.public_id)],
         )
       }
@@ -175,7 +177,7 @@ async function deleteStaleChildren(client: pg.Client, spec: TableSpec, rows: App
 
 async function prune(client: pg.Client, table: AppTable, publicIds: string[]): Promise<number> {
   const result = await step(`borrar de ${table} lo que ya no está en Strapi`, () =>
-    client.query(`DELETE FROM ${q(table)} WHERE public_id NOT IN (SELECT unnest($1::text[]))`, [publicIds]),
+    client.query(`DELETE FROM ${q(table)} WHERE public_id NOT IN (SELECT unnest($1::text[])) AND ${mirroredRows(SPEC_BY_TABLE[table])}`, [publicIds]),
   )
   return result.rowCount ?? 0
 }

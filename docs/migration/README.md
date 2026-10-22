@@ -22,7 +22,7 @@ Reglas que aplican siempre:
 
 Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 22 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Para retomar rápido:** lee la sección 0, luego la §13 (dónde quedó la última conversación y qué está esperando respuesta) y la §14 (Fase 5: la app sobre `msp_app`, lo último que se hizo, con cómo correrla y cómo seguir). Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Para retomar rápido:** lee la sección 0, luego la §13 (dónde quedó la última conversación y qué está esperando respuesta) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -168,12 +168,12 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 
 ## 6. Estado actual del trabajo
 
-Al 22 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). Nada está fusionado a `main`. Hay dos ramas encadenadas:
+Al 22 oct 2026, 10:15 (UTC-6). `main` coincide con `origin/main` (último commit `fa54fe4`). Nada está fusionado a `main`. Hay dos ramas encadenadas:
 
 - **`feat/lib-domain`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, `FORMULAS.md`, documentos corregidos). Subida a `origin`.
-- **`feat/data-facade`**, que sale de la anterior: `6d5adec` y `9b39f51` (21 oct: código muerto fuera y fachada `dataClient`, v1.28.2). Subida a `origin` hasta `9b39f51`.
+- **`feat/data-facade`**, que sale de la anterior: `6d5adec` y `9b39f51` (21 oct: código muerto fuera y fachada `dataClient`, v1.28.2), y encima los commits que hizo **el usuario** el 22 oct con el trabajo de catálogos, login, pnpm, `.env` único, despliegue en Vercel y certificado versionado (v1.29.0): `4a2d42f`, `fe5e52b`, `9dc8e36`, `04933ed`, `9c0ab82` y `a9baab4`. Subida a `origin` hasta `a9baab4` (la rama local está al día con `origin/feat/data-facade`).
 
-**Sin commit** en `feat/data-facade`: todo el trabajo de catálogos y login sobre Prisma (v1.29.0, §14). El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
+**Sin commit** en `feat/data-facade` (22 oct, después de `a9baab4`): la cuenta propia `app-engteam` y el cambio del ETL para no borrar cuentas `app-…` (§14.7). Archivos: `CHANGELOG.md`, `docs/migration/README.md`, `etl/README.md`, `etl/package.json`, `etl/src/load/load.test.ts`, `etl/src/load/specs.ts`, `etl/src/load/verify.ts`, `etl/src/load/write.ts` y el nuevo `etl/src/app/local-user.ts`. El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito; el usuario hace sus commits y push él mismo. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -186,7 +186,8 @@ Al 22 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). Na
 | Revisión del warehouse en Postgres | 15–16 oct: comparadas las tablas del push de n8n contra el servidor de staging. Resultado en §11.3 y §11.4. |
 | **Fase 3: ETL Strapi → `msp_app`** | **Carga inicial hecha** (19 oct, COMMIT) con el snapshot del RDS del 16 oct 22:21: 1,135 proyectos, 1,688 bloques, 238,226 unidades, 17 usuarios, catálogos, perfiles, financiamiento y tasas (los totales incluyen los padres «No definido»). Verificación antes del COMMIT y `load:verify` posterior: 25/25 tablas, 19/19 relaciones, 1/1 agregados. 0 filas excluidas; 664 advertencias. Migración `20261016120000_etl_run` aplicada (bitácora en `msp_app.etl_run`). Idempotencia comprobada el 19 oct: un `--dry-run` con el mismo snapshot dio 0 filas nuevas, 0 cambiadas y 0 borradas en las 25 tablas. Reporte de diferencias de fórmulas hecho el 19 oct (§12.8): 52 % de las unidades difiere del motor en al menos un campo, casi todo por reglas distintas en períodos viejos. Del 19 al 21 oct la carga guardó el valor recalculado; desde el 21 oct copia los campos de fórmula tal cual vienen de Strapi (recarga con COMMIT el 21 oct con el mismo snapshot: 123,442 unidades vueltas a su valor de Strapi, verificación y `load:verify` 25/25, 19/19, 1/1). Falta refrescar con un snapshot nuevo. Detalle completo en la §12. |
 | **Fase 5 (inicio): fachada y limpieza** | 21 oct, rama **`feat/data-facade`** (sale de `feat/lib-domain`, commit `9b39f51`, v1.28.2). Borrado el código muerto de `ROADMAP.md` §4.1 (9 archivos). La UI pide los datos a `dataClient` (`lib/api/client.ts`, contrato `DataClient` de 31 métodos) en vez de `strapiClient`; detrás sigue el mismo cliente de Strapi, así que producción no cambia. Backend elegido con `NEXT_PUBLIC_DATA_BACKEND` (solo `strapi` por ahora). Siguiente: implementación `prisma`, empezando por auth y catálogos. |
-| **Fase 5: catálogos sobre Prisma** | 21–22 oct, misma rama, sin commit (v1.29.0). Detalle para retomar en la §14. Prisma en la raíz (decisión 10): segundo generador `app` en `prisma/schema.prisma` → `lib/db/generated` (ignorado; lo crea `postinstall` o `pnpm db:generate`). `lib/db/`: conexión a `msp_app` solo con `DATABASE_URL_APP` (sin respaldo a `DATABASE_URL_DBO_STAGE`), repositorio genérico de los 12 catálogos y Server Actions. La implementación `prisma` de `dataClient` cubre los 5 métodos de catálogo; los demás fallan con un mensaje claro. Sin auth todavía: las Server Actions solo responden en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`, y el login valida contra `msp_app.user` con los hashes bcrypt (decisión 13), sin llamar a Strapi; la sesión queda en el navegador hasta Auth.js. Se corre con `npm run dev:staging` y `.env.staging.local`, sin cargar el `.env` de producción. Verificado: lectura de los 12 catálogos contra `msp_app` en sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id), `npm test` 89/89, `tsc` sin errores nuevos, `next build` aislado OK, servidor levantado y proxy de Strapi sin salida a producción. Falta recorrer la lista "debe seguir funcionando" de `ROADMAP.md` §4.4 en el navegador. |
+| **Fase 5: staging en Vercel** | 22 oct, commits del usuario hasta `a9baab4`. Proyecto de Vercel **nuevo** (no `admin.primeiqlatam.com`) con el backend `prisma`, funcionando: login y catálogos contra `msp_app`. Un solo `.env` local, guarda que acepta `MSP_STAGING_DEPLOY=true`, raíz TLS de Railway versionada y metida en cada función. Cuenta `app-engteam` en `msp_app.user` (sin commit el cambio del ETL que la protege). Detalle en §14.2, §14.2.1 y §14.7. |
+| **Fase 5: catálogos sobre Prisma** | 21–22 oct, misma rama, con commit desde el 22 oct (v1.29.0). Detalle para retomar en la §14. Lo que sigue en esta fila es el estado del 21 oct; lo que cambió el 22 (staging en Vercel, `.env` único) está en la fila de arriba. Prisma en la raíz (decisión 10): segundo generador `app` en `prisma/schema.prisma` → `lib/db/generated` (ignorado; lo crea `postinstall` o `pnpm db:generate`). `lib/db/`: conexión a `msp_app` solo con `DATABASE_URL_APP` (sin respaldo a `DATABASE_URL_DBO_STAGE`), repositorio genérico de los 12 catálogos y Server Actions. La implementación `prisma` de `dataClient` cubre los 5 métodos de catálogo; los demás fallan con un mensaje claro. Sin auth todavía: las Server Actions solo responden en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`, y el login valida contra `msp_app.user` con los hashes bcrypt (decisión 13), sin llamar a Strapi; la sesión queda en el navegador hasta Auth.js. Se corre con `npm run dev:staging` y `.env.staging.local`, sin cargar el `.env` de producción. Verificado: lectura de los 12 catálogos contra `msp_app` en sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id), `npm test` 89/89, `tsc` sin errores nuevos, `next build` aislado OK, servidor levantado y proxy de Strapi sin salida a producción. Falta recorrer la lista "debe seguir funcionando" de `ROADMAP.md` §4.4 en el navegador. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -198,8 +199,9 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | `npm run stage:ping` | Usuario `j_stage_admin`; esquemas `dbo` (11 tablas, sin acceso), `dbo_stage` (16 tablas, lectura y escritura), `msp_app` (31 con `etl_run`, dueño), `public` (0); las 11 tablas del push presentes en `dbo` y `dbo_stage`. |
 | `npm run stage:describe` | Estructura de `dbo_stage`; `-- --schema dbo` para el otro esquema. Las 11 tablas del warehouse con `vivas≈0 insertadas=0`. |
 | `npm run app:status` | "Database schema is up to date!" (2 migraciones: `init` y `etl_run`). |
-| `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 19 oct (unidades 238,226, bloques 1,688, proyectos 1,135, usuarios 17). |
-| `npm test` | 48 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre 89: el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, guarda y login) y el resto de módulos puros. |
+| `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 19 oct (unidades 238,226, bloques 1,688, proyectos 1,135) y **18 usuarios**: los 17 de Strapi más la cuenta propia `app-engteam` (22 oct, §14.7). |
+| `npm run app:local-user` | Sin `--apply` solo simula: debe decir `public_id app-engteam … ya existe: se actualizará`. |
+| `npm test` | 50 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre 92: el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, guarda, login y `normalizeCaPem`) y el resto de módulos puros. |
 | `npm run load:verify -- --snapshot 20261016-222126-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
 | `npm run warehouse:ping` | **Todavía no se ha corrido con éxito.** Necesita `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3). Debe mostrar solo `SELECT`/`SHOW VIEW` y las 11 tablas del push en `dbo_stage` y `dbo`. |
 
@@ -233,11 +235,11 @@ Reglas:
 
 El plan completo por fases (decisiones, esquema nuevo, carga, push, app, workers, corte y limpieza) está en [`ROADMAP.md`](./ROADMAP.md). Sus casillas de las fases 1 a 3 están al día (21 oct); en la Fase 1 queda abierta la comparación con `strapi:pull:print`, que no bloquea.
 
-Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3), ~~carga inicial Strapi → `msp_app`~~ (Fase 3, §12), ~~`lib/domain/` con el motor de fórmulas y su contexto de bloque~~ (19 oct), ~~reporte de diferencias de fórmulas~~ (§12.8), ~~fachada `dataClient` y código muerto~~ (21 oct), ~~catálogos y login de la app sobre `msp_app`~~ (21–22 oct, §14).
+Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3), ~~carga inicial Strapi → `msp_app`~~ (Fase 3, §12), ~~`lib/domain/` con el motor de fórmulas y su contexto de bloque~~ (19 oct), ~~reporte de diferencias de fórmulas~~ (§12.8), ~~fachada `dataClient` y código muerto~~ (21 oct), ~~catálogos y login de la app sobre `msp_app`~~ (21–22 oct, §14), ~~commit de catálogos y login~~ (22 oct, el usuario), ~~staging en Vercel con el backend `prisma`~~ (22 oct, §14.2.1), ~~cuenta `engteam@` en la base nueva~~ (22 oct, §14.7).
 
 Lo inmediato en la **Fase 5** (la línea en la que se estaba trabajando; detalle en la §14.6):
 
-- **A.** Que el usuario recorra en el navegador la lista de catálogos de `ROADMAP.md` §4.4 y, si está bien, **preguntarle** si se hace commit en `feat/data-facade` (sin push).
+- **A.** Que el usuario recorra en el navegador (local o el staging de Vercel) la lista de catálogos de `ROADMAP.md` §4.4, y que haga commit de lo que quedó sin commit el 22 oct (§6 y §14.7).
 - **B.** Siguiente módulo de la implementación `prisma`, a elección del usuario: proyectos en solo lectura (lo que más pantallas habilita), perfiles de tipo de cambio (el más corto) o auth con Auth.js (el orden del roadmap).
 
 Lo inmediato en el resto de la migración:
@@ -276,7 +278,11 @@ Lo inmediato en el resto de la migración:
 - **Pendientes del esquema de la app (Fase 2):** los enums con `@map` (`Availability.Not_Available` ↔ `"Not Available"`, `OfficeClassification.Micro_1` ↔ `"Micro 1"`, …) necesitan un mapeo explícito al cargar desde Strapi y al exponer DTOs; el índice único parcial "una sola corrida de sync activa" no está modelado (Prisma no lo soporta; agregarlo a mano en una migración); `m2_range` de oficinas y la calidad industrial quedaron como texto porque Strapi tiene variantes sucias.
 - **Permisos en staging:** `j_stage_admin` tiene `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` sobre todo `dbo_stage` (incluidas las `sec_*`). Desde el 21 oct (decisión 9) el push nuevo puede escribir en las 11 tablas del warehouse; como el permiso alcanza también a las `sec_*`, la protección de esas tablas tiene que estar en el código (lista cerrada de tablas en el cliente de escritura).
 - **Códigos ISO de países invertidos respecto al formulario** (22 oct): en los datos, `isoCode` es alfa-3 (`GTM`, `SLV`) e `isoCode2` alfa-2 (`GT`), y el IVA, la cuota y los departamentos leen `isoCode2`. El formulario de `components/catalogs/catalog-table.tsx` valida al revés (2 letras en `isoCode`, 3 en `isoCode2`), así que hoy no deja guardar un país existente sin cambiarle los códigos, tampoco con Strapi. El servidor nuevo no valida el largo. Sin decidir; anotado en `ROADMAP.md` §4.4.
-- **`j_stage_admin` también ve el `dbo` de producción del servidor de Railway**: la app nueva usa esa credencial (copiada como `DATABASE_URL_APP` en `.env.staging.local`), y el código la fija a `msp_app`. Lo seguro sería un usuario de Postgres propio que solo pueda entrar a `msp_app`; tiene que crearlo un administrador, no el agente.
+- **`j_stage_admin` también ve el `dbo` de producción del servidor de Railway**: la app nueva usa esa credencial (copiada como `DATABASE_URL_APP` en el `.env` y, desde el 22 oct, también en las variables del proyecto de staging de Vercel), y el código la fija a `msp_app`. Lo seguro sería un usuario de Postgres propio que solo pueda entrar a `msp_app`; tiene que crearlo un administrador, no el agente. Con el despliegue en Vercel esto pesa más: es una razón más para la protección de despliegues (§14.2.1).
+- **`next dev` expande los `$` del `.env`** (22 oct): Next carga el `.env` con `dotenv-expand`, que reemplaza `$2a`, `$10`… aunque el valor esté entre comillas simples. Un hash bcrypt en `DEV_LOGIN_PASSWORD_HASH` llega roto a `pnpm run dev` (39 caracteres en vez de 60) y el login falla con "Invalid identifier or password". `pnpm dev:staging` lee con `util.parseEnv` de Node, que no expande; escapar con `\$` arregla Next pero rompe ese lector. Vercel entrega los valores tal cual. Por eso la cuenta `engteam@` se metió en la base (§14.7).
+- **`.env.local` manda sobre `.env`** en Next. El 22 oct había un `.env.local` (un `vercel env pull` de producción) con `STRAPI_PASSWORD`, `SYNC_API_KEY` y `STRAPI_ADMIN_TOKEN` activos, aunque el `.env` los tenía comentados; se absorbió en el `.env` (§14.2). Antes de afirmar que un entorno "no tiene credenciales de producción", revisar **todos** los `.env*`.
+- **Clave de producción expuesta en el chat** (22 oct): el usuario pegó en la conversación las líneas `market_scan_USERNAME`/`market_scan_PASSWORD` del `.env` (cuenta `engteam@primeiqlatam.com` del panel de Strapi). Se le recomendó rotarla. Es un cambio en Strapi de producción: lo hace una persona, no el agente. El hash bcrypt de esa clave es el de `app-engteam`; si se rota, actualizar `DEV_LOGIN_PASSWORD_HASH` y repetir `npm run app:local-user -- --apply`.
+- **Mensajes de error de la base hacia el navegador**: `actionFailure` (`lib/db/action-result.ts`) devuelve el mensaje del error al cliente; un fallo de conexión podría mostrar el usuario o el host de Postgres (nunca la clave). Se ofreció volverlos genéricos y registrar el detalle solo en el servidor; sin respuesta.
 - **Skill e inventario de producción desactualizados:** `inventario-produccion.md` y la skill `proteger-produccion` todavía nombran `STRAPI_DATABASE_URL` (hoy son las variables `DATABASE_*_STRAPI`) y no registran el Postgres de staging (`railway`, esquemas `msp_app`/`dbo_stage`/`dbo`). La skill además pide un proyecto de Railway nuevo para la app, y la decisión 8 usó el servidor de staging. Solo el usuario puede editarlos.
 
 ---
@@ -437,12 +443,13 @@ Por período: 2026 T3 vivienda 25 % con diferencias, 2026 S1 vivienda 71 % (la c
 
 ### 13.1 Estado
 
-- **Lo último (21–22 oct):** la Fase 5 arrancó. La UI usa la fachada `dataClient`, y la implementación `prisma` ya cubre catálogos y login contra `msp_app`. La app corre en local sin Strapi con `npm run dev:staging`; el usuario la levanta él mismo, y al 22 oct la tenía corriendo en su terminal. Todo eso está en `feat/data-facade`, **sin commit**. Detalle, cómo correrla y cómo seguir: **§14**.
-- Ramas: `feat/lib-domain` (subida hasta `f8c8ea6`) y `feat/data-facade` encima (subida hasta `9b39f51`), sin fusionar; ver §6.
+- **Lo último (22 oct, mañana):** el usuario está probando la app nueva en un **proyecto de Vercel nuevo** con el backend `prisma`, y ya funciona (login y catálogos contra `msp_app`). Para llegar ahí se resolvieron, en orden: pnpm fijado en 10.34.7, `.env` único, la guarda de Server Actions para staging (`MSP_STAGING_DEPLOY`) y la raíz TLS de Railway versionada. Luego se creó en la base la cuenta `engteam@primeiqlatam.com` (`app-engteam`) y se cambió el ETL para que no la borre. Bitácora completa, con cada error de Vercel y su causa: **§14.7**. Cómo correr y desplegar: §14.2 y §14.2.1.
+- La app corre en local con `pnpm dev:staging` (recomendado) o `pnpm run dev`; el usuario la levanta él mismo, y al 22 oct tenía `pnpm run dev` corriendo en su terminal.
+- Ramas: `feat/lib-domain` (subida hasta `f8c8ea6`) y `feat/data-facade` encima (subida hasta `a9baab4` por el usuario), sin fusionar. Lo de `app-engteam` y el ETL está **sin commit**; ver §6.
 - `msp_app` tiene la carga del snapshot `20261016-222126-full` **con los campos de fórmula tal cual vienen de Strapi** (recarga con COMMIT del 21 oct, `load:verify` limpio; ver §12.1). Se confirmó con el usuario que las tablas y los datos de Strapi están en `msp_app` (25/25 tablas, 19/19 relaciones, 1/1 agregados; 664 advertencias conocidas, §12.5). Strapi, el warehouse y n8n no se tocaron.
 - 21 oct: nuevo [`FORMULAS.md`](FORMULAS.md), el mapa de dónde vive cada fórmula (motor en `lib/domain/`, hoja de unidades, moneda local, n8n, warehouse, ETL). Respuesta corta para el usuario: las fórmulas no están en la base ni en Strapi; están en `lib/domain/units/formulas.ts` y corren en el navegador; los promedios del bloque los calcula n8n.
 - 21 oct: nuevo `npm run warehouse:ping` en `etl/` para el warehouse MySQL. Todavía no se ha probado: falta `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3).
-- No hay nada a medias en el código. Lo pendiente: la revisión del usuario en el navegador y su decisión de commit (§14.6), y respuestas externas (§13.2 y la prueba de acceso de la §13.3).
+- No hay nada a medias en el código. Lo pendiente: el commit del usuario de lo del 22 oct, los ajustes del proyecto de Vercel (§14.7, "Pendiente"), la revisión en el navegador (§14.6) y respuestas externas (§13.2 y la prueba de acceso de la §13.3).
 
 ### 13.2 La duda que queda abierta: ¿qué regla de Interior es la correcta?
 
@@ -498,8 +505,8 @@ No es imprescindible para la §13.2, pero sirve para confirmar la hipótesis de 
 
 Preguntárselo antes de hacerlo; ninguno está autorizado todavía:
 
-- **Refrescar la carga** con un snapshot nuevo del RDS, de noche (después de las 19:00 UTC-6) o con `--allow-business-hours` si él lo pide (§8, punto 1).
-- **Commit** del trabajo de la §14 en `feat/data-facade`. **Sin `git push`**: el usuario sube él mismo.
+- **Refrescar la carga** con un snapshot nuevo del RDS, de noche (después de las 19:00 UTC-6) o con `--allow-business-hours` si él lo pide (§8, punto 1). Ya con el cambio del 22 oct: debe conservar `app-engteam` (comprobarlo después con `npm run app:ping`, 18 usuarios si Strapi sigue con 17).
+- **Mensajes de error genéricos** hacia el navegador en las Server Actions (§10, último punto).
 - **Siguiente módulo** de la Fase 5 (§14.6).
 - **Corregir la validación ISO** del formulario de países (§10), cuando el negocio confirme qué columna es cuál.
 - **Quitar `@univerjs/*` y `luckysheet`** de `package.json` (sin uso desde v1.28.2).
@@ -513,6 +520,9 @@ Cómo trabaja el usuario:
 - Cualquier otra escritura (`dbo_stage` de staging, producción) requiere preguntarle.
 - Para correr la app pide un comando para levantarla él; si el agente la levanta, detenerla cuando lo pida.
 - Si algo no se entiende, lo pregunta: explicarle en palabras simples qué es cada archivo o variable y por qué existe.
+- Se preocupa por la seguridad ("¿no estás exponiendo ninguna variable?", "¿esto está bien subirlo a GitHub?"): ante esas preguntas, verificar de verdad (escanear el repo, el bundle `.next/static` y el historial de git) antes de responder, y nunca imprimir valores del `.env`.
+- Hace él mismo los commits y el push, y despliega en Vercel él mismo; pega en el chat los errores que ve en Vercel.
+- Alterna entre modo Ask (solo preguntas, sin cambios) y modo Agent. En Ask no se edita ni se escribe en la base, aunque lo pida: se explica y se espera a que cambie de modo.
 
 ---
 
@@ -528,10 +538,11 @@ Estrategia completa en `ROADMAP.md` (fase 5 y §4). En corto: la UI habla con un
 | Implementación `prisma` | `lib/api/prisma-client.ts` | Catálogos (5 métodos) y login/sesión (4) reales; los otros 22 métodos lanzan "todavía no está migrado". |
 | Cliente Prisma de la app | generador `app` en `prisma/schema.prisma` → `lib/db/generated/` (ignorado); `lib/db/connection.ts`, `lib/db/client.ts` | Se genera en `postinstall` o con `pnpm db:generate`. Solo usa `DATABASE_URL_APP`, `search_path=msp_app`, pool de 2, raíz TLS de Railway (`DATABASE_CA_APP` o `etl/certs/dbo-stage-ca.pem`). |
 | Catálogos | `lib/db/catalog-mapping.ts` (puro), `lib/db/catalogs.ts` (repositorio), `lib/db/catalog-actions.ts` (Server Actions) | Los 12 catálogos de `CATALOG_TYPES` menos `block-types` (no tiene tabla). Paginación, `sort` y búsqueda como Strapi; `documentId` = `publicId`; borrar algo en uso da "está en uso" (FK `Restrict`). |
-| Login | `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts` (puro) | Valida correo o usuario y clave contra `msp_app.user` con los hashes bcrypt de Strapi (decisión 13). Si el correo no está ahí, prueba la cuenta de desarrollo de `.env.staging.local` (§14.3). El usuario de sesión queda en `localStorage` (`msp_dev_session`). |
+| Login | `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts` (puro) | Valida correo o usuario y clave contra `msp_app.user` con los hashes bcrypt de Strapi (decisión 13). Si el correo no está ahí, prueba la cuenta de desarrollo `DEV_LOGIN_*` del `.env` (§14.3). Desde el 22 oct `engteam@` está en la tabla como `app-engteam` (§14.7). El usuario de sesión queda en `localStorage` (`msp_dev_session`). |
 | Guarda | `lib/db/guard.ts` | Toda Server Action llama a `assertPrismaActionsAllowed()`: solo responde con `NEXT_PUBLIC_DATA_BACKEND=prisma`, en `next dev` o en un despliegue de staging con `MSP_STAGING_DEPLOY=true` y sin credenciales de Strapi/sync (§14.2.1). Las acciones existen también en el build de producción (Next las publica), por eso la guarda es obligatoria hasta Auth.js. |
 | Lanzador | `scripts/dev-staging.mjs`, `.env.staging.example` | Ver §14.2. |
-| Pruebas | `lib/db/catalog-mapping.test.ts`, `lib/db/user-mapping.test.ts` | Entran en `npm test` de la raíz (89 en total). |
+| Pruebas | `lib/db/catalog-mapping.test.ts`, `lib/db/user-mapping.test.ts`, `lib/db/connection.test.ts` | Entran en `npm test` de la raíz (92 en total al 22 oct). |
+| Cuentas propias de la app | `etl/src/app/local-user.ts` (`npm run app:local-user` en `etl/`), `localPrefix` / `mirroredRows` en `etl/src/load/specs.ts` | 22 oct, sin commit. Ver §14.7. |
 
 Dependencias nuevas en la raíz (mismas versiones que `etl/`): `@prisma/client`, `@prisma/adapter-pg`, `pg`, `bcryptjs`, y `prisma`/`@types/pg` como desarrollo. `npm run app:generate` en `etl/` genera solo su propio cliente (`--generator client`).
 
@@ -547,7 +558,7 @@ Desde la raíz del repo. Abrir http://localhost:3000/login. Para detenerla, `Ctr
 - `scripts/dev-staging.mjs` lee `.env.staging.local` si existe; si no, el `.env`. Vacía cada clave de los otros `.env*` que no redefine, y marca `__NEXT_PROCESSED_ENV=true`: Next no aplica ningún `.env`, ni al recargar en caliente. Next igual muestra "Environments: .env.local, .env" en el arranque; es solo el listado de archivos, no los aplica.
 - Fuerza `NEXT_PUBLIC_DATA_BACKEND=prisma` y `NEXT_PUBLIC_STRAPI_URL=""`. Sin URL, el código cae a `http://localhost:1337`: comprobado el 21 oct, el proxy `/api/strapi/*` da 503 "fetch failed" y no llega a producción.
 - Se niega a arrancar si falta el archivo o `DATABASE_URL_APP`, o si tiene activas `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_KEY`, `SYNC_API_URL`, `NEXT_PUBLIC_STRAPI_URL` o `STRAPI_URL`.
-- Con el `.env` único, `pnpm dev` también corre en modo `prisma` (ya no hay credenciales de producción activas). `dev:staging` sigue siendo lo recomendado por esos controles.
+- Con el `.env` único, `pnpm dev` también corre en modo `prisma` (ya no hay credenciales de producción activas). `dev:staging` sigue siendo lo recomendado por esos controles. Diferencia práctica: `pnpm dev` expande los `$` del `.env` (§10), así que ahí `DEV_LOGIN_PASSWORD_HASH` no sirve; las cuentas que están en `msp_app.user` (las 17 de Strapi y `app-engteam`) entran igual con los dos.
 - Con el backend `prisma`, las URLs de n8n de producción que el código trae por defecto (Copilot, sesiones de chat, contadores de bloque) quedan vacías (`productionN8nDefault` en `lib/api/data-backend.ts`): `/copilots` responde error en vez de llamar al n8n real. La barra de tipo de cambio conserva su `GET` público.
 
 ### 14.2.1 Despliegue de staging en Vercel (22 oct)
@@ -562,7 +573,10 @@ Proyecto de Vercel **nuevo**, no el de `admin.primeiqlatam.com`. La guarda (`lib
 | `DATABASE_CA_APP` | **Opcional** desde el 22 oct: `etl/certs/dbo-stage-ca.pem` se versiona (excepción en `.gitignore`; es la raíz pública que el servidor entrega en el handshake TLS) y `outputFileTracingIncludes` de `next.config.mjs` la mete en cada función. Si Railway rota la raíz: `npm run stage:cert` en `etl/`, commit y deploy, o definir esta variable (PEM, PEM con `\n` o base64). |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1`, para que Vercel use el pnpm fijado en `package.json` |
 
-No poner en Vercel ninguna variable de Strapi, sync, n8n ni del ETL: **no importar el `.env` entero** al panel (trae `DATABASE_*_STRAPI` y `DATABASE_URL_DBO_STAGE`). `DEV_LOGIN_*` es opcional; sin ella solo entran los usuarios de `msp_app`.
+No poner en Vercel ninguna variable de Strapi, sync, n8n ni del ETL: **no importar el `.env` entero** al panel (trae `DATABASE_*_STRAPI` y `DATABASE_URL_DBO_STAGE`). `DEV_LOGIN_*` ya no hace falta en Vercel desde que `app-engteam` está en `msp_app.user` (§14.7); si se pone, el hash va sin comillas ni barras (Vercel no expande `$`). Después de cambiar variables en Vercel hay que hacer **redeploy**, y cada variable tiene que estar marcada para el entorno que se usa (Production y/o Preview).
+
+Notas:
+
 - pnpm está fijado en `package.json` (`"packageManager": "pnpm@10.34.7"`, 22 oct): el `pnpm` de corepack descarga y usa esa versión, así que `pnpm install` y `pnpm run <script>` funcionan. Antes corepack caía a su 9.15.4, que falla con el `allowBuilds` de `pnpm-workspace.yaml` ("packages field missing or empty"). `npm run <script>` también funciona.
 
 ### 14.3 Las claves de la app nueva (antes en `.env.staging.local`, desde el 22 oct al final del `.env`)
@@ -571,16 +585,18 @@ Son tres claves, creadas por el agente sin imprimir valores:
 
 - `DATABASE_URL_APP`: copia de `DATABASE_URL_DBO_STAGE` del `.env` (usuario `j_stage_admin`, servidor de staging de Railway). Ver el riesgo en la §10.
 - `DEV_LOGIN_EMAIL` y `DEV_LOGIN_PASSWORD_HASH`: cuenta de desarrollo `engteam@primeiqlatam.com`, pedida por el usuario el 21 oct. Esa cuenta **no existe** entre los 17 usuarios de `msp_app` (será del panel de administración de Strapi). Se guardó solo el hash bcrypt de la clave, generado desde `market_scan_USERNAME`/`market_scan_PASSWORD` del `.env`; entra con rol `administrator`. Se eligió esto en vez de insertarla en `msp_app.user` porque la próxima carga del ETL (espejo de Strapi) la borraría.
+- **Desde el 22 oct la cuenta también está en la base** (pedido del usuario): fila `app-engteam` en `msp_app.user`, rol `super_administrator`, mismo hash, creada con `npm run app:local-user -- --apply` en `etl/`. El login la encuentra antes que a `DEV_LOGIN_*`, así que entra igual con `pnpm run dev`, `pnpm dev:staging` y en Vercel, sin variables de login. El ETL ya no borra las cuentas con `public_id` `app-…` (`localPrefix` en `etl/src/load/specs.ts`; ver `etl/README.md`). `DEV_LOGIN_*` queda en el `.env` porque el script lee de ahí el correo y el hash. Ojo: `next dev` expande los `$` del hash aunque esté entre comillas simples, así que esa variable por sí sola solo funciona con `pnpm dev:staging` o en Vercel.
 
-Los 17 usuarios reales de `msp_app` (los del panel de usuarios de Strapi, p. ej. `jnoriega@primelatam.com`) también pueden entrar con su clave de siempre.
+Los 17 usuarios reales de `msp_app` (los del panel de usuarios de Strapi, p. ej. `jnoriega@primelatam.com`) también pueden entrar con su clave de siempre, además de las cuentas propias `app-…` (hoy solo `app-engteam`).
 
 ### 14.4 Qué se puede probar hoy en modo `prisma`
 
 - **Completo:** `/catalogs` (los 12 catálogos: listar, buscar, paginar, crear, editar, borrar), login y logout.
 - **Parcial:** `/projects/new` (los selectores de país, desarrolladora, tipo de seguridad, NSE, amenidades y servicios; **no guardar**, `createProject` no está migrado), `/blocks/new` (categoría, enfoque y estado; el selector de proyecto falla), `/settings` (muestra el usuario; guardar falla).
 - **Falla al cargar (no migrado):** listas, vistas y edición de proyectos y bloques; `/units` y la hoja; perfiles de tipo de cambio; olvidé y restablecer contraseña.
-- **No abrir:** `/copilots` (sin variable, el Copilot usa la URL de n8n de producción por defecto) y `/sync`. La barra de tipo de cambio puede hacer un `GET` al webhook público; es lectura y la skill lo permite.
-- Lo que se crea en los catálogos cae en `msp_app` y la próxima carga del ETL lo borra (espejo de Strapi).
+- **No abrir:** `/sync`. `/copilots` ya no llama a n8n de producción con el backend `prisma` (desde el 22 oct `productionN8nDefault` deja vacía la URL por defecto), pero tampoco funciona: da error. La barra de tipo de cambio puede hacer un `GET` al webhook público; es lectura y la skill lo permite.
+- Lo mismo vale para el staging de Vercel (§14.2.1).
+- Lo que se crea en los catálogos cae en `msp_app` y la próxima carga del ETL lo borra (espejo de Strapi). La excepción son los usuarios con `public_id` `app-…` (§14.7).
 
 Totales esperados en `/catalogs` (carga del 16 oct): desarrolladores 538, amenidades 85, servicios 18, NSE 15, enfoques de bloque 15, topografías 12, estados de bloque 10, tipos de seguridad 9, categorías de bloque 7, tipos de parqueo 5, países 2, usos de unidad 2.
 
@@ -591,15 +607,61 @@ Totales esperados en `/catalogs` (carga del 16 oct): desarrolladores 538, amenid
 3. Repositorio en `lib/db/<modulo>.ts` que recibe el `PrismaClient` (así se puede probar con un cliente de solo lectura).
 4. Server Actions en `lib/db/<modulo>-actions.ts` (`"use server"`): cada una llama a `assertPrismaActionsAllowed()` y devuelve `ActionResult` (`lib/db/action-result.ts`), nunca lanza.
 5. En `lib/api/prisma-client.ts`, reemplazar los `notMigrated(...)` del módulo por llamadas a las acciones con `unwrap()`.
-6. Prueba de humo contra `msp_app` en **sesión de solo lectura**: script temporal `scripts/tmp-*.mts` (extensión `.mts`, la raíz no es ESM) corrido con `etl\node_modules\.bin\tsx.cmd`, con `options: "-c search_path=msp_app -c default_transaction_read_only=on"` y `process.loadEnvFile(".env.staging.local")`. Borrarlo después. No imprimir hashes ni credenciales.
+6. Prueba de humo contra `msp_app` en **sesión de solo lectura**: script temporal `scripts/tmp-*.mts` (extensión `.mts`, la raíz no es ESM) corrido con `etl\node_modules\.bin\tsx.cmd`, con `options: "-c search_path=msp_app -c default_transaction_read_only=on"` y `process.loadEnvFile(".env")` (`.env.staging.local` ya no existe desde el 22 oct). Borrarlo después. No imprimir hashes ni credenciales.
 7. `npm test`, `npx tsc --noEmit` (la línea base es de **38 errores** previos; ninguno debe estar en archivos nuevos), y si se tocó el empaquetado, un `next build` aislado: `$env:__NEXT_PROCESSED_ENV="true"; $env:NEXT_PUBLIC_DATA_BACKEND="prisma"; npx next build` (no carga ningún `.env`; los avisos "Dynamic server usage" del i18n son previos).
 8. `CHANGELOG.md` y versión, `CLAUDE.md` si cambia la arquitectura, casillas de `ROADMAP.md`, la fila de la §6 y esta §14; `graphify update .`.
 
 ### 14.6 Siguiente paso
 
-1. El usuario recorre `/catalogs` (lista de `ROADMAP.md` §4.4). Si algo falla, revisar la salida de `npm run dev:staging` en su terminal.
-2. Preguntarle si se hace **commit** en `feat/data-facade` (sin push). Archivos del cambio: `.gitignore`, `.env.staging.example`, `CHANGELOG.md`, `CLAUDE.md`, `docs/migration/README.md`, `docs/migration/ROADMAP.md`, `etl/package.json`, `lib/api/client.ts`, `lib/api/data-backend.ts`, `lib/api/prisma-client.ts`, `lib/db/` (menos `generated/`), `lib/copilot/constants.ts`, `lib/copilot/primeiq-chat-session-api.ts`, `components/units/datasheet-units-table.tsx`, `package.json`, `pnpm-lock.yaml`, `prisma/schema.prisma`, `scripts/dev-staging.mjs`. Nunca `.env`, `.env.staging.local` ni `.env.respaldo-*.local`.
+1. El usuario recorre `/catalogs` (lista de `ROADMAP.md` §4.4), en local o en el staging de Vercel. Si algo falla en local, revisar la salida de `pnpm dev:staging` / `pnpm run dev` en su terminal; en Vercel, pedirle el mensaje que ve (los errores de la guarda y del certificado dicen qué ven y en qué entorno corren).
+2. El trabajo de catálogos y login **ya tiene commit y push** (el usuario, hasta `a9baab4`). Falta el commit de lo del 22 oct sin commit (lista en la §6). Nunca `.env`, `.env.staging.local` ni `.env.respaldo-*.local`.
 3. Elegir con el usuario el siguiente módulo (con opciones concretas):
    - **Proyectos en solo lectura** (`getProjects`, `getProjectById`): habilita la lista con filtros avanzados, la vista y los selectores de proyecto en bloques y perfiles. Es el más pesado en relaciones (país, desarrolladora, NSE, amenidades, servicios, perfil, financiamiento).
    - **Perfiles de tipo de cambio** (5 métodos + `getProjects` para vincular): el más corto.
-   - **Auth con Auth.js** (decisiones 12 y 13): reemplaza la sesión en `localStorage` y la guarda de solo desarrollo; es lo que permitiría correr el modo `prisma` fuera de `next dev`.
+   - **Auth con Auth.js** (decisiones 12 y 13): reemplaza la sesión en `localStorage` y la guarda (`next dev` o `MSP_STAGING_DEPLOY`). Desde el 22 oct el modo `prisma` ya corre en el staging de Vercel, pero cualquiera que llegue a la URL puede invocar las Server Actions; Auth.js es lo que falta para no depender solo de la protección de despliegues de Vercel.
+
+### 14.7 Bitácora del 22 oct: staging en Vercel y cuenta `app-engteam`
+
+Lo que pidió el usuario ese día, en orden, y cómo quedó. Sirve para no repetir diagnósticos.
+
+1. **Análisis de este README "como senior dev"**: hecho, solo respuesta (riesgos y recomendaciones), sin cambios.
+2. **`pnpm run build` fallaba con "packages field missing or empty"**: corepack usaba pnpm 9.15.4, que no entiende `allowBuilds`. Se fijó `"packageManager": "pnpm@10.34.7"` en `package.json`.
+3. **"Deja un único `.env` y dime qué variables poner en Vercel"**. Respuestas del usuario: proyecto de Vercel **nuevo**, backend **prisma**, y "únelos, deja las variables de Strapi para referencia pero ya no lo usaremos". Resultado: `.env` único (§14.2), `.env.staging.local` y `.env.local` absorbidos y borrados, respaldo en `.env.respaldo-20261022.local`, tabla de variables en §14.2.1, plantilla en `.env.staging.example`.
+4. **Errores de Vercel**, uno detrás de otro:
+
+| Mensaje que vio el usuario | Causa | Arreglo |
+|---|---|---|
+| "El backend prisma todavía no tiene autenticación: solo se puede usar en desarrollo local." | `lib/api/prisma-client.ts` repetía en el navegador una comprobación de `NODE_ENV` (`assertDevSession`). | Se quitó; decide solo la guarda del servidor. |
+| "Las acciones sobre la base nueva solo corren en desarrollo local o en un despliegue con MSP_STAGING_DEPLOY=true." | Primero, la guarda solo aceptaba `next dev`. Después, la variable no estaba en el entorno de Vercel que se usaba, o faltaba el redeploy. | `lib/db/guard.ts` acepta `MSP_STAGING_DEPLOY=true` (sin credenciales de Strapi/sync). El mensaje dice si la variable falta o qué valor tiene, y el `VERCEL_ENV`. |
+| "Falta la raíz del certificado (/var/task/etl/certs/dbo-stage-ca.pem)…" | El `.pem` estaba ignorado por git (`*.pem`) y no llegaba a la función. | Excepción `!etl/certs/dbo-stage-ca.pem` en `.gitignore` y `outputFileTracingIncludes` en `next.config.mjs`. |
+| "Falta la raíz del certificado: DATABASE_CA_APP no está definida en este despliegue (entorno de Vercel: production)…" | El archivo todavía no estaba commiteado y la variable no existía en Vercel. | Commit del `.pem` (usuario, `a9baab4`). `DATABASE_CA_APP` queda opcional y acepta PEM, PEM con `\n` o base64 (`normalizeCaPem`). |
+
+5. **"¿No estás exponiendo ninguna variable de entorno?"**: se escanearon el bundle del navegador (`.next/static`), los 532 archivos versionados y el historial de git. No hay contraseñas, tokens, hashes ni URLs de base de datos; solo valores públicos (correo del equipo, usuario de MySQL y URL de Strapi en la documentación). Ningún `.env` en el historial. De ahí salió el hallazgo del `.env.local` (§10).
+6. **"¿Qué es eso de certificación?" y "¿está bien subirlo a GitHub?"**: `etl/certs/dbo-stage-ca.pem` es la raíz **pública** con la que Railway firma su certificado TLS (sujeto `CN=root-ca`, autofirmada, **sin clave privada**, vence el **1 dic 2028**). El servidor la entrega a cualquiera en el handshake, y conocerla no da acceso. El secreto real es `DATABASE_URL_APP`, que nunca se commitea. Si el usuario prefiriera no versionarla: quitar la excepción del `.gitignore` y usar `DATABASE_CA_APP` en Vercel.
+7. **No podía entrar con `engteam@primeiqlatam.com`** en `pnpm run dev`: el hash de `DEV_LOGIN_PASSWORD_HASH` llegaba roto por la expansión de `$` (§10). El usuario pidió meter la cuenta en la base y que el ETL no la borre. Hecho:
+
+| Campo de `msp_app.user` | Valor |
+|---|---|
+| `public_id` | `app-engteam` |
+| `username` / `email` | `engteam` / `engteam@primeiqlatam.com` |
+| `role` | `super_administrator` |
+| `provider`, `confirmed`, `blocked` | `local`, `true`, `false` |
+| `password_hash` | el mismo de `DEV_LOGIN_PASSWORD_HASH`, bcrypt de la clave del panel de Strapi |
+
+- **Cómo se creó**: `npm run app:local-user -- --apply` en `etl/` (`etl/src/app/local-user.ts`). Lee el correo y el hash de `DEV_LOGIN_*` (con `dotenv`, que no expande `$`), revisa que el correo y el usuario no los tenga otra fila, y hace upsert por `public_id`. Sin `--apply` solo simula. `--role` cambia el rol.
+- **Por qué el ETL ya no la borra**: el prefijo `app-` marca las cuentas propias de la app nueva (un `documentId` de Strapi no tiene guiones; las filas sintéticas del ETL usan `etl-`). `TableSpec.localPrefix` y `mirroredRows()` en `etl/src/load/specs.ts` la excluyen en tres sitios:
+  - el `prune` de la carga espejo (`write.ts`);
+  - el renombrado provisional de únicos (`releaseUniques`), que si no le cambiaba el correo por `__etl_release__…`;
+  - la verificación (`verify.ts`, tabla y "usuario → rol"), que si no la contaba como sobrante y hacía ROLLBACK de la carga completa.
+- **Probado**: `npm test` del ETL 50/50 (dos pruebas nuevas) y lectura de la fila después de insertarla. **Sin probar**: una carga completa real, porque lee el MySQL de producción y va fuera de 7:00–19:00 (§8, punto 1).
+- **Riesgo**: si Strapi llega a tener un usuario con el correo `engteam@primeiqlatam.com` o el usuario `engteam`, la carga falla por el índice único. Se resuelve a mano: borrar `app-engteam` o cambiarle el correo.
+
+**Pendiente** de lo del 22 oct (ninguno lo hace el agente sin que el usuario lo pida):
+
+- Commit de lo que quedó sin commit (lista en la §6).
+- En el proyecto de Vercel, dejar solo las variables de la §14.2.1. No se confirmó si el usuario importó el `.env` entero; si lo hizo, quitar `DATABASE_*_STRAPI`, `DATABASE_URL_DBO_STAGE` y todo lo de Strapi/n8n. `DEV_LOGIN_*` ya puede quitarse.
+- Activar la protección de despliegues de Vercel en ese proyecto (no confirmado).
+- Rotar la clave de `engteam@` en Strapi (la hace una persona; §10) y luego actualizar `DEV_LOGIN_PASSWORD_HASH` y repetir `app:local-user -- --apply`.
+- Borrar `.env.respaldo-20261022.local` cuando el usuario confirme que no le falta nada.
+- Decidir si los errores de las Server Actions se vuelven genéricos (§10).
+- Antes del 1 dic 2028, o si Railway rota la raíz: `npm run stage:cert` en `etl/`, commit y deploy.

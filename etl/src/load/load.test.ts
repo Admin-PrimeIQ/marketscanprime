@@ -4,7 +4,7 @@ import { draft, fixture, published } from "./fixtures"
 import { checkUnits, FORMULA_COLUMNS, formulaCsv, formulaDiffs, summarizeFormulas, type FormulaField, type UnitCheck } from "./formulas"
 import { cents, date, float, numeric, timestamp } from "./normalize"
 import { snapshotCountMismatches, STRAPI_TABLES } from "./snapshot"
-import { SPECS, type AppTable } from "./specs"
+import { APP_LOCAL_PREFIX, mirroredRows, SPEC_BY_TABLE, SPECS, type AppTable } from "./specs"
 import { transform } from "./transform"
 import { validate } from "./validate"
 import { massDeletions, type TableStats } from "./write"
@@ -303,6 +303,15 @@ describe("freno al borrado masivo", () => {
   })
   test("primera carga sobre msp_app vacía no frena", () => {
     assert.deepEqual(massDeletions(stats({ unit: { expected: 238_000, inserted: 238_000 } })), [])
+  })
+})
+
+describe("cuentas propias de la app nueva", () => {
+  test("el espejo deja fuera los usuarios con public_id app-…", () => {
+    assert.equal(mirroredRows(SPEC_BY_TABLE.user, "t.public_id"), `t.public_id NOT LIKE '${APP_LOCAL_PREFIX}%'`)
+  })
+  test("las demás tablas son espejo completo", () => {
+    for (const spec of SPECS.filter((s) => s.table !== "user")) assert.equal(mirroredRows(spec), "TRUE")
   })
 })
 

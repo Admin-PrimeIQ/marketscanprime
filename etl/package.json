@@ -20,6 +20,7 @@
     "app:status": "tsx src/app/prisma-cli.ts migrate status",
     "app:deploy": "tsx src/app/prisma-cli.ts migrate deploy",
     "app:pull:print": "tsx src/app/prisma-cli.ts db pull --print",
+    "app:local-user": "tsx src/app/local-user.ts",
     "stage:cert": "tsx src/stage/fetch-cert.ts",
     "stage:ping": "tsx src/stage/ping.ts",
     "stage:describe": "tsx src/stage/describe.ts",

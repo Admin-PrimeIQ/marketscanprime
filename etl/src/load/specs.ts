@@ -30,6 +30,21 @@ export interface TableSpec {
   scope?: string
   /** Columnas con índice único además de la llave: se liberan antes de escribir. */
   uniques?: string[]
+  /**
+   * Prefijo de `public_id` de las filas que crea la app nueva y que no vienen de Strapi: el espejo
+   * no las renombra, no las borra ni las verifica.
+   */
+  localPrefix?: string
+}
+
+/** `public_id` de las cuentas propias de la app nueva. Un `documentId` de Strapi no lleva guiones. */
+export const APP_LOCAL_PREFIX = "app-"
+
+/** Condición SQL que deja fuera las filas propias de la app nueva (`localPrefix`). */
+export function mirroredRows(spec: TableSpec, column = "public_id"): string {
+  if (!spec.localPrefix) return "TRUE"
+  if (!/^[a-z0-9-]+$/.test(spec.localPrefix)) throw new Error(`localPrefix inválido en ${spec.table}: ${spec.localPrefix}`)
+  return `${column} NOT LIKE '${spec.localPrefix}%'`
 }
 
 export type AppTable =
@@ -324,6 +339,7 @@ export const SPECS: TableSpec[] = [
     publicId: true,
     key: ["public_id"],
     uniques: ["username", "email"],
+    localPrefix: APP_LOCAL_PREFIX,
     columns: [
       ...document,
       c("username", "text"),
