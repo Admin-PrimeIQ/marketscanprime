@@ -6,11 +6,15 @@
  * anidadas, `unitType` como arreglo, `{ data, meta }` en listas). El backend se elige para toda la
  * app a la vez con `NEXT_PUBLIC_DATA_BACKEND`; mezclarlos por módulo dejaría dos fuentes de verdad.
  *
- * Hoy solo existe `strapi`. La implementación `prisma` se agrega módulo por módulo
- * (ver `docs/migration/ROADMAP.md`, fase 5).
+ * La implementación `prisma` (`lib/api/prisma-client.ts`) se completa módulo por módulo
+ * (ver `docs/migration/ROADMAP.md`, fase 5); hoy cubre los catálogos.
  */
 
+import { resolveDataBackend, type DataBackend } from "./data-backend"
+import { prismaDataClient } from "./prisma-client"
 import { strapiClient } from "./strapi"
+
+export { resolveDataBackend, type DataBackend }
 
 type StrapiClient = typeof strapiClient
 
@@ -56,22 +60,13 @@ export type DataClient = Pick<
   | "deleteCatalogItem"
 >
 
-export type DataBackend = "strapi" | "prisma"
-
-export function resolveDataBackend(raw: string | undefined = process.env.NEXT_PUBLIC_DATA_BACKEND): DataBackend {
-  const value = (raw ?? "").trim().toLowerCase()
-  if (value === "" || value === "strapi") return "strapi"
-  if (value === "prisma") return "prisma"
-  throw new Error(`NEXT_PUBLIC_DATA_BACKEND="${raw}" no es válido: usa "strapi" o "prisma".`)
-}
-
 function createDataClient(backend: DataBackend): DataClient {
   switch (backend) {
     case "strapi":
       // El mismo singleton: sus métodos dependen de `this`, así que no se copian a otro objeto.
       return strapiClient
     case "prisma":
-      throw new Error('La implementación "prisma" de la fachada de datos todavía no existe.')
+      return prismaDataClient
   }
 }
 

@@ -13,8 +13,10 @@ There is no local backend in this repo — Strapi is a remote service configured
 Package manager is **pnpm** (`pnpm-workspace.yaml`; a stale `package-lock.json` is also present — ignore it). Node from `.nvmrc` (24.14.1; `engines` requires ≥20).
 
 ```bash
-pnpm install          # postinstall runs patch-package (patches/)
+pnpm install          # postinstall runs patch-package (patches/) and prisma generate --generator app
 pnpm dev              # next dev
+pnpm dev:staging      # next dev on the prisma backend, from .env.staging.local only (see below)
+pnpm db:generate      # regenerate the app's Prisma client into lib/db/generated (gitignored)
 pnpm build            # next build
 pnpm start            # next start
 ```
@@ -23,7 +25,7 @@ pnpm start            # next start
 
 Type checking: `npx tsc --noEmit`. Note `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so **a green build does not mean the types are clean**. The baseline is noisy — filter output to files you touched.
 
-Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine and block context in `lib/domain/units/`, plus `lib/*.test.ts`, `lib/copilot/` and `components/units/`. The ETL in `etl/` has its own `npm test`.
+Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine and block context in `lib/domain/units/`, plus `lib/*.test.ts`, `lib/copilot/`, `lib/db/` (catalog mapping and guard) and `components/units/`. The ETL in `etl/` has its own `npm test`.
 
 ## Environment
 
@@ -36,6 +38,10 @@ Tests: `npm test` runs the pure modules with `node --test` (no dependencies need
 | `NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL` | n8n Chat Trigger for the Copilot (must end in `/chat`; `lib/copilot/constants.ts` appends it if missing). |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Override for the n8n exchange-rates feed. |
 | `NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL` | n8n webhook that recomputes block counters after a unit save. |
+| `NEXT_PUBLIC_DATA_BACKEND` | `strapi` (default) or `prisma`. Picks the `dataClient` implementation for the whole app. |
+| `DATABASE_URL_APP` | Postgres of the new app (schema `msp_app`), read by `lib/db/connection.ts`. Only in `.env.staging.local`. The Railway CA comes from `DATABASE_CA_APP` (PEM) or `DATABASE_CA_FILE_APP` (default `etl/certs/dbo-stage-ca.pem`). |
+
+`.env.staging.local` (gitignored, template in `.env.staging.example`) is the environment for the `prisma` backend. `pnpm dev:staging` ([`scripts/dev-staging.mjs`](scripts/dev-staging.mjs)) loads only that file and blanks every key of the regular `.env`, so the local app can't reach production Strapi or its credentials. Don't run the `prisma` backend any other way.
 
 ## Architecture
 
@@ -43,7 +49,9 @@ Tests: `npm test` runs the pure modules with `node --test` (no dependencies need
 
 A single ~3k-line [`StrapiClient`](lib/api/strapi.ts) singleton (`strapiClient`) holds all API knowledge: entity interfaces (`StrapiProject`, `StrapiBlock`, `StrapiUnit`, `StrapiExchangeRateProfile`, `CatalogItem`), query-string building for Strapi v5 filters/populate/pagination, and every CRUD method. New backend calls belong here, not inline in components.
 
-Pages and components never import `strapiClient`: they call `dataClient` from the facade [`lib/api/client.ts`](lib/api/client.ts), whose `DataClient` type lists the methods the UI uses. `NEXT_PUBLIC_DATA_BACKEND` picks the implementation (`strapi`, the default and only one so far; a `prisma` one is being built for the migration, see `docs/migration/ROADMAP.md` phase 5). A new method the UI needs goes in `strapi.ts` **and** in `DataClient`. Types `Strapi*` and pure helpers are still imported from `strapi.ts`.
+Pages and components never import `strapiClient`: they call `dataClient` from the facade [`lib/api/client.ts`](lib/api/client.ts), whose `DataClient` type lists the methods the UI uses. `NEXT_PUBLIC_DATA_BACKEND` picks the implementation: `strapi` (the default, what production runs) or `prisma` ([`lib/api/prisma-client.ts`](lib/api/prisma-client.ts), being built module by module for the migration, see `docs/migration/ROADMAP.md` phase 5). A new method the UI needs goes in `strapi.ts`, in `DataClient` **and** in the `prisma` implementation (at least as a "not migrated" error). Types `Strapi*` and pure helpers are still imported from `strapi.ts`.
+
+The `prisma` side so far covers the catalogs: Server Actions in [`lib/db/catalog-actions.ts`](lib/db/catalog-actions.ts) → generic repository [`lib/db/catalogs.ts`](lib/db/catalogs.ts) (endpoint → model map and DTO rules in the pure `catalog-mapping.ts`, `documentId` = `publicId`) → Prisma client [`lib/db/client.ts`](lib/db/client.ts) (`server-only`, schema `msp_app`). There is no server-side auth yet, so every action calls `assertPrismaActionsAllowed()` ([`lib/db/guard.ts`](lib/db/guard.ts)): it only answers under `next dev` with the `prisma` backend. Login on that backend ([`lib/db/auth-actions.ts`](lib/db/auth-actions.ts)) checks email/username and password against `msp_app.user` with the bcrypt hashes copied from Strapi, never calls Strapi, and keeps the user in `localStorage`. Both the guard and that client-side session go away with Auth.js. The app's client is the `app` generator of `prisma/schema.prisma`; migrations are still applied only from `etl/`.
 
 **Base URL is environment-dependent** and this matters: in the browser the client points at `/api/strapi`; on the server it calls Strapi directly (avoids loopback). [`app/api/strapi/[...path]/route.ts`](app/api/strapi/[...path]/route.ts) is a transparent proxy whose sole purpose is **server-side logging** of every call (method, path, resolved user email, status, duration, body/summary) via [`lib/server-logger.ts`](lib/server-logger.ts) into Vercel Functions logs. Keep browser traffic flowing through it.
 

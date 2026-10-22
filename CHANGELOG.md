@@ -6,6 +6,20 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Los catálogos ya pueden leerse y escribirse en la base nueva (v1.29.0)
+
+_2026-10-21_
+
+Primer módulo de la implementación `prisma` de la fachada (fase 5 de `docs/migration/ROADMAP.md`). **Producción no cambia**: sigue en `NEXT_PUBLIC_DATA_BACKEND=strapi`, y todo lo nuevo se niega a responder fuera de `next dev`.
+
+- **Prisma en la app** (decisión 10 del README de migración): `@prisma/client`, `@prisma/adapter-pg` y `pg` en la raíz, con `prisma` como dependencia de desarrollo, en las mismas versiones que `etl/`. [prisma/schema.prisma](prisma/schema.prisma) tiene un segundo generador, `app`, que escribe en `lib/db/generated/` (ignorado por git). Lo regeneran `postinstall` y `pnpm db:generate`. `npm run app:generate` en `etl/` ahora genera solo su propio cliente.
+- **`lib/db/`**: [connection.ts](lib/db/connection.ts) se conecta a `msp_app` solo con `DATABASE_URL_APP`, sin respaldo a otras URL, con la raíz TLS de Railway y un pool de 2. [client.ts](lib/db/client.ts) es el cliente `server-only`. [catalogs.ts](lib/db/catalogs.ts) es un repositorio genérico de los 12 catálogos, y [catalog-mapping.ts](lib/db/catalog-mapping.ts) tiene sus reglas puras: el modelo de cada endpoint, paginación, `sort` y búsqueda como en Strapi, `documentId` = `publicId`, validación y errores de Prisma traducidos ("está en uso", "debe ser único"). Las Server Actions están en [catalog-actions.ts](lib/db/catalog-actions.ts).
+- **Fachada**: [lib/api/prisma-client.ts](lib/api/prisma-client.ts) implementa `DataClient`. Los 5 métodos de catálogo son reales, y los demás fallan con "todavía no está migrado". `resolveDataBackend` pasó a [lib/api/data-backend.ts](lib/api/data-backend.ts).
+- **Login sobre la base nueva, sin sesión de servidor todavía** (llega con Auth.js): [guard.ts](lib/db/guard.ts) hace que las Server Actions solo respondan en `next dev` con el backend `prisma`. El login de ese backend ([auth-actions.ts](lib/db/auth-actions.ts)) valida correo o usuario y clave contra la tabla `user` de `msp_app`, con los hashes bcrypt copiados de Strapi (decisión 13), y nunca llama a Strapi. Responde con el mismo mensaje de Strapi si falla. El usuario y su rol real quedan en `localStorage`. Dependencia nueva: `bcryptjs`.
+- **`pnpm dev:staging`** ([scripts/dev-staging.mjs](scripts/dev-staging.mjs)): corre la app en modo `prisma` con las variables de `.env.staging.local` (plantilla en [.env.staging.example](.env.staging.example)), sin cargar el `.env` de producción y con sus claves vaciadas. El lanzador se niega a arrancar si `.env.staging.local` trae credenciales de Strapi.
+- **Hallazgo**: en los datos, `isoCode` de los países es alfa-3 (`GTM`) e `isoCode2` alfa-2 (`GT`). El formulario de catálogos valida al revés, así que hoy no deja guardar un país existente, tampoco con Strapi. El servidor nuevo no impone largo. Queda anotado en `ROADMAP.md` §4.4 para decidir con negocio.
+- **Verificación**: lectura de los 12 catálogos contra `msp_app` en una sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id, búsqueda). `npm test` 86/86, con 12 pruebas nuevas en `lib/db/`. `tsc --noEmit` da 38 errores, los mismos de antes, ninguno en archivos nuevos. `next build` sin `.env` compila. Falta recorrer en el navegador la lista "debe seguir funcionando" de catálogos.
+
 ## La UI pide los datos a una fachada, no a Strapi; fuera el código muerto (v1.28.2)
 
 _2026-10-21_

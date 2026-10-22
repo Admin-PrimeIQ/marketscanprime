@@ -17,6 +17,12 @@ generator client {
   output   = "../etl/generated/app"
 }
 
+// Cliente de la app Next.js (lib/db/). Se genera desde la raíz con `pnpm db:generate`.
+generator app {
+  provider = "prisma-client"
+  output   = "../lib/db/generated"
+}
+
 datasource db {
   provider = "postgresql"
 }

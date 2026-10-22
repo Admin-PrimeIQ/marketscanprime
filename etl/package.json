@@ -15,7 +15,7 @@
     "strapi:check": "tsx src/strapi/check.ts",
     "warehouse:ping": "tsx src/warehouse/ping.ts",
     "app:validate": "prisma validate --config prisma.app.config.ts",
-    "app:generate": "prisma generate --config prisma.app.config.ts",
+    "app:generate": "prisma generate --config prisma.app.config.ts --generator client",
     "app:ping": "tsx src/app/ping.ts",
     "app:status": "tsx src/app/prisma-cli.ts migrate status",
     "app:deploy": "tsx src/app/prisma-cli.ts migrate deploy",

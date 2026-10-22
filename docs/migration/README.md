@@ -20,9 +20,9 @@ Reglas que aplican siempre:
 
 ---
 
-Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 21 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
+Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 22 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Para retomar rápido:** lee la sección 0, luego la §13 (dónde quedó la última conversación y qué está esperando respuesta), la §6 (estado), la §12 (el ETL Strapi → `msp_app`, lo último que se hizo), la §11 (el Postgres de staging, donde ocurre todo lo nuevo) y la §8 (próximos pasos). Después corre, desde `etl/`, los chequeos de solo lectura de la §6.1 para confirmar que el estado sigue igual.
+**Para retomar rápido:** lee la sección 0, luego la §13 (dónde quedó la última conversación y qué está esperando respuesta) y la §14 (Fase 5: la app sobre `msp_app`, lo último que se hizo, con cómo correrla y cómo seguir). Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -59,7 +59,7 @@ n8n (Docker en EC2, administrado con Coolify) ──────┘ (pull, conta
 MySQL "dbo_stage"  ──promoción MANUAL──►  dbo (MySQL)  y  dbo (Postgres en Railway)
 ```
 
-- **Strapi** es la fuente de verdad. El backoffice nunca toca MySQL: todo pasa por `lib/api/strapi.ts` (39 métodos; 52 archivos lo importan al 21 oct, inventario en `ROADMAP.md` §4).
+- **Strapi** es la fuente de verdad. El backoffice nunca toca MySQL: todo pasa por `lib/api/strapi.ts` (39 métodos, inventario en `ROADMAP.md` §4). Desde el 21 oct la UI no lo importa directo: llama a la fachada `dataClient` (`lib/api/client.ts`), que en producción delega en ese mismo cliente (§14).
 - **Solo Strapi** se conecta directo a la base `strapi`. n8n escribe en ella a través de la API.
 - **n8n** corre 9 workflows: 5 de sincronización (Writeback API, Resolve Targets, Drainer, Block Worker, Pull Block Worker), contadores de bloque (Block Edit Queue), tipo de cambio Banguat, sesiones de chat y Copilot.
 - **Coolify** es solo el panel que despliega y reinicia los contenedores Docker de n8n y Redis en el EC2.
@@ -94,12 +94,16 @@ Dejar de depender de Strapi y n8n, en un proyecto propio y optimizado:
 | 1 | Los workers reemplazan a n8n: sincronización, contadores de bloque y tipo de cambio. |
 | 2 | El **Copilot queda en espera** hasta entender cómo funciona (prompts y herramientas viven en el repo `n8n-manager`, no aquí). |
 | 3 | Infraestructura en **Railway**: Postgres (ya existe), workers y Redis. |
-| 4 | **Prisma va en este repo** como herramienta de ETL, no dentro del runtime de la app Next.js. |
+| 4 | **Prisma va en este repo** como herramienta de ETL, no dentro del runtime de la app Next.js. *Actualizada el 21 oct 2026 (decisión 10): para la Fase 5 Prisma entra también al runtime de la app, en la raíz.* |
 | 5 | Primero: **cliente Prisma de Strapi** (MySQL) con todas las tablas migrables. |
 | 6 | Después: **cliente Prisma de `dbo_stage`** (MySQL) para insertar lo leído de Strapi. El usuario enviará la conexión. **Hasta el corte, `dbo_stage` solo se lee; el ETL escribe en una copia sombra** (ver `ROADMAP.md`, fase 4). *Actualizada por la decisión 9: la conexión que llegó es Postgres, no MySQL.* |
 | 7 | La promoción `dbo_stage` → `dbo` (MySQL y Postgres) **sigue siendo manual**, como hoy. |
 | 8 | (15 oct 2026) El esquema de la app nueva vive en el **Postgres de staging de Railway** (`DATABASE_URL_DBO_STAGE`, base `railway`), en el esquema **`msp_app`**, junto al esquema `dbo_stage` de ese mismo servidor (5 tablas `sec_*`), que **solo se lee**. El usuario confirmó que nada de producción escribe en ese servidor y que no aloja el `dbo` de los otros proyectos. `msp_app` lo creó un administrador con dueño `j_stage_admin`; ese usuario no puede crear esquemas ni bases. |
 | 9 | (15–16 oct 2026) El `dbo_stage` de referencia pasa a ser el **Postgres de staging**, tratado "como si fuera el `dbo_stage` de MySQL". El usuario (no el agente) creó ahí las **11 tablas del push** de n8n, vacías, en `dbo_stage` (con escritura para `j_stage_admin`) y en un esquema `dbo` (sin acceso para `j_stage_admin`). Ver §11.3. **Confirmado por el usuario (21 oct 2026):** el `dbo_stage` de este servidor es la copia sombra de la Fase 4 y el push nuevo escribe en él con `j_stage_admin`, **solo en las 11 tablas del warehouse** (§11.3); las 5 tablas `sec_*` no se tocan nunca. Las conexiones que no son del push siguen abriéndolo en solo lectura. |
+| 10 | (21 oct 2026) **Prisma entra al runtime de la app**, instalado en la raíz del repo (cambia `package.json` y `pnpm-lock.yaml`; se trabaja en rama, sin merge hasta probarlo). La app lee y escribe `msp_app` desde `lib/db/`. Las migraciones se siguen aplicando desde `etl/` (`npm run app:deploy`). |
+| 11 | (21 oct 2026) La implementación `prisma` de la fachada **empieza por catálogos** (valida la base con poco riesgo); auth va después. |
+| 12 | (21 oct 2026) Sesión con **Auth.js** (NextAuth v5), proveedor de credenciales. |
+| 13 | (21 oct 2026) **Se reutilizan los hashes bcrypt** de `up_users` (copiados por el ETL a `user.password_hash`): nadie cambia contraseña al pasar a la app nueva. |
 
 ### Propuestas descartadas durante la conversación (no retomar sin motivo)
 
@@ -164,7 +168,12 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 
 ## 6. Estado actual del trabajo
 
-Al 21 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). El trabajo del 19 y 21 oct está en la rama **`feat/lib-domain`**, **sin fusionar a `main`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, documentos corregidos), los tres subidos por el usuario a `origin/feat/lib-domain`. Sin commit todavía: `docs/migration/FORMULAS.md` y esta versión del README. El agente **no hace `git push`** ni fusiona sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
+Al 22 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). Nada está fusionado a `main`. Hay dos ramas encadenadas:
+
+- **`feat/lib-domain`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, `FORMULAS.md`, documentos corregidos). Subida a `origin`.
+- **`feat/data-facade`**, que sale de la anterior: `6d5adec` y `9b39f51` (21 oct: código muerto fuera y fachada `dataClient`, v1.28.2). Subida a `origin` hasta `9b39f51`.
+
+**Sin commit** en `feat/data-facade`: todo el trabajo de catálogos y login sobre Prisma (v1.29.0, §14). El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -176,7 +185,8 @@ Al 21 oct 2026. `main` coincide con `origin/main` (último commit `fa54fe4`). El
 | **Fase 2: esquema de la app** | `prisma/schema.prisma` (29 modelos, 30 tablas con `_prisma_migrations`) y la migración `prisma/migrations/20261015210000_init`, aplicada en `msp_app` el 15 oct 2026. `migrate status`: al día; `migrate diff` contra la base: sin diferencias. Tablas vacías. Se opera desde `etl/` con `npm run app:*` (ver `etl/README.md`). |
 | Revisión del warehouse en Postgres | 15–16 oct: comparadas las tablas del push de n8n contra el servidor de staging. Resultado en §11.3 y §11.4. |
 | **Fase 3: ETL Strapi → `msp_app`** | **Carga inicial hecha** (19 oct, COMMIT) con el snapshot del RDS del 16 oct 22:21: 1,135 proyectos, 1,688 bloques, 238,226 unidades, 17 usuarios, catálogos, perfiles, financiamiento y tasas (los totales incluyen los padres «No definido»). Verificación antes del COMMIT y `load:verify` posterior: 25/25 tablas, 19/19 relaciones, 1/1 agregados. 0 filas excluidas; 664 advertencias. Migración `20261016120000_etl_run` aplicada (bitácora en `msp_app.etl_run`). Idempotencia comprobada el 19 oct: un `--dry-run` con el mismo snapshot dio 0 filas nuevas, 0 cambiadas y 0 borradas en las 25 tablas. Reporte de diferencias de fórmulas hecho el 19 oct (§12.8): 52 % de las unidades difiere del motor en al menos un campo, casi todo por reglas distintas en períodos viejos. Del 19 al 21 oct la carga guardó el valor recalculado; desde el 21 oct copia los campos de fórmula tal cual vienen de Strapi (recarga con COMMIT el 21 oct con el mismo snapshot: 123,442 unidades vueltas a su valor de Strapi, verificación y `load:verify` 25/25, 19/19, 1/1). Falta refrescar con un snapshot nuevo. Detalle completo en la §12. |
-| **Fase 5 (inicio): fachada y limpieza** | 21 oct, rama **`feat/data-facade`** (sale de `feat/lib-domain`, sin commit, v1.28.2). Borrado el código muerto de `ROADMAP.md` §4.1 (9 archivos). La UI pide los datos a `dataClient` (`lib/api/client.ts`, contrato `DataClient` de 31 métodos) en vez de `strapiClient`; detrás sigue el mismo cliente de Strapi, así que producción no cambia. Backend elegido con `NEXT_PUBLIC_DATA_BACKEND` (solo `strapi` por ahora). Siguiente: implementación `prisma`, empezando por auth y catálogos. |
+| **Fase 5 (inicio): fachada y limpieza** | 21 oct, rama **`feat/data-facade`** (sale de `feat/lib-domain`, commit `9b39f51`, v1.28.2). Borrado el código muerto de `ROADMAP.md` §4.1 (9 archivos). La UI pide los datos a `dataClient` (`lib/api/client.ts`, contrato `DataClient` de 31 métodos) en vez de `strapiClient`; detrás sigue el mismo cliente de Strapi, así que producción no cambia. Backend elegido con `NEXT_PUBLIC_DATA_BACKEND` (solo `strapi` por ahora). Siguiente: implementación `prisma`, empezando por auth y catálogos. |
+| **Fase 5: catálogos sobre Prisma** | 21–22 oct, misma rama, sin commit (v1.29.0). Detalle para retomar en la §14. Prisma en la raíz (decisión 10): segundo generador `app` en `prisma/schema.prisma` → `lib/db/generated` (ignorado; lo crea `postinstall` o `pnpm db:generate`). `lib/db/`: conexión a `msp_app` solo con `DATABASE_URL_APP` (sin respaldo a `DATABASE_URL_DBO_STAGE`), repositorio genérico de los 12 catálogos y Server Actions. La implementación `prisma` de `dataClient` cubre los 5 métodos de catálogo; los demás fallan con un mensaje claro. Sin auth todavía: las Server Actions solo responden en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`, y el login valida contra `msp_app.user` con los hashes bcrypt (decisión 13), sin llamar a Strapi; la sesión queda en el navegador hasta Auth.js. Se corre con `npm run dev:staging` y `.env.staging.local`, sin cargar el `.env` de producción. Verificado: lectura de los 12 catálogos contra `msp_app` en sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id), `npm test` 89/89, `tsc` sin errores nuevos, `next build` aislado OK, servidor levantado y proxy de Strapi sin salida a producción. Falta recorrer la lista "debe seguir funcionando" de `ROADMAP.md` §4.4 en el navegador. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -189,7 +199,7 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | `npm run stage:describe` | Estructura de `dbo_stage`; `-- --schema dbo` para el otro esquema. Las 11 tablas del warehouse con `vivas≈0 insertadas=0`. |
 | `npm run app:status` | "Database schema is up to date!" (2 migraciones: `init` y `etl_run`). |
 | `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 19 oct (unidades 238,226, bloques 1,688, proyectos 1,135, usuarios 17). |
-| `npm test` | 48 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre las del motor de fórmulas en `lib/domain/`. |
+| `npm test` | 48 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre 89: el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, guarda y login) y el resto de módulos puros. |
 | `npm run load:verify -- --snapshot 20261016-222126-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
 | `npm run warehouse:ping` | **Todavía no se ha corrido con éxito.** Necesita `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3). Debe mostrar solo `SELECT`/`SHOW VIEW` y las 11 tablas del push en `dbo_stage` y `dbo`. |
 
@@ -223,9 +233,14 @@ Reglas:
 
 El plan completo por fases (decisiones, esquema nuevo, carga, push, app, workers, corte y limpieza) está en [`ROADMAP.md`](./ROADMAP.md). Sus casillas de las fases 1 a 3 están al día (21 oct); en la Fase 1 queda abierta la comparación con `strapi:pull:print`, que no bloquea.
 
-Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3), ~~carga inicial Strapi → `msp_app`~~ (Fase 3, §12), ~~`lib/domain/` con el motor de fórmulas y su contexto de bloque~~ (19 oct), ~~reporte de diferencias de fórmulas~~ (§12.8).
+Hechos ya: ~~verificar el cliente de Strapi~~ (Fase 1), ~~esquema limpio de Postgres para la app~~ (Fase 2), ~~revisar si el Postgres de staging tiene las tablas del push~~ (§11.3), ~~carga inicial Strapi → `msp_app`~~ (Fase 3, §12), ~~`lib/domain/` con el motor de fórmulas y su contexto de bloque~~ (19 oct), ~~reporte de diferencias de fórmulas~~ (§12.8), ~~fachada `dataClient` y código muerto~~ (21 oct), ~~catálogos y login de la app sobre `msp_app`~~ (21–22 oct, §14).
 
-Lo inmediato:
+Lo inmediato en la **Fase 5** (la línea en la que se estaba trabajando; detalle en la §14.6):
+
+- **A.** Que el usuario recorra en el navegador la lista de catálogos de `ROADMAP.md` §4.4 y, si está bien, **preguntarle** si se hace commit en `feat/data-facade` (sin push).
+- **B.** Siguiente módulo de la implementación `prisma`, a elección del usuario: proyectos en solo lectura (lo que más pantallas habilita), perfiles de tipo de cambio (el más corto) o auth con Auth.js (el orden del roadmap).
+
+Lo inmediato en el resto de la migración:
 
 1. **Refrescar la carga de la Fase 3.** `msp_app` refleja Strapi al 16 oct 22:21. Desde `etl/`, **fuera de 7:00–19:00 (UTC-6)**: `npm run load -- --dry-run` (lee un snapshot nuevo del RDS, carga y hace ROLLBACK), y si cuadra, `npm run load -- --snapshot <el que acaba de crear>` para el COMMIT sin volver a leer el RDS. Es idempotente: solo inserta, actualiza o borra lo que cambió. El usuario ya autorizó esta carga en espejo hacia `msp_app`; avisarle del resultado.
 2. **Confirmar qué regla de Interior vale** (§12.8 y §13). Desde el 21 oct `msp_app` guarda los valores de Strapi tal cual; la respuesta decide con qué regla se recalculará después (en la app nueva o en una carga posterior). Dos vías, no excluyentes: preguntarle al negocio (§13.2) o leer el warehouse. El usuario dice que ya hay acceso (21 oct, mismas credenciales que `j_stage_admin`); falta comprobarlo con `npm run warehouse:ping` (§13.3).
@@ -246,7 +261,7 @@ Lo inmediato:
 - ¿Otros proyectos **escriben** en las tablas de Market Scan dentro de `dbo` (`housing_*`, `office_*`, `industrial_*`, `banking_info`) o solo las leen?
 - El usuario dijo primero que los tableros "ya no leerán el warehouse MySQL" y después que ambos `dbo` se usan. Confirmar quién lee cada uno.
 - ¿El ETL hacia `dbo_stage` es carga única o reemplaza al push de forma permanente? ¿Todos los bloques o por selección?
-- ¿Se migran las contraseñas (`up_users.password`, bcrypt) a la app nueva? El ETL las copia tal cual a `user.password_hash` (no se imprimen en reportes) y no migra `reset_password_token`. Confirmar con el usuario.
+- ~~¿Se migran las contraseñas (`up_users.password`, bcrypt) a la app nueva?~~ Resuelto el 21 oct: sí, se reutilizan (decisión 13). El ETL las copia tal cual a `user.password_hash` (no se imprimen en reportes) y no migra `reset_password_token`.
 - Red: ¿Railway puede llegar al RDS MySQL? (probablemente requiere IPs de salida fijas o túnel).
 - **Reglas de Interior (negocio):** ¿la cuota de Interior (S1/S2) es 8 % a 10 años o 7.5 % a 20 años como GAM? ¿Los lotes de Interior llevan IVA 0.916 o 1.12? Detalle en la §13.2.
 
@@ -260,6 +275,8 @@ Lo inmediato:
 - El pull de n8n no tiene reversa y borra del CRM las unidades que no estén en el warehouse.
 - **Pendientes del esquema de la app (Fase 2):** los enums con `@map` (`Availability.Not_Available` ↔ `"Not Available"`, `OfficeClassification.Micro_1` ↔ `"Micro 1"`, …) necesitan un mapeo explícito al cargar desde Strapi y al exponer DTOs; el índice único parcial "una sola corrida de sync activa" no está modelado (Prisma no lo soporta; agregarlo a mano en una migración); `m2_range` de oficinas y la calidad industrial quedaron como texto porque Strapi tiene variantes sucias.
 - **Permisos en staging:** `j_stage_admin` tiene `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` sobre todo `dbo_stage` (incluidas las `sec_*`). Desde el 21 oct (decisión 9) el push nuevo puede escribir en las 11 tablas del warehouse; como el permiso alcanza también a las `sec_*`, la protección de esas tablas tiene que estar en el código (lista cerrada de tablas en el cliente de escritura).
+- **Códigos ISO de países invertidos respecto al formulario** (22 oct): en los datos, `isoCode` es alfa-3 (`GTM`, `SLV`) e `isoCode2` alfa-2 (`GT`), y el IVA, la cuota y los departamentos leen `isoCode2`. El formulario de `components/catalogs/catalog-table.tsx` valida al revés (2 letras en `isoCode`, 3 en `isoCode2`), así que hoy no deja guardar un país existente sin cambiarle los códigos, tampoco con Strapi. El servidor nuevo no valida el largo. Sin decidir; anotado en `ROADMAP.md` §4.4.
+- **`j_stage_admin` también ve el `dbo` de producción del servidor de Railway**: la app nueva usa esa credencial (copiada como `DATABASE_URL_APP` en `.env.staging.local`), y el código la fija a `msp_app`. Lo seguro sería un usuario de Postgres propio que solo pueda entrar a `msp_app`; tiene que crearlo un administrador, no el agente.
 - **Skill e inventario de producción desactualizados:** `inventario-produccion.md` y la skill `proteger-produccion` todavía nombran `STRAPI_DATABASE_URL` (hoy son las variables `DATABASE_*_STRAPI`) y no registran el Postgres de staging (`railway`, esquemas `msp_app`/`dbo_stage`/`dbo`). La skill además pide un proyecto de Railway nuevo para la app, y la decisión 8 usó el servidor de staging. Solo el usuario puede editarlos.
 
 ---
@@ -416,15 +433,16 @@ Por período: 2026 T3 vivienda 25 % con diferencias, 2026 S1 vivienda 71 % (la c
 
 ---
 
-## 13. Dónde quedó la última conversación (21 oct 2026)
+## 13. Dónde quedó la última conversación (22 oct 2026)
 
 ### 13.1 Estado
 
-- Código y documentos en la rama `feat/lib-domain` (subida hasta `f8c8ea6`, sin fusionar; ver §6). Sin commit: `docs/migration/FORMULAS.md` y esta versión del README.
+- **Lo último (21–22 oct):** la Fase 5 arrancó. La UI usa la fachada `dataClient`, y la implementación `prisma` ya cubre catálogos y login contra `msp_app`. La app corre en local sin Strapi con `npm run dev:staging`; el usuario la levanta él mismo, y al 22 oct la tenía corriendo en su terminal. Todo eso está en `feat/data-facade`, **sin commit**. Detalle, cómo correrla y cómo seguir: **§14**.
+- Ramas: `feat/lib-domain` (subida hasta `f8c8ea6`) y `feat/data-facade` encima (subida hasta `9b39f51`), sin fusionar; ver §6.
 - `msp_app` tiene la carga del snapshot `20261016-222126-full` **con los campos de fórmula tal cual vienen de Strapi** (recarga con COMMIT del 21 oct, `load:verify` limpio; ver §12.1). Se confirmó con el usuario que las tablas y los datos de Strapi están en `msp_app` (25/25 tablas, 19/19 relaciones, 1/1 agregados; 664 advertencias conocidas, §12.5). Strapi, el warehouse y n8n no se tocaron.
 - 21 oct: nuevo [`FORMULAS.md`](FORMULAS.md), el mapa de dónde vive cada fórmula (motor en `lib/domain/`, hoja de unidades, moneda local, n8n, warehouse, ETL). Respuesta corta para el usuario: las fórmulas no están en la base ni en Strapi; están en `lib/domain/units/formulas.ts` y corren en el navegador; los promedios del bloque los calcula n8n.
 - 21 oct: nuevo `npm run warehouse:ping` en `etl/` para el warehouse MySQL. Todavía no se ha probado: falta `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3).
-- No hay nada a medias en el código. Lo pendiente son respuestas externas: las de la §13.2 y la prueba de acceso de la §13.3.
+- No hay nada a medias en el código. Lo pendiente: la revisión del usuario en el navegador y su decisión de commit (§14.6), y respuestas externas (§13.2 y la prueba de acceso de la §13.3).
 
 ### 13.2 La duda que queda abierta: ¿qué regla de Interior es la correcta?
 
@@ -481,12 +499,91 @@ No es imprescindible para la §13.2, pero sirve para confirmar la hipótesis de 
 Preguntárselo antes de hacerlo; ninguno está autorizado todavía:
 
 - **Refrescar la carga** con un snapshot nuevo del RDS, de noche (después de las 19:00 UTC-6) o con `--allow-business-hours` si él lo pide (§8, punto 1).
-- **Entrada en `CHANGELOG.md`** del trabajo del 21 oct (copia tal cual, `warehouse:ping`, `FORMULAS.md`). Es solo documentación del ETL: no cambia la app ni su versión.
-- **Commit** de `FORMULAS.md` y del README. **Sin `git push`**: el usuario sube él mismo.
+- **Commit** del trabajo de la §14 en `feat/data-facade`. **Sin `git push`**: el usuario sube él mismo.
+- **Siguiente módulo** de la Fase 5 (§14.6).
+- **Corregir la validación ISO** del formulario de países (§10), cuando el negocio confirme qué columna es cuál.
+- **Quitar `@univerjs/*` y `luckysheet`** de `package.json` (sin uso desde v1.28.2).
+- **Arreglar el respaldo de credenciales del warehouse** en `etl/src/warehouse/connection.ts`: sin `DATABASE_USER_WAREHOUSE` usa las de Strapi, aunque la §13.3 dice que el acceso es con las de `j_stage_admin`.
 
 Cómo trabaja el usuario:
 
 - Escribe en español, con pedidos cortos.
 - Cuando hay que elegir, prefiere que se le den opciones concretas.
-- Ya autorizó escribir en `msp_app` (cargas en espejo desde Strapi).
+- Ya autorizó escribir en `msp_app` (cargas en espejo desde Strapi, y lo que se guarde desde la app en modo `prisma`).
 - Cualquier otra escritura (`dbo_stage` de staging, producción) requiere preguntarle.
+- Para correr la app pide un comando para levantarla él; si el agente la levanta, detenerla cuando lo pida.
+- Si algo no se entiende, lo pregunta: explicarle en palabras simples qué es cada archivo o variable y por qué existe.
+
+---
+
+## 14. Fase 5: la app sobre `msp_app` (para retomar)
+
+Estrategia completa en `ROADMAP.md` (fase 5 y §4). En corto: la UI habla con una fachada; detrás hay dos implementaciones (`strapi`, la de producción, y `prisma`, la nueva), elegidas con `NEXT_PUBLIC_DATA_BACKEND` para toda la app a la vez.
+
+### 14.1 Qué está hecho
+
+| Pieza | Archivos | Estado |
+|---|---|---|
+| Fachada | `lib/api/client.ts` (`dataClient`, tipo `DataClient` de 31 métodos), `lib/api/data-backend.ts` | 33 archivos de la UI la usan; fuera de `lib/api/` nadie importa `strapiClient`. Commit `9b39f51`. |
+| Implementación `prisma` | `lib/api/prisma-client.ts` | Catálogos (5 métodos) y login/sesión (4) reales; los otros 22 métodos lanzan "todavía no está migrado". |
+| Cliente Prisma de la app | generador `app` en `prisma/schema.prisma` → `lib/db/generated/` (ignorado); `lib/db/connection.ts`, `lib/db/client.ts` | Se genera en `postinstall` o con `pnpm db:generate`. Solo usa `DATABASE_URL_APP`, `search_path=msp_app`, pool de 2, raíz TLS de Railway (`DATABASE_CA_APP` o `etl/certs/dbo-stage-ca.pem`). |
+| Catálogos | `lib/db/catalog-mapping.ts` (puro), `lib/db/catalogs.ts` (repositorio), `lib/db/catalog-actions.ts` (Server Actions) | Los 12 catálogos de `CATALOG_TYPES` menos `block-types` (no tiene tabla). Paginación, `sort` y búsqueda como Strapi; `documentId` = `publicId`; borrar algo en uso da "está en uso" (FK `Restrict`). |
+| Login | `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts` (puro) | Valida correo o usuario y clave contra `msp_app.user` con los hashes bcrypt de Strapi (decisión 13). Si el correo no está ahí, prueba la cuenta de desarrollo de `.env.staging.local` (§14.3). El usuario de sesión queda en `localStorage` (`msp_dev_session`). |
+| Guarda | `lib/db/guard.ts` | Toda Server Action llama a `assertPrismaActionsAllowed()`: solo responde en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`. Las acciones existen también en el build de producción (Next las publica), por eso la guarda es obligatoria hasta Auth.js. |
+| Lanzador | `scripts/dev-staging.mjs`, `.env.staging.example` | Ver §14.2. |
+| Pruebas | `lib/db/catalog-mapping.test.ts`, `lib/db/user-mapping.test.ts` | Entran en `npm test` de la raíz (89 en total). |
+
+Dependencias nuevas en la raíz (mismas versiones que `etl/`): `@prisma/client`, `@prisma/adapter-pg`, `pg`, `bcryptjs`, y `prisma`/`@types/pg` como desarrollo. `npm run app:generate` en `etl/` genera solo su propio cliente (`--generator client`).
+
+### 14.2 Cómo correr la app sin Strapi
+
+```powershell
+npm run dev:staging
+```
+
+Desde la raíz del repo. Abrir http://localhost:3000/login. Para detenerla, `Ctrl+C`.
+
+- `scripts/dev-staging.mjs` lee **solo** `.env.staging.local`. Además vacía cada clave de `.env`, `.env.local`, `.env.development` y `.env.development.local` que staging no redefine, y marca `__NEXT_PROCESSED_ENV=true`: Next no aplica ningún `.env`, ni al recargar en caliente (nunca pisa una variable que ya existe). Next igual muestra "Environments: .env.local, .env" en el arranque; es solo el listado de archivos, no los aplica.
+- Fuerza `NEXT_PUBLIC_DATA_BACKEND=prisma` y `NEXT_PUBLIC_STRAPI_URL=""`. Sin URL, el código cae a `http://localhost:1337`: comprobado el 21 oct, el proxy `/api/strapi/*` da 503 "fetch failed" y no llega a producción.
+- Se niega a arrancar si falta `.env.staging.local` o `DATABASE_URL_APP`, o si el archivo define `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_KEY` o `NEXT_PUBLIC_STRAPI_URL`.
+- No usar `pnpm dev` para el modo `prisma`: carga el `.env` de producción.
+- El pnpm global (9.15.4) falla con el `pnpm-workspace.yaml`; para instalar dependencias usar `npx -y pnpm@10 …`. `npm run <script>` funciona normal.
+
+### 14.3 `.env.staging.local` (ignorado por git, línea explícita en `.gitignore`)
+
+Tiene tres claves, creadas por el agente sin imprimir valores:
+
+- `DATABASE_URL_APP`: copia de `DATABASE_URL_DBO_STAGE` del `.env` (usuario `j_stage_admin`, servidor de staging de Railway). Ver el riesgo en la §10.
+- `DEV_LOGIN_EMAIL` y `DEV_LOGIN_PASSWORD_HASH`: cuenta de desarrollo `engteam@primeiqlatam.com`, pedida por el usuario el 21 oct. Esa cuenta **no existe** entre los 17 usuarios de `msp_app` (será del panel de administración de Strapi). Se guardó solo el hash bcrypt de la clave, generado desde `market_scan_USERNAME`/`market_scan_PASSWORD` del `.env`; entra con rol `administrator`. Se eligió esto en vez de insertarla en `msp_app.user` porque la próxima carga del ETL (espejo de Strapi) la borraría.
+
+Los 17 usuarios reales de `msp_app` (los del panel de usuarios de Strapi, p. ej. `jnoriega@primelatam.com`) también pueden entrar con su clave de siempre.
+
+### 14.4 Qué se puede probar hoy en modo `prisma`
+
+- **Completo:** `/catalogs` (los 12 catálogos: listar, buscar, paginar, crear, editar, borrar), login y logout.
+- **Parcial:** `/projects/new` (los selectores de país, desarrolladora, tipo de seguridad, NSE, amenidades y servicios; **no guardar**, `createProject` no está migrado), `/blocks/new` (categoría, enfoque y estado; el selector de proyecto falla), `/settings` (muestra el usuario; guardar falla).
+- **Falla al cargar (no migrado):** listas, vistas y edición de proyectos y bloques; `/units` y la hoja; perfiles de tipo de cambio; olvidé y restablecer contraseña.
+- **No abrir:** `/copilots` (sin variable, el Copilot usa la URL de n8n de producción por defecto) y `/sync`. La barra de tipo de cambio puede hacer un `GET` al webhook público; es lectura y la skill lo permite.
+- Lo que se crea en los catálogos cae en `msp_app` y la próxima carga del ETL lo borra (espejo de Strapi).
+
+Totales esperados en `/catalogs` (carga del 16 oct): desarrolladores 538, amenidades 85, servicios 18, NSE 15, enfoques de bloque 15, topografías 12, estados de bloque 10, tipos de seguridad 9, categorías de bloque 7, tipos de parqueo 5, países 2, usos de unidad 2.
+
+### 14.5 Cómo agregar el siguiente módulo (receta seguida con catálogos)
+
+1. `graphify query` sobre el módulo y leer su inventario en `ROADMAP.md` §4 (pantallas, métodos, "debe seguir funcionando").
+2. Reglas puras en `lib/db/<modulo>-mapping.ts`: fila de Prisma → la misma forma que devuelve Strapi (`documentId` = `publicId`, relaciones anidadas, `{ data, meta }` en listas). Sin `@/` ni React, imports relativos con `.ts`, para que corran con `node --test`. Pruebas en `lib/db/<modulo>-mapping.test.ts`.
+3. Repositorio en `lib/db/<modulo>.ts` que recibe el `PrismaClient` (así se puede probar con un cliente de solo lectura).
+4. Server Actions en `lib/db/<modulo>-actions.ts` (`"use server"`): cada una llama a `assertPrismaActionsAllowed()` y devuelve `ActionResult` (`lib/db/action-result.ts`), nunca lanza.
+5. En `lib/api/prisma-client.ts`, reemplazar los `notMigrated(...)` del módulo por llamadas a las acciones con `unwrap()`.
+6. Prueba de humo contra `msp_app` en **sesión de solo lectura**: script temporal `scripts/tmp-*.mts` (extensión `.mts`, la raíz no es ESM) corrido con `etl\node_modules\.bin\tsx.cmd`, con `options: "-c search_path=msp_app -c default_transaction_read_only=on"` y `process.loadEnvFile(".env.staging.local")`. Borrarlo después. No imprimir hashes ni credenciales.
+7. `npm test`, `npx tsc --noEmit` (la línea base es de **38 errores** previos; ninguno debe estar en archivos nuevos), y si se tocó el empaquetado, un `next build` aislado: `$env:__NEXT_PROCESSED_ENV="true"; $env:NEXT_PUBLIC_DATA_BACKEND="prisma"; npx next build` (no carga ningún `.env`; los avisos "Dynamic server usage" del i18n son previos).
+8. `CHANGELOG.md` y versión, `CLAUDE.md` si cambia la arquitectura, casillas de `ROADMAP.md`, la fila de la §6 y esta §14; `graphify update .`.
+
+### 14.6 Siguiente paso
+
+1. El usuario recorre `/catalogs` (lista de `ROADMAP.md` §4.4). Si algo falla, revisar la salida de `npm run dev:staging` en su terminal.
+2. Preguntarle si se hace **commit** en `feat/data-facade` (sin push). Archivos del cambio: `.gitignore`, `.env.staging.example`, `CHANGELOG.md`, `CLAUDE.md`, `docs/migration/README.md`, `docs/migration/ROADMAP.md`, `etl/package.json`, `lib/api/client.ts`, `lib/api/data-backend.ts`, `lib/api/prisma-client.ts`, `lib/db/` (menos `generated/`), `package.json`, `pnpm-lock.yaml`, `prisma/schema.prisma`, `scripts/dev-staging.mjs`. Nunca `.env` ni `.env.staging.local`.
+3. Elegir con el usuario el siguiente módulo (con opciones concretas):
+   - **Proyectos en solo lectura** (`getProjects`, `getProjectById`): habilita la lista con filtros avanzados, la vista y los selectores de proyecto en bloques y perfiles. Es el más pesado en relaciones (país, desarrolladora, NSE, amenidades, servicios, perfil, financiamiento).
+   - **Perfiles de tipo de cambio** (5 métodos + `getProjects` para vincular): el más corto.
+   - **Auth con Auth.js** (decisiones 12 y 13): reemplaza la sesión en `localStorage` y la guarda de solo desarrollo; es lo que permitiría correr el modo `prisma` fuera de `next dev`.
