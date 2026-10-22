@@ -44,7 +44,7 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 - [ ] Activar la protección de despliegues en el proyecto de Vercel de staging.
 - [ ] Aclarar qué abre la credencial `j_stage_admin` (pregunta de la §9 de `README.md`) y, si hace falta, que un administrador cree un rol que solo pueda leer y escribir datos en `msp_app`.
-- [ ] Rotar la clave de `engteam@primeiqlatam.com` en Strapi; después actualizar `DEV_LOGIN_PASSWORD_HASH` y repetir `npm run app:local-user -- --apply` en `etl/`.
+- [ ] Rotar la clave de `engteam@primeiqlatam.com` en Strapi. Ya no afecta a la app nueva: desde el 22 oct, 14:26, `app-engteam` tiene clave propia.
 
 ## 7. Decisiones pendientes del usuario
 
