@@ -19,6 +19,8 @@ next-env.d.ts
 # Misc
 .DS_Store
 *.pem
+# Raíz pública de Railway (la entrega el servidor en el handshake TLS): la app la necesita en Vercel
+!etl/certs/dbo-stage-ca.pem
 
 # Debug
 npm-debug.log*
