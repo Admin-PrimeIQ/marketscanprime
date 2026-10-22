@@ -15,8 +15,14 @@ export function assertPrismaActionsAllowed(env: Record<string, string | undefine
     throw new Error('Las acciones sobre la base nueva requieren NEXT_PUBLIC_DATA_BACKEND="prisma".')
   }
   if (env.NODE_ENV === "development") return
-  if (env.MSP_STAGING_DEPLOY?.trim() !== "true") {
-    throw new Error("Las acciones sobre la base nueva solo corren en desarrollo local o en un despliegue con MSP_STAGING_DEPLOY=true.")
+  const flag = env.MSP_STAGING_DEPLOY
+  if (flag?.trim() !== "true") {
+    const seen = flag === undefined ? "no está definida" : `vale ${JSON.stringify(flag)}`
+    const where = env.VERCEL_ENV ? ` (entorno de Vercel: ${env.VERCEL_ENV})` : ""
+    throw new Error(
+      `Las acciones sobre la base nueva solo corren en desarrollo local o en un despliegue con MSP_STAGING_DEPLOY=true. ` +
+        `En este despliegue MSP_STAGING_DEPLOY ${seen}${where}.`,
+    )
   }
   const leaked = PRODUCTION_SECRETS.filter((key) => env[key]?.trim())
   if (leaked.length > 0) {
