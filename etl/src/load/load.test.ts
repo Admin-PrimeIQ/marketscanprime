@@ -4,7 +4,7 @@ import { draft, fixture, published } from "./fixtures"
 import { checkUnits, FORMULA_COLUMNS, formulaCsv, formulaDiffs, summarizeFormulas, type FormulaField, type UnitCheck } from "./formulas"
 import { cents, date, float, numeric, timestamp } from "./normalize"
 import { snapshotCountMismatches, STRAPI_TABLES } from "./snapshot"
-import { SPECS, type AppTable } from "./specs"
+import { APP_LOCAL_PREFIX, mirroredRows, mirroredScope, SPEC_BY_TABLE, SPECS, type AppTable } from "./specs"
 import { transform } from "./transform"
 import { validate } from "./validate"
 import { massDeletions, type TableStats } from "./write"
@@ -67,6 +67,21 @@ describe("camino feliz", () => {
     assert.equal(data.user[0].role, "administrator")
     assert.equal(data.user[0].blocked, "false")
     assert.equal(data.user[0].password_hash, "$2a$10$hash")
+  })
+  test("cuenta credential de Better Auth con el hash de Strapi", () => {
+    assert.deepEqual(
+      data.account.map(({ user_id, account_id, provider_id, password }) => ({ user_id, account_id, provider_id, password })),
+      [{ user_id: "user-ana", account_id: "user-ana", provider_id: "credential", password: "$2a$10$hash" }],
+    )
+    assert.equal(data.account[0].updated_at, data.user[0].updated_at)
+  })
+  test("sin cuenta si el usuario no es local o no tiene clave", () => {
+    const s = fixture()
+    s.tables.up_users.push(
+      published(71, "user-sso", { username: "sso", email: "sso@example.com", password: null, provider: "google", confirmed: true, blocked: null }),
+      published(72, "user-nopass", { username: "nopass", email: "nopass@example.com", password: null, provider: "local", confirmed: true, blocked: null }),
+    )
+    assert.deepEqual(transform(validate(s).resolved).account.map((a) => a.user_id), ["user-ana"])
   })
 })
 
@@ -303,6 +318,19 @@ describe("freno al borrado masivo", () => {
   })
   test("primera carga sobre msp_app vacía no frena", () => {
     assert.deepEqual(massDeletions(stats({ unit: { expected: 238_000, inserted: 238_000 } })), [])
+  })
+})
+
+describe("cuentas propias de la app nueva", () => {
+  test("el espejo deja fuera los usuarios con public_id app-…", () => {
+    assert.equal(mirroredRows(SPEC_BY_TABLE.user, "t.public_id"), `t.public_id NOT LIKE '${APP_LOCAL_PREFIX}%'`)
+  })
+  test("las demás tablas son espejo completo", () => {
+    for (const spec of SPECS.filter((s) => s.table !== "user")) assert.equal(mirroredRows(spec), "TRUE")
+  })
+  test("las cuentas de usuarios app-… tampoco son espejo (heredan del padre)", () => {
+    assert.equal(mirroredScope(SPEC_BY_TABLE.account, "j0.public_id"), `j0.public_id NOT LIKE '${APP_LOCAL_PREFIX}%'`)
+    assert.equal(mirroredScope(SPEC_BY_TABLE.unit_housing, "j0.public_id"), "TRUE")
   })
 })
 

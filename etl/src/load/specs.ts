@@ -15,6 +15,8 @@ export interface Column {
   enumType?: string
   /** Tabla padre (`kind: "ref"`); el valor en la fila es su `public_id`. */
   ref?: AppTable
+  /** `ref` cuya columna es texto (el id del padre escrito como texto, p. ej. `account.account_id`). */
+  textRef?: boolean
   /** No se imprime en reportes. */
   sensitive?: boolean
 }
@@ -30,6 +32,31 @@ export interface TableSpec {
   scope?: string
   /** Columnas con índice único además de la llave: se liberan antes de escribir. */
   uniques?: string[]
+  /**
+   * Prefijo de `public_id` de las filas que crea la app nueva y que no vienen de Strapi: el espejo
+   * no las renombra, no las borra ni las verifica.
+   */
+  localPrefix?: string
+}
+
+/** `public_id` de las cuentas propias de la app nueva. Un `documentId` de Strapi no lleva guiones. */
+export const APP_LOCAL_PREFIX = "app-"
+
+/** Condición SQL que deja fuera las filas propias de la app nueva (`localPrefix`). */
+export function mirroredRows(spec: TableSpec, column = "public_id"): string {
+  if (!spec.localPrefix) return "TRUE"
+  if (!/^[a-z0-9-]+$/.test(spec.localPrefix)) throw new Error(`localPrefix inválido en ${spec.table}: ${spec.localPrefix}`)
+  return `${column} NOT LIKE '${spec.localPrefix}%'`
+}
+
+/**
+ * Lo mismo para cualquier tabla: las hijas heredan el `localPrefix` de su padre (`scope`), así una
+ * cuenta de un usuario `app-…` tampoco es espejo. `scopeColumn` es el `public_id` del padre.
+ */
+export function mirroredScope(spec: TableSpec, scopeColumn: string): string {
+  if (spec.publicId) return mirroredRows(spec, scopeColumn)
+  const parent = spec.columns.find((c) => c.name === spec.scope)?.ref
+  return parent ? mirroredRows(SPEC_BY_TABLE[parent], scopeColumn) : "TRUE"
 }
 
 export type AppTable =
@@ -58,6 +85,7 @@ export type AppTable =
   | "unit_office"
   | "unit_industrial"
   | "user"
+  | "account"
 
 const c = (name: string, kind: Exclude<Kind, "enum" | "ref">): Column => ({ name, kind })
 const e = (name: string, enumType: string): Column => ({ name, kind: "enum", enumType })
@@ -324,6 +352,7 @@ export const SPECS: TableSpec[] = [
     publicId: true,
     key: ["public_id"],
     uniques: ["username", "email"],
+    localPrefix: APP_LOCAL_PREFIX,
     columns: [
       ...document,
       c("username", "text"),
@@ -333,6 +362,21 @@ export const SPECS: TableSpec[] = [
       e("role", "user_role"),
       c("confirmed", "bool"),
       c("blocked", "bool"),
+      ...stamps,
+    ],
+  },
+  {
+    // Cuenta `credential` de Better Auth: el login lee la clave de aquí y exige `account_id` = id
+    // del usuario. Las de usuarios `app-…` quedan fuera del espejo por su padre (`mirroredScope`).
+    table: "account",
+    publicId: false,
+    key: ["user_id", "provider_id"],
+    scope: "user_id",
+    columns: [
+      r("user_id", "user"),
+      { ...r("account_id", "user"), textRef: true },
+      c("provider_id", "text"),
+      { name: "password", kind: "text", sensitive: true },
       ...stamps,
     ],
   },

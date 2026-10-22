@@ -1,5 +1,5 @@
 import type pg from "pg"
-import { SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
+import { mirroredRows, mirroredScope, SPEC_BY_TABLE, SPECS, type AppData, type AppRow, type AppTable, type TableSpec } from "./specs"
 import { pgType, q } from "./sql"
 
 /**
@@ -9,7 +9,8 @@ import { pgType, q } from "./sql"
  *   mantienen entre corridas y una fila idéntica no se reescribe (`IS DISTINCT FROM`).
  * - Tablas hijas: se borran las filas del padre que ya no existen en Strapi.
  * - Modo `full` (espejo): lo que ya no está en Strapi se borra; en `sample` solo se tocan las filas
- *   de la muestra y nunca se borra nada fuera de ella.
+ *   de la muestra y nunca se borra nada fuera de ella. Las filas propias de la app nueva
+ *   (`localPrefix`) no son espejo y quedan intactas en los dos modos.
  */
 
 export type Mode = "full" | "sample"
@@ -150,7 +151,8 @@ async function releaseUniques(client: pg.Client, spec: TableSpec, rows: AppRow[]
       )
       if (mode === "full") {
         await client.query(
-          `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder} WHERE t.${c} IS NOT NULL AND t.public_id NOT IN (SELECT unnest($1::text[]))`,
+          `UPDATE ${q(spec.table)} AS t SET ${c} = ${placeholder}
+            WHERE t.${c} IS NOT NULL AND t.public_id NOT IN (SELECT unnest($1::text[])) AND ${mirroredRows(spec, "t.public_id")}`,
           [rows.map((r) => r.public_id)],
         )
       }
@@ -165,6 +167,10 @@ async function deleteStaleChildren(client: pg.Client, spec: TableSpec, rows: App
   const unnest = spec.key.map((_, i) => `$${i + 1}::text[]`).join(", ")
   const params: unknown[] = spec.key.map((k) => rows.map((r) => r[k]))
   let sql = `DELETE FROM ${q(spec.table)} WHERE ${tuple} NOT IN (SELECT * FROM unnest(${unnest}))`
+  const parent = spec.columns.find((c) => c.name === spec.scope)!.ref!
+  if (SPEC_BY_TABLE[parent].localPrefix) {
+    sql += ` AND ${q(spec.scope!)} IN (SELECT id FROM ${q(parent)} WHERE ${mirroredScope(spec, "public_id")})`
+  }
   if (mode === "sample") {
     params.push(scopeIds)
     sql += ` AND ${q(spec.scope!)} = ANY($${params.length}::integer[])`
@@ -175,7 +181,7 @@ async function deleteStaleChildren(client: pg.Client, spec: TableSpec, rows: App
 
 async function prune(client: pg.Client, table: AppTable, publicIds: string[]): Promise<number> {
   const result = await step(`borrar de ${table} lo que ya no está en Strapi`, () =>
-    client.query(`DELETE FROM ${q(table)} WHERE public_id NOT IN (SELECT unnest($1::text[]))`, [publicIds]),
+    client.query(`DELETE FROM ${q(table)} WHERE public_id NOT IN (SELECT unnest($1::text[])) AND ${mirroredRows(SPEC_BY_TABLE[table])}`, [publicIds]),
   )
   return result.rowCount ?? 0
 }

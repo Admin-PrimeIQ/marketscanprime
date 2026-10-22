@@ -930,7 +930,7 @@ class StrapiClient {
         } else if (response.status === 403) {
           errorMessage = (errorDetails && errorDetails.error?.message) || errorMessage || 'Acceso denegado. Tu cuenta puede estar bloqueada o no confirmada.'
         } else if (response.status === 404) {
-          errorMessage = 'Endpoint de autenticación no encontrado. Verifica la URL de Strapi en .env.local'
+          errorMessage = 'Endpoint de autenticación no encontrado. Verifica la URL de Strapi en .env'
         } else if (response.status >= 500) {
           errorMessage = (errorDetails && errorDetails.error?.message) || 'Error del servidor. Por favor, intenta más tarde.'
         }

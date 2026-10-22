@@ -92,7 +92,7 @@ Por eso:
 
 - No correr `pnpm dev`/`pnpm start` del backoffice con el `.env` de producción salvo que el usuario lo pida explícitamente, y en ese caso **solo navegar pantallas de lectura**; nunca guardar, crear, clonar, borrar, ni abrir `/sync`.
 - No hacer pruebas automáticas (Playwright, scripts) contra la app conectada a producción.
-- La app nueva (implementación `prisma`) se corre contra el Postgres **nuevo**, con un `.env` distinto (p. ej. `.env.staging.local`).
+- La app nueva (implementación `prisma`) se corre contra el Postgres **nuevo** con el **`.env` único de la raíz** (decisión 15 de `docs/migration/README.md`), que no contiene credenciales de Strapi ni n8n de producción, y de preferencia con `pnpm dev:staging`. No crear un `.env` aparte (`.env.local`, `.env.staging.local` ni `.env` por carpeta).
 
 ## Git y despliegue
 

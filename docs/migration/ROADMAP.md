@@ -97,8 +97,8 @@ Son preguntas de negocio/infraestructura; sin respuesta, el código posterior se
 - [ ] **El pull (warehouse → CRM).** ¿Sigue existiendo cuando la app sea la fuente de verdad? Propuesta: **eliminarlo**; si el equipo carga datos al warehouse por otra vía, se reemplaza por un importador explícito con vista previa, no por un pull que borra unidades.
 - [ ] **Quién lee cada `dbo`** y si otros proyectos **escriben** en las tablas de Market Scan (`housing_*`, `office_*`, `industrial_*`, `banking_info`).
 - [ ] **Red:** confirmar que Railway (y la máquina que corra el ETL) puede llegar al RDS MySQL; si no, IP de salida fija o túnel.
-- [ ] **Usuarios:** migrar `up_users` con su hash bcrypt (nadie cambia contraseña) o forzar restablecimiento. Hoy el ETL ya copia el hash a `user.password_hash`; falta la confirmación del usuario.
-- [ ] **Dónde vive la app nueva:** este repo (`Admin-PrimeIQ/marketscanprime`), que es una copia paralela del backoffice. **Confirmar en Vercel que ningún proyecto de producción despliega desde este repo**; hasta entonces, `main` se trata como producción y no se hace `push` sin aprobación.
+- [x] **Usuarios:** migrar `up_users` con su hash bcrypt (nadie cambia contraseña) o forzar restablecimiento. Resuelto el 21 oct (`README.md` §3, decisión 13): se reutilizan los hashes; el ETL los copia a `user.password_hash`.
+- [ ] **Dónde vive la app nueva:** este repo (`Admin-PrimeIQ/marketscanprime`), que es una copia paralela del backoffice. **Confirmar en Vercel que ningún proyecto de producción despliega desde este repo**; hasta entonces, `main` se trata como producción y no se hace `push` sin aprobación. El usuario dijo el 22 oct que el backoffice de producción vive en otro repo y con otro dominio, pero que el Strapi y la base `strapi` a los que apunta este repo son los de producción y no se modifican (`README.md` §2); falta la comprobación en Vercel.
 - [ ] **Infraestructura nueva:** Postgres y Redis propios, separados del Postgres `dbo` que ya existe (ese es producción y lo usan otros proyectos). Postgres resuelto: por decisión del usuario (`README.md` §3, decisiones 8 y 9) la migración usa el servidor de staging de Railway (base `railway`, esquema `msp_app`) en lugar de un proyecto nuevo. Faltan el Redis y el servicio de workers.
 
 **Hecho cuando:** cada punto tiene una respuesta escrita en `README.md` §9.
@@ -147,7 +147,7 @@ Script en `etl/src/load/`, **idempotente** (se puede correr N veces; hace upsert
 - [x] Cargas completas **fuera de horario laboral** (la extracción completa se rechaza entre 7:00 y 19:00): la base `strapi` es la misma que usa Strapi en producción.
 - [x] **Recalcular** los campos de fórmula de cada unidad con `lib/domain` y reportar las diferencias contra lo guardado en Strapi (sustituye a `.migration/`). Hecho el 19 oct; resultado en `README.md` §12.8. Desde el 21 oct (decisión del usuario) la carga copia los valores tal cual vienen de Strapi y el recálculo queda solo como reporte (`etl/reports/formulas-*`); el recálculo se aplicará cuando negocio confirme las reglas de Interior.
 - [x] Reporte final: incidencias con su porqué, exclusiones, filas nuevas/cambiadas/borradas por tabla y verificación de filas, relaciones y agregados. Las fórmulas van en su propio reporte (`etl/reports/formulas-*.json` y `.csv`) y el resumen de lo reemplazado queda en `etl_run.counts`.
-- [x] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`. Hecho el 19 oct con el snapshot del 16 oct; falta refrescar con un snapshot nuevo leído de noche.
+- [x] Primera corrida real (`load:validate` → `load --dry-run` → `load`) y aplicar la migración `etl_run`. Hecho el 19 oct con el snapshot del 16 oct. Refrescada el 22 oct con el snapshot `20261022-172111-full`, leído de día con `--allow-business-hours` porque el usuario lo autorizó (`README.md` §14.7 puntos 15 y 16).
 
 **Hecho cuando:** dos corridas seguidas dejan la base idéntica y los conteos cuadran con `strapi:check`.
 
@@ -180,8 +180,8 @@ Una variable `NEXT_PUBLIC_DATA_BACKEND=strapi|prisma` elige la implementación *
 2. [ ] **Base:** cliente Prisma, `lib/db/`, `lib/domain/`; tipos `Strapi*` renombrados a tipos de dominio en `lib/types/` (hoy los importan `lib/block-domain-ui.ts`, `lib/units/unit-type-*.ts` y `lib/auth/*`). `lib/domain/` ya existe (19 oct): `units/formulas.ts`, `units/varas.ts`, `units/context.ts` (contexto de bloque para el motor), `region.ts` y `geo.ts`, con pruebas en `npm test`. `lib/constants.ts` y `lib/region.ts` quedan como reexportaciones más lo de UI; el antiguo `lib/domain.ts` (etiquetas de UI) pasó a `lib/block-domain-ui.ts`. Cliente Prisma de la app hecho el 21 oct (v1.29.0): generador `app` → `lib/db/generated`, `lib/db/connection.ts` (solo `DATABASE_URL_APP`, `search_path=msp_app`) y `lib/db/client.ts` (`server-only`). Falta el renombre de tipos.
 3. [x] **Fachada** `lib/api/client.ts` con la implementación `strapi`; los imports de la UI pasaron de `strapiClient` a `dataClient` (21 oct, v1.28.2, rama `feat/data-facade`). El contrato es el tipo `DataClient` (31 métodos) y el backend lo elige `NEXT_PUBLIC_DATA_BACKEND` (tiene que ser `NEXT_PUBLIC_` porque la UI lo lee en el navegador). Fuera de `lib/api/` nadie importa `strapiClient`; los tipos `Strapi*` y los helpers puros siguen saliendo de `strapi.ts` hasta el paso 2.
 4. [ ] Implementación `prisma`, módulo por módulo. Orden (decisión 11 del README): catálogos → auth → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
-   - [x] Catálogos (21 oct, v1.29.0): `lib/db/catalogs.ts` + `lib/db/catalog-actions.ts`, y `lib/api/prisma-client.ts` en la fachada. Hasta que llegue auth, las Server Actions solo responden en `next dev` con el backend `prisma`, y la sesión es local. Se corre con `pnpm dev:staging` (`.env.staging.local`, sin el `.env` de producción).
-   - [ ] Auth (Auth.js, hashes bcrypt reutilizados: decisiones 12 y 13). Reemplaza la sesión local y la guarda de solo desarrollo.
+   - [x] Catálogos (21 oct, v1.29.0): `lib/db/catalogs.ts` + `lib/db/catalog-actions.ts`, y `lib/api/prisma-client.ts` en la fachada. Las Server Actions solo responden con el backend `prisma`, en `next dev` o en un despliegue de staging con `MSP_STAGING_DEPLOY=true` (desde el 22 oct; `README.md` §14.2.1); desde el 22 oct por la tarde además piden sesión y rol (subpaso siguiente). Se corre con `pnpm dev:staging`, que lee solo el `.env` único de la raíz (sin credenciales de Strapi ni n8n desde el 22 oct).
+   - [ ] Auth (hashes bcrypt reutilizados: decisiones 12 y 13). **Sesión y autorización hechas el 22 oct, sin commit** (`README.md` §14.9): Better Auth en vez de Auth.js (la decisión 12 se reemplazó), sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`. La guarda por entorno se mantiene. Falta probarlo en el navegador y lo de cuenta (`forgotPassword`, `resetPassword`, `updateMe`, `changePassword`).
 5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
 6. [ ] Linter funcionando (`eslint` instalado) y `tsc --noEmit` limpio en los archivos nuevos; quitar `ignoreBuildErrors`.
 
@@ -280,13 +280,13 @@ A revisar con negocio:
 ### 4.3 Autenticación, cuenta y permisos
 
 - **Pantallas:** `(auth)/login`, `(auth)/forgot-password`, `(auth)/reset-password`, `(auth)/register` (solo redirige), `(main)/settings`.
-- **Archivos:** `context/AuthContext.tsx`, `lib/auth/auth.ts`, `lib/auth/is-strapi-super-admin.ts`, `lib/auth/verify-strapi-bearer.ts`, `middleware.ts` (hoy no hace nada), `components/main-layout-client.tsx` (guarda en el cliente).
+- **Archivos:** `context/AuthContext.tsx`, `lib/auth/auth.ts`, `lib/auth/is-strapi-super-admin.ts`, `lib/auth/verify-strapi-bearer.ts`, `components/main-layout-client.tsx` (guarda en el cliente). Desde el 22 oct (backend `prisma`): `lib/auth/server.ts` (Better Auth), `lib/auth/permissions.ts`, `lib/db/session.ts`, `lib/db/auth-actions.ts` y `proxy.ts` (reemplaza a `middleware.ts`, que no hacía nada).
 - **Métodos:** `login`, `forgotPassword`, `resetPassword`, `getMe`, `updateMe`, `changePassword`, `logout`, `isAuthenticated`, `getCurrentToken`.
 - **Lo que Strapi hace hoy y hay que construir:**
-  - Verificar contraseñas bcrypt y emitir el JWT → sesión en cookie httpOnly (Auth.js o Better Auth, proveedor de credenciales).
+  - Verificar contraseñas bcrypt y emitir el JWT → sesión en cookie httpOnly con **Better Auth** (elegido el 22 oct; sesión en `msp_app.session`, clave en `msp_app.account`).
   - **Enviar el correo de recuperación** con su proveedor de email → token de restablecimiento con expiración + proveedor de correo propio (Resend o SES). Requisito nuevo.
   - Roles (`up_roles`) → enum `role` en `user`; `isSuperAdmin()` deja de adivinar por nombre del rol.
-  - Validar el bearer en el servidor contra `/users/me` de Strapi (`isValidStrapiBearer` / `fetchStrapiUserFromBearer`, en **7 Route Handlers**: los 6 de sync y `exchange-rates`) → helper `requireUser()` / `requireRole("super_admin")`.
+  - Validar el bearer en el servidor contra `/users/me` de Strapi (`isValidStrapiBearer` / `fetchStrapiUserFromBearer`, en **7 Route Handlers**: los 6 de sync y `exchange-rates`) → helper `requireUser()` / `requireRole(permiso)` (`lib/db/session.ts`, 22 oct). Hoy, con el backend `prisma`, `exchange-rates` usa `requireUser()` y los 6 de sync responden 503 hasta que se migre sync.
   - ⚠️ Hoy las dos rutas `generate-code` **no validan al llamante** y usan credenciales de administrador de Strapi por dentro. En la app nueva desaparecen. En el backoffice de producción la corrección le corresponde a su responsable; desde este repo solo se reporta.
 - **Debe seguir funcionando:**
   - [ ] Inicio de sesión con correo y contraseña actuales (sin pedir cambio de contraseña si se migran los hash).
@@ -294,7 +294,7 @@ A revisar con negocio:
   - [ ] Editar perfil y cambiar contraseña en `/settings`.
   - [ ] Ver/ocultar por rol: tarjeta de endpoint en `/settings`, disparar y detener corridas de sync, archivos de corrida, funciones de super-admin en la hoja de unidades.
   - [ ] Cerrar sesión limpia la caché del tipo de cambio (`DELETE /api/exchange-rates`).
-  - [ ] Nuevo: rutas protegidas en el servidor (`middleware.ts`), no solo en el layout.
+  - [ ] Nuevo: rutas protegidas en el servidor, no solo en el layout. Hecho en código el 22 oct con `proxy.ts` (backend `prisma`); falta recorrerlo en staging.
 
 ### 4.4 Catálogos
 
@@ -420,7 +420,7 @@ A revisar con negocio:
 |---|---|
 | `NEXT_PUBLIC_STRAPI_URL`, `STRAPI_USERNAME`, `STRAPI_PASSWORD` | `DATABASE_URL_APP` (Postgres de la app, esquema `msp_app`; hoy el ETL usa las credenciales de `DATABASE_URL_DBO_STAGE` si falta) |
 | `NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL` | `REDIS_URL` (cola de workers) |
-| `SYNC_API_URL`, `SYNC_API_KEY` | `AUTH_SECRET` (sesiones) |
+| `SYNC_API_URL`, `SYNC_API_KEY` | `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` (sesiones, desde el 22 oct) |
 | `EXCHANGE_RATES_WEBHOOK_URL` | Llave del proveedor de correo (Resend o SES) |
 | — | `STAGE_DATABASE_URL` (solo workers: `dbo_stage`) |
 | — | `NEXT_PUBLIC_DATA_BACKEND` (solo durante la migración) |

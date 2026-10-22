@@ -8,8 +8,9 @@ export function pgType(column: Column): string {
   switch (column.kind) {
     case "text":
       return "text"
-    case "int":
     case "ref":
+      return column.textRef ? "text" : "integer"
+    case "int":
       return "integer"
     case "numeric":
       return "numeric"

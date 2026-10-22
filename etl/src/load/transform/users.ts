@@ -22,3 +22,21 @@ export function userRow(resolved: Resolved, row: RawRow): AppRow {
     ...stamps(row),
   }
 }
+
+/**
+ * Cuenta `credential` de Better Auth por cada usuario local con clave: el login lee el hash de
+ * `account.password`, no de `user.password_hash`. Better Auth exige `account_id` = id del usuario:
+ * aquí va su `public_id` y la carga lo resuelve como las demás `ref`.
+ */
+export function credentialAccounts(users: AppRow[]): AppRow[] {
+  return users
+    .filter((u) => u.provider === "local" && u.password_hash)
+    .map((u) => ({
+      user_id: u.public_id,
+      account_id: u.public_id,
+      provider_id: "credential",
+      password: u.password_hash,
+      created_at: u.created_at,
+      updated_at: u.updated_at,
+    }))
+}

@@ -1,49 +1,57 @@
 "use server"
 
-import bcrypt from "bcryptjs"
+import { headers } from "next/headers"
+import { APIError } from "better-auth/api"
 import type { StrapiUser } from "@/lib/api/strapi"
+import { getAuth } from "@/lib/auth/server"
 import { actionFailure, type ActionResult } from "./action-result"
-import { getAppPrisma } from "./client"
 import { assertPrismaActionsAllowed } from "./guard"
-import {
-  canPasswordLogin,
-  devAccountUser,
-  devLoginAccount,
-  INVALID_CREDENTIALS,
-  toSessionUser,
-} from "./user-mapping"
+import { requireUser } from "./session"
+import { fromAuthUser, INVALID_CREDENTIALS, toSessionUser } from "./user-mapping"
 
 /**
- * Login del backend `prisma` contra la tabla `user` de `msp_app`, con los hashes bcrypt que el ETL
- * copió de Strapi (decisión 13): cada quien entra con su correo o usuario y su clave de siempre.
- * Si el correo no está en la tabla, se prueba la cuenta de desarrollo de `.env.staging.local`.
- * Todavía no crea una sesión del lado del servidor; eso llega con Auth.js. Por eso, como el resto
- * de `lib/db/`, solo responde en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+ * Login del backend `prisma` con Better Auth contra `msp_app`: correo o usuario y la clave de
+ * siempre (hash bcrypt de Strapi, decisión 13). Deja la cookie de sesión httpOnly con `nextCookies`.
+ * Nunca llama a Strapi. Usuario inexistente, clave mala o usuario bloqueado dan el mismo mensaje.
  */
-export async function devLoginAction(identifier: string, password: string): Promise<ActionResult<StrapiUser>> {
+export async function loginAction(identifier: string, password: string): Promise<ActionResult<StrapiUser>> {
   try {
     assertPrismaActionsAllowed()
     const id = typeof identifier === "string" ? identifier.trim() : ""
     if (!id || typeof password !== "string" || !password) return { ok: false, message: INVALID_CREDENTIALS }
 
-    const user = await getAppPrisma().user.findFirst({
-      where: { OR: [{ email: { equals: id, mode: "insensitive" } }, { username: id }] },
-    })
-    if (user) {
-      if (!canPasswordLogin(user) || !(await bcrypt.compare(password, user.passwordHash))) {
-        return { ok: false, message: INVALID_CREDENTIALS }
-      }
-      return { ok: true, data: toSessionUser(user) }
+    const auth = getAuth()
+    const requestHeaders = await headers()
+    try {
+      const { user } = id.includes("@")
+        ? await auth.api.signInEmail({ body: { email: id, password }, headers: requestHeaders })
+        : await auth.api.signInUsername({ body: { username: id, password }, headers: requestHeaders })
+      return { ok: true, data: toSessionUser(fromAuthUser(user)) }
+    } catch (error) {
+      if (error instanceof APIError) return { ok: false, message: INVALID_CREDENTIALS }
+      throw error
     }
-
-    const devAccount = devLoginAccount(process.env)
-    if (devAccount && devAccount.email.toLowerCase() === id.toLowerCase()) {
-      if (await bcrypt.compare(password, devAccount.passwordHash)) {
-        return { ok: true, data: toSessionUser(devAccountUser(devAccount.email)) }
-      }
-    }
-    return { ok: false, message: INVALID_CREDENTIALS }
   } catch (error) {
     return actionFailure(error, "Error inesperado al iniciar sesión")
+  }
+}
+
+/** Revoca la sesión en la base y borra la cookie. Sin sesión no hay nada que cerrar. */
+export async function logoutAction(): Promise<ActionResult<null>> {
+  try {
+    assertPrismaActionsAllowed()
+    await getAuth().api.signOut({ headers: await headers() })
+    return { ok: true, data: null }
+  } catch (error) {
+    if (error instanceof APIError) return { ok: true, data: null }
+    return actionFailure(error, "Error inesperado al cerrar sesión")
+  }
+}
+
+export async function getMeAction(): Promise<ActionResult<StrapiUser>> {
+  try {
+    return { ok: true, data: toSessionUser(await requireUser()) }
+  } catch (error) {
+    return actionFailure(error, "Error inesperado al leer la sesión")
   }
 }

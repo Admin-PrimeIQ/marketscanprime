@@ -1,6 +1,6 @@
 /**
- * Usuario de `msp_app` → forma de `StrapiUser`, que es lo que la UI guarda en la sesión.
- * Puro: corre bajo `node --test`.
+ * Usuario de la sesión (Better Auth sobre `msp_app.user`) → forma de `StrapiUser`, que es lo que la
+ * UI guarda y muestra. Puro: corre bajo `node --test`.
  */
 
 import type { StrapiUser } from "../api/strapi.ts"
@@ -10,12 +10,24 @@ export interface UserRow {
   username: string
   email: string
   provider: string
-  passwordHash: string | null
   role: string
   confirmed: boolean
   blocked: boolean
   createdAt: Date
   updatedAt: Date
+}
+
+/** Lo que devuelve Better Auth como `user` (con `additionalFields` y el plugin `username`). */
+export interface AuthUser {
+  id: string | number
+  email: string
+  username?: string | null
+  emailVerified?: boolean | null
+  provider?: string | null
+  role?: string | null
+  blocked?: boolean | null
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 /** Valores del enum `UserRole` → nombre visible del rol en Strapi. */
@@ -30,34 +42,17 @@ const ROLE_NAMES: Record<string, string> = {
 /** Mismo mensaje que `POST /api/auth/local` de Strapi: no dice si falló el usuario o la clave. */
 export const INVALID_CREDENTIALS = "Invalid identifier or password"
 
-/** Solo cuentas locales, no bloqueadas y con hash; Strapi rechaza las demás igual. */
-export function canPasswordLogin(user: UserRow | null): user is UserRow & { passwordHash: string } {
-  return !!user && user.provider === "local" && !user.blocked && !!user.passwordHash
-}
-
-/**
- * Cuenta de desarrollo opcional de `.env.staging.local` (`DEV_LOGIN_EMAIL` + `DEV_LOGIN_PASSWORD_HASH`,
- * un hash bcrypt), para entrar con una cuenta que no está en `msp_app.user` sin escribir en la base.
- */
-export function devLoginAccount(env: Record<string, string | undefined>): { email: string; passwordHash: string } | null {
-  const email = env.DEV_LOGIN_EMAIL?.trim()
-  const passwordHash = env.DEV_LOGIN_PASSWORD_HASH?.trim()
-  return email && passwordHash ? { email, passwordHash } : null
-}
-
-export function devAccountUser(email: string): UserRow {
-  const epoch = new Date(0)
+export function fromAuthUser(user: AuthUser): UserRow {
   return {
-    id: 0,
-    username: email.split("@")[0] || email,
-    email,
-    provider: "local",
-    passwordHash: null,
-    role: "administrator",
-    confirmed: true,
-    blocked: false,
-    createdAt: epoch,
-    updatedAt: epoch,
+    id: Number(user.id),
+    username: user.username ?? "",
+    email: user.email,
+    provider: user.provider ?? "local",
+    role: user.role ?? "",
+    confirmed: user.emailVerified === true,
+    blocked: user.blocked === true,
+    createdAt: new Date(user.createdAt),
+    updatedAt: new Date(user.updatedAt),
   }
 }
 
