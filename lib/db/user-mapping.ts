@@ -36,7 +36,7 @@ export function canPasswordLogin(user: UserRow | null): user is UserRow & { pass
 }
 
 /**
- * Cuenta de desarrollo opcional de `.env.staging.local` (`DEV_LOGIN_EMAIL` + `DEV_LOGIN_PASSWORD_HASH`,
+ * Cuenta de desarrollo opcional del `.env` (`DEV_LOGIN_EMAIL` + `DEV_LOGIN_PASSWORD_HASH`,
  * un hash bcrypt), para entrar con una cuenta que no está en `msp_app.user` sin escribir en la base.
  */
 export function devLoginAccount(env: Record<string, string | undefined>): { email: string; passwordHash: string } | null {

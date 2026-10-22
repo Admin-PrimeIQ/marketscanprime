@@ -15,7 +15,7 @@ Package manager is **pnpm**, pinned by `packageManager` in `package.json` (10.34
 ```bash
 pnpm install          # postinstall runs patch-package (patches/) and prisma generate --generator app
 pnpm dev              # next dev
-pnpm dev:staging      # next dev on the prisma backend, from .env.staging.local only (see below)
+pnpm dev:staging      # next dev on the prisma backend, from the root .env only (see below)
 pnpm db:generate      # regenerate the app's Prisma client into lib/db/generated (gitignored)
 pnpm build            # next build
 pnpm start            # next start
@@ -42,7 +42,7 @@ Tests: `npm test` runs the pure modules with `node --test` (no dependencies need
 | `DATABASE_URL_APP` | Postgres of the new app (schema `msp_app`), read by `lib/db/connection.ts`. The Railway CA comes from `DATABASE_CA_APP` (PEM, PEM with literal `\n`, or base64) or `DATABASE_CA_FILE_APP` (default `etl/certs/dbo-stage-ca.pem`, the one `.pem` that is committed — it's the public root the server hands out in the TLS handshake — and bundled into every function by `outputFileTracingIncludes` in `next.config.mjs`). |
 | `MSP_STAGING_DEPLOY` | `true` only on the staging Vercel project: lets the `prisma` Server Actions run outside `next dev` (`lib/db/guard.ts`), and only if no Strapi/sync credentials are present. |
 
-Since 2026-10-22 the local `.env` is a **single file for the `prisma` backend** (template in `.env.staging.example`): the Strapi and n8n production variables are kept there **commented out** as reference (`# [Strapi/n8n producción]`) and must stay that way. The ETL variables (`DATABASE_*_STRAPI`, `DATABASE_URL_DBO_STAGE`) stay active because `etl/` reads the root `.env`. `pnpm dev:staging` ([`scripts/dev-staging.mjs`](scripts/dev-staging.mjs)) reads `.env.staging.local` if present, otherwise `.env`, and refuses to start if Strapi/sync credentials are active. With `NEXT_PUBLIC_DATA_BACKEND=prisma`, the n8n production URLs hardcoded as defaults (Copilot, chat sessions, block counters) resolve to empty (`productionN8nDefault` in `lib/api/data-backend.ts`); only the exchange-rates `GET` keeps its default.
+Since 2026-10-22 the local `.env` is a **single file for the `prisma` backend** (template in `.env.staging.example`): the Strapi and n8n production variables are **not** in it (removed on 2026-10-22, not even commented out) and must not be added back. The ETL variables (`DATABASE_*_STRAPI`, `DATABASE_URL_DBO_STAGE`) stay active because `etl/` reads the root `.env`. `pnpm dev:staging` ([`scripts/dev-staging.mjs`](scripts/dev-staging.mjs)) reads only the root `.env` and refuses to start if Strapi/sync credentials are active. Every program in the repo that needs credentials (the app, the launcher, `etl/`) reads that one root `.env`; don't create `.env.local`, `.env.staging.local` or per-folder `.env` files. With `NEXT_PUBLIC_DATA_BACKEND=prisma`, the n8n production URLs hardcoded as defaults (Copilot, chat sessions, block counters) resolve to empty (`productionN8nDefault` in `lib/api/data-backend.ts`); only the exchange-rates `GET` keeps its default.
 
 ## Architecture
 

@@ -16,9 +16,10 @@ import {
 /**
  * Login del backend `prisma` contra la tabla `user` de `msp_app`, con los hashes bcrypt que el ETL
  * copió de Strapi (decisión 13): cada quien entra con su correo o usuario y su clave de siempre.
- * Si el correo no está en la tabla, se prueba la cuenta de desarrollo de `.env.staging.local`.
+ * Si el correo no está en la tabla, se prueba la cuenta de desarrollo del `.env`.
  * Todavía no crea una sesión del lado del servidor; eso llega con Auth.js. Por eso, como el resto
- * de `lib/db/`, solo responde en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+ * de `lib/db/`, pasa por `assertPrismaActionsAllowed()`: backend `prisma`, y `next dev` o un
+ * despliegue de staging con `MSP_STAGING_DEPLOY=true`.
  */
 export async function devLoginAction(identifier: string, password: string): Promise<ActionResult<StrapiUser>> {
   try {
