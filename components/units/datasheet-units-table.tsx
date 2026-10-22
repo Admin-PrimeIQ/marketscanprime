@@ -43,6 +43,7 @@ import {
   getStrapiPublicBaseUrl,
 } from "@/lib/api/strapi"
 import { dataClient } from "@/lib/api/client"
+import { productionN8nDefault } from "@/lib/api/data-backend"
 import { useAuth } from "@/context/AuthContext"
 import { blockBehavior } from "@/lib/block-category"
 import { isStrapiSuperAdmin } from "@/lib/auth/is-strapi-super-admin"
@@ -236,10 +237,12 @@ function mergeReadonlyCellTheme(
 }
 
 /** Webhook para sincronizar contadores del block tras guardar una fila. Valores por defecto; luego usar env. */
-const BLOCK_COUNTER_WEBHOOK_URL = process.env.NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL ?? "https://n8n.primeiqlatam.com/webhook/block-counter-update"
+const BLOCK_COUNTER_WEBHOOK_URL =
+  process.env.NEXT_PUBLIC_BLOCK_COUNTER_WEBHOOK_URL ?? productionN8nDefault("https://n8n.primeiqlatam.com/webhook/block-counter-update")
 
 async function notifyBlockCounterUpdate(blockId: string): Promise<void> {
   const url = BLOCK_COUNTER_WEBHOOK_URL
+  if (!url) return
   const body = { blockId: blockId }
   try {
     const res = await fetch(url, {

@@ -15,18 +15,15 @@ import {
  *
  * - Catálogos: reales, contra `msp_app` vía Server Actions.
  * - Login: valida usuario y clave contra la tabla `user` de `msp_app` (hashes bcrypt de Strapi).
- *   Nunca llama a Strapi. La sesión vive en `localStorage` y solo en `next dev`; la reemplaza Auth.js.
+ *   Nunca llama a Strapi. La sesión vive en `localStorage` hasta que llegue Auth.js.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
+ *
+ * Dónde se puede usar (`next dev` o un despliegue con `MSP_STAGING_DEPLOY=true`) lo decide la guarda
+ * de las Server Actions (`lib/db/guard.ts`), no el navegador.
  */
 
 const DEV_SESSION_KEY = "msp_dev_session"
 const DEV_TOKEN = "dev-local"
-
-function assertDevSession(): void {
-  if (process.env.NODE_ENV !== "development") {
-    throw new Error("El backend prisma todavía no tiene autenticación: solo se puede usar en desarrollo local.")
-  }
-}
 
 function readDevSession(): StrapiUser | null {
   if (typeof window === "undefined") return null
@@ -51,7 +48,6 @@ function unwrap<T>(result: ActionResult<T>): T {
 
 export const prismaDataClient: DataClient = {
   async login(identifier: string, password: string): Promise<StrapiAuthResponse> {
-    assertDevSession()
     const user = unwrap(await devLoginAction(identifier, password))
     localStorage.setItem(DEV_SESSION_KEY, JSON.stringify(user))
     return { jwt: DEV_TOKEN, user }
@@ -63,9 +59,8 @@ export const prismaDataClient: DataClient = {
     return readDevSession() !== null
   },
   async getMe() {
-    assertDevSession()
     const user = readDevSession()
-    if (!user) throw new Error("No hay sesión local de desarrollo.")
+    if (!user) throw new Error("No hay sesión iniciada en la base nueva.")
     return user
   },
   async forgotPassword() {

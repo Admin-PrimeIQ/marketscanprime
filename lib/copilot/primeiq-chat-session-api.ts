@@ -1,10 +1,12 @@
+import { productionN8nDefault } from "../api/data-backend"
+
 const DEFAULT_BASE = "https://n8n.primeiqlatam.com/webhook"
 
 function baseUrl(): string {
   const raw =
     (typeof process !== "undefined"
       ? process.env.NEXT_PUBLIC_PRIMEIQ_SESSION_API_BASE
-      : undefined) ?? DEFAULT_BASE
+      : undefined) ?? productionN8nDefault(DEFAULT_BASE)
   return raw.replace(/\/$/, "")
 }
 

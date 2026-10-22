@@ -15,6 +15,7 @@ import {
   type CatalogRow,
 } from "./catalog-mapping.ts"
 import { assertPrismaActionsAllowed } from "./guard.ts"
+import { productionN8nDefault } from "../api/data-backend.ts"
 
 const row = (overrides: Partial<CatalogRow> = {}): CatalogRow => ({
   id: 7,
@@ -135,4 +136,19 @@ test("las acciones sobre Prisma solo corren en desarrollo con el backend prisma"
   assert.throws(() => assertPrismaActionsAllowed({ NODE_ENV: "production", NEXT_PUBLIC_DATA_BACKEND: "prisma" }))
   assert.throws(() => assertPrismaActionsAllowed({ NODE_ENV: "development", NEXT_PUBLIC_DATA_BACKEND: "strapi" }))
   assert.throws(() => assertPrismaActionsAllowed({ NODE_ENV: "development" }))
+})
+
+test("un despliegue de staging corre las acciones solo si se marca y no trae credenciales de producción", () => {
+  const staging = { NODE_ENV: "production", NEXT_PUBLIC_DATA_BACKEND: "prisma", MSP_STAGING_DEPLOY: "true" }
+  assert.doesNotThrow(() => assertPrismaActionsAllowed(staging))
+  assert.throws(() => assertPrismaActionsAllowed({ ...staging, MSP_STAGING_DEPLOY: "1" }))
+  assert.throws(() => assertPrismaActionsAllowed({ ...staging, NEXT_PUBLIC_DATA_BACKEND: "strapi" }))
+  assert.throws(() => assertPrismaActionsAllowed({ ...staging, STRAPI_PASSWORD: "x" }), /STRAPI_PASSWORD/)
+  assert.throws(() => assertPrismaActionsAllowed({ ...staging, SYNC_API_KEY: "x" }), /SYNC_API_KEY/)
+})
+
+test("con el backend prisma no hay URL de n8n de producción por omisión", () => {
+  assert.equal(productionN8nDefault("https://n8n.example/webhook", "prisma"), "")
+  assert.equal(productionN8nDefault("https://n8n.example/webhook", "strapi"), "https://n8n.example/webhook")
+  assert.equal(productionN8nDefault("https://n8n.example/webhook", undefined), "https://n8n.example/webhook")
 })

@@ -5,6 +5,8 @@
  * Browser → `/api/copilot/n8n-chat` (proxy). Server → upstream below. Override: N8N_CHAT_WEBHOOK_UPSTREAM_URL
  * or NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL (must include `/chat` when using production Chat Trigger URL).
  */
+import { productionN8nDefault } from "../api/data-backend"
+
 export const COPILOT_N8N_WEBHOOK_DEFAULT =
   "https://n8n.primeiqlatam.com/webhook/506f62e4-284a-4d21-b20a-877944adfe1e/chat"
 
@@ -23,7 +25,7 @@ export function getCopilotN8nWebhookUrl(): string {
     typeof process !== "undefined"
       ? process.env.NEXT_PUBLIC_N8N_CHAT_WEBHOOK_URL?.trim()
       : ""
-  const raw = fromEnv || COPILOT_N8N_WEBHOOK_DEFAULT
+  const raw = fromEnv || productionN8nDefault(COPILOT_N8N_WEBHOOK_DEFAULT)
   return normalizeN8nChatWebhookUrl(raw)
 }
 
