@@ -3,7 +3,9 @@
  * `.env` de producción.
  *
  * Next carga `.env*` por su cuenta y no hay opción para apagarlo. Este lanzador:
- *   1. Lee solo `.env.staging.local` (plantilla en `.env.staging.example`).
+ *   1. Lee solo `.env.staging.local` si existe; si no, el `.env` único (plantilla en
+ *      `.env.staging.example`). En los dos casos se niega si trae credenciales de Strapi o de sync
+ *      sin comentar.
  *   2. Define vacía cada variable que aparece en los `.env` que Next cargaría y que staging no
  *      redefine: Next nunca pisa una variable que ya existe, ni siquiera al recargar en caliente.
  *   3. Marca el entorno como ya procesado (`__NEXT_PROCESSED_ENV`), así Next no lee ningún `.env`.
@@ -17,10 +19,10 @@ import { resolve } from "node:path"
 import { parseEnv } from "node:util"
 
 const root = process.cwd()
-const STAGING_FILE = ".env.staging.local"
+const STAGING_FILE = existsSync(resolve(root, ".env.staging.local")) ? ".env.staging.local" : ".env"
 const NEXT_ENV_FILES = [".env", ".env.local", ".env.development", ".env.development.local"]
 // Credenciales de producción que ninguna corrida paralela puede llevar.
-const FORBIDDEN = ["STRAPI_USERNAME", "STRAPI_PASSWORD", "SYNC_API_KEY", "NEXT_PUBLIC_STRAPI_URL"]
+const FORBIDDEN = ["STRAPI_USERNAME", "STRAPI_PASSWORD", "SYNC_API_KEY", "SYNC_API_URL", "NEXT_PUBLIC_STRAPI_URL", "STRAPI_URL"]
 
 function fail(message) {
   console.error(`dev:staging: ${message}`)
@@ -32,7 +34,7 @@ function readEnvFile(file) {
 }
 
 if (!existsSync(resolve(root, STAGING_FILE))) {
-  fail(`falta ${STAGING_FILE}. Copia .env.staging.example y completa DATABASE_URL_APP.`)
+  fail(`falta ${STAGING_FILE}. Copia .env.staging.example como .env y completa DATABASE_URL_APP.`)
 }
 
 const staging = readEnvFile(STAGING_FILE)

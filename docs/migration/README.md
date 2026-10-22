@@ -529,7 +529,7 @@ Estrategia completa en `ROADMAP.md` (fase 5 y §4). En corto: la UI habla con un
 | Cliente Prisma de la app | generador `app` en `prisma/schema.prisma` → `lib/db/generated/` (ignorado); `lib/db/connection.ts`, `lib/db/client.ts` | Se genera en `postinstall` o con `pnpm db:generate`. Solo usa `DATABASE_URL_APP`, `search_path=msp_app`, pool de 2, raíz TLS de Railway (`DATABASE_CA_APP` o `etl/certs/dbo-stage-ca.pem`). |
 | Catálogos | `lib/db/catalog-mapping.ts` (puro), `lib/db/catalogs.ts` (repositorio), `lib/db/catalog-actions.ts` (Server Actions) | Los 12 catálogos de `CATALOG_TYPES` menos `block-types` (no tiene tabla). Paginación, `sort` y búsqueda como Strapi; `documentId` = `publicId`; borrar algo en uso da "está en uso" (FK `Restrict`). |
 | Login | `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts` (puro) | Valida correo o usuario y clave contra `msp_app.user` con los hashes bcrypt de Strapi (decisión 13). Si el correo no está ahí, prueba la cuenta de desarrollo de `.env.staging.local` (§14.3). El usuario de sesión queda en `localStorage` (`msp_dev_session`). |
-| Guarda | `lib/db/guard.ts` | Toda Server Action llama a `assertPrismaActionsAllowed()`: solo responde en `next dev` con `NEXT_PUBLIC_DATA_BACKEND=prisma`. Las acciones existen también en el build de producción (Next las publica), por eso la guarda es obligatoria hasta Auth.js. |
+| Guarda | `lib/db/guard.ts` | Toda Server Action llama a `assertPrismaActionsAllowed()`: solo responde con `NEXT_PUBLIC_DATA_BACKEND=prisma`, en `next dev` o en un despliegue de staging con `MSP_STAGING_DEPLOY=true` y sin credenciales de Strapi/sync (§14.2.1). Las acciones existen también en el build de producción (Next las publica), por eso la guarda es obligatoria hasta Auth.js. |
 | Lanzador | `scripts/dev-staging.mjs`, `.env.staging.example` | Ver §14.2. |
 | Pruebas | `lib/db/catalog-mapping.test.ts`, `lib/db/user-mapping.test.ts` | Entran en `npm test` de la raíz (89 en total). |
 
@@ -543,15 +543,31 @@ npm run dev:staging
 
 Desde la raíz del repo. Abrir http://localhost:3000/login. Para detenerla, `Ctrl+C`.
 
-- `scripts/dev-staging.mjs` lee **solo** `.env.staging.local`. Además vacía cada clave de `.env`, `.env.local`, `.env.development` y `.env.development.local` que staging no redefine, y marca `__NEXT_PROCESSED_ENV=true`: Next no aplica ningún `.env`, ni al recargar en caliente (nunca pisa una variable que ya existe). Next igual muestra "Environments: .env.local, .env" en el arranque; es solo el listado de archivos, no los aplica.
+- **Desde el 22 oct hay un solo `.env`** (pedido del usuario), pensado para el backend `prisma`. Las variables de Strapi y n8n de producción (`NEXT_PUBLIC_STRAPI_URL`, `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_URL`, `SYNC_API_KEY`, `market_scan_USERNAME`, `market_scan_PASSWORD`) siguen ahí **comentadas** con `# [Strapi/n8n producción]`, solo como referencia: no descomentarlas. Siguen activas las del ETL (`DATABASE_*_STRAPI`, `DATABASE_URL_DBO_STAGE`), porque `etl/` lee el `.env` de la raíz. El respaldo de los dos archivos originales quedó en `.env.respaldo-20261022.local` (ignorado por git; borrarlo cuando ya no haga falta).
+- `scripts/dev-staging.mjs` lee `.env.staging.local` si existe; si no, el `.env`. Vacía cada clave de los otros `.env*` que no redefine, y marca `__NEXT_PROCESSED_ENV=true`: Next no aplica ningún `.env`, ni al recargar en caliente. Next igual muestra "Environments: .env.local, .env" en el arranque; es solo el listado de archivos, no los aplica.
 - Fuerza `NEXT_PUBLIC_DATA_BACKEND=prisma` y `NEXT_PUBLIC_STRAPI_URL=""`. Sin URL, el código cae a `http://localhost:1337`: comprobado el 21 oct, el proxy `/api/strapi/*` da 503 "fetch failed" y no llega a producción.
-- Se niega a arrancar si falta `.env.staging.local` o `DATABASE_URL_APP`, o si el archivo define `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_KEY` o `NEXT_PUBLIC_STRAPI_URL`.
-- No usar `pnpm dev` para el modo `prisma`: carga el `.env` de producción.
+- Se niega a arrancar si falta el archivo o `DATABASE_URL_APP`, o si tiene activas `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_KEY`, `SYNC_API_URL`, `NEXT_PUBLIC_STRAPI_URL` o `STRAPI_URL`.
+- Con el `.env` único, `pnpm dev` también corre en modo `prisma` (ya no hay credenciales de producción activas). `dev:staging` sigue siendo lo recomendado por esos controles.
+- Con el backend `prisma`, las URLs de n8n de producción que el código trae por defecto (Copilot, sesiones de chat, contadores de bloque) quedan vacías (`productionN8nDefault` en `lib/api/data-backend.ts`): `/copilots` responde error en vez de llamar al n8n real. La barra de tipo de cambio conserva su `GET` público.
+
+### 14.2.1 Despliegue de staging en Vercel (22 oct)
+
+Proyecto de Vercel **nuevo**, no el de `admin.primeiqlatam.com`. La guarda (`lib/db/guard.ts`) deja correr las Server Actions fuera de `next dev` solo con `MSP_STAGING_DEPLOY=true` y el backend `prisma`, y se niega si el entorno tiene `STRAPI_USERNAME`, `STRAPI_PASSWORD` o `SYNC_API_KEY`. Como todavía no hay sesión de servidor, cualquiera que llegue a la URL puede invocar las acciones (incluido el login, que valida claves reales): el proyecto **tiene que** estar detrás de la protección de despliegues de Vercel. Variables del proyecto:
+
+| Variable | Valor |
+|---|---|
+| `NEXT_PUBLIC_DATA_BACKEND` | `prisma` |
+| `MSP_STAGING_DEPLOY` | `true` |
+| `DATABASE_URL_APP` | La misma del `.env` |
+| `DATABASE_CA_APP` | Contenido PEM de `etl/certs/dbo-stage-ca.pem` (el archivo está en `.gitignore`) |
+| `ENABLE_EXPERIMENTAL_COREPACK` | `1`, para que Vercel use el pnpm fijado en `package.json` |
+
+No poner en Vercel ninguna variable de Strapi, sync, n8n ni del ETL. `DEV_LOGIN_*` es opcional; sin ella solo entran los usuarios de `msp_app`.
 - pnpm está fijado en `package.json` (`"packageManager": "pnpm@10.34.7"`, 22 oct): el `pnpm` de corepack descarga y usa esa versión, así que `pnpm install` y `pnpm run <script>` funcionan. Antes corepack caía a su 9.15.4, que falla con el `allowBuilds` de `pnpm-workspace.yaml` ("packages field missing or empty"). `npm run <script>` también funciona.
 
-### 14.3 `.env.staging.local` (ignorado por git, línea explícita en `.gitignore`)
+### 14.3 Las claves de la app nueva (antes en `.env.staging.local`, desde el 22 oct al final del `.env`)
 
-Tiene tres claves, creadas por el agente sin imprimir valores:
+Son tres claves, creadas por el agente sin imprimir valores:
 
 - `DATABASE_URL_APP`: copia de `DATABASE_URL_DBO_STAGE` del `.env` (usuario `j_stage_admin`, servidor de staging de Railway). Ver el riesgo en la §10.
 - `DEV_LOGIN_EMAIL` y `DEV_LOGIN_PASSWORD_HASH`: cuenta de desarrollo `engteam@primeiqlatam.com`, pedida por el usuario el 21 oct. Esa cuenta **no existe** entre los 17 usuarios de `msp_app` (será del panel de administración de Strapi). Se guardó solo el hash bcrypt de la clave, generado desde `market_scan_USERNAME`/`market_scan_PASSWORD` del `.env`; entra con rol `administrator`. Se eligió esto en vez de insertarla en `msp_app.user` porque la próxima carga del ETL (espejo de Strapi) la borraría.
@@ -582,7 +598,7 @@ Totales esperados en `/catalogs` (carga del 16 oct): desarrolladores 538, amenid
 ### 14.6 Siguiente paso
 
 1. El usuario recorre `/catalogs` (lista de `ROADMAP.md` §4.4). Si algo falla, revisar la salida de `npm run dev:staging` en su terminal.
-2. Preguntarle si se hace **commit** en `feat/data-facade` (sin push). Archivos del cambio: `.gitignore`, `.env.staging.example`, `CHANGELOG.md`, `CLAUDE.md`, `docs/migration/README.md`, `docs/migration/ROADMAP.md`, `etl/package.json`, `lib/api/client.ts`, `lib/api/data-backend.ts`, `lib/api/prisma-client.ts`, `lib/db/` (menos `generated/`), `package.json`, `pnpm-lock.yaml`, `prisma/schema.prisma`, `scripts/dev-staging.mjs`. Nunca `.env` ni `.env.staging.local`.
+2. Preguntarle si se hace **commit** en `feat/data-facade` (sin push). Archivos del cambio: `.gitignore`, `.env.staging.example`, `CHANGELOG.md`, `CLAUDE.md`, `docs/migration/README.md`, `docs/migration/ROADMAP.md`, `etl/package.json`, `lib/api/client.ts`, `lib/api/data-backend.ts`, `lib/api/prisma-client.ts`, `lib/db/` (menos `generated/`), `lib/copilot/constants.ts`, `lib/copilot/primeiq-chat-session-api.ts`, `components/units/datasheet-units-table.tsx`, `package.json`, `pnpm-lock.yaml`, `prisma/schema.prisma`, `scripts/dev-staging.mjs`. Nunca `.env`, `.env.staging.local` ni `.env.respaldo-*.local`.
 3. Elegir con el usuario el siguiente módulo (con opciones concretas):
    - **Proyectos en solo lectura** (`getProjects`, `getProjectById`): habilita la lista con filtros avanzados, la vista y los selectores de proyecto en bloques y perfiles. Es el más pesado en relaciones (país, desarrolladora, NSE, amenidades, servicios, perfil, financiamiento).
    - **Perfiles de tipo de cambio** (5 métodos + `getProjects` para vincular): el más corto.
