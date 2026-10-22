@@ -25,6 +25,7 @@
   "engines": {
     "node": ">=20"
   },
+  "packageManager": "pnpm@10.34.7",
   "scripts": {
     "build": "next build",
     "dev": "next dev",

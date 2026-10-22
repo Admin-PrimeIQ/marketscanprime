@@ -217,7 +217,7 @@ Vive en el paquete aislado [`etl/`](../../etl/README.md) (npm propio, fuera del 
 - `etl/src/strapi/check.ts`: verificación de solo lectura (conteos contra el manual, columnas, `document_id` repetidos). **Pasa** contra la base real.
 - `etl/src/strapi/distinct-values.ts`: valores distintos de las columnas que pasan a enum.
 
-No se instaló en la raíz porque el pnpm global (9.15.4) no lee el `pnpm-workspace.yaml` del repo (`allowBuilds` es de pnpm 10+) y para no tocar el build de Vercel.
+No se instaló en la raíz porque el pnpm global (9.15.4) no lee el `pnpm-workspace.yaml` del repo (`allowBuilds` es de pnpm 10+) y para no tocar el build de Vercel. (Desde el 22 oct `package.json` fija pnpm 10.34.7 y ese problema ya no existe; el cliente de Strapi sigue en `etl/` porque es solo para el ETL.)
 
 Reglas:
 
@@ -547,7 +547,7 @@ Desde la raíz del repo. Abrir http://localhost:3000/login. Para detenerla, `Ctr
 - Fuerza `NEXT_PUBLIC_DATA_BACKEND=prisma` y `NEXT_PUBLIC_STRAPI_URL=""`. Sin URL, el código cae a `http://localhost:1337`: comprobado el 21 oct, el proxy `/api/strapi/*` da 503 "fetch failed" y no llega a producción.
 - Se niega a arrancar si falta `.env.staging.local` o `DATABASE_URL_APP`, o si el archivo define `STRAPI_USERNAME`, `STRAPI_PASSWORD`, `SYNC_API_KEY` o `NEXT_PUBLIC_STRAPI_URL`.
 - No usar `pnpm dev` para el modo `prisma`: carga el `.env` de producción.
-- El pnpm global (9.15.4) falla con el `pnpm-workspace.yaml`; para instalar dependencias usar `npx -y pnpm@10 …`. `npm run <script>` funciona normal.
+- pnpm está fijado en `package.json` (`"packageManager": "pnpm@10.34.7"`, 22 oct): el `pnpm` de corepack descarga y usa esa versión, así que `pnpm install` y `pnpm run <script>` funcionan. Antes corepack caía a su 9.15.4, que falla con el `allowBuilds` de `pnpm-workspace.yaml` ("packages field missing or empty"). `npm run <script>` también funciona.
 
 ### 14.3 `.env.staging.local` (ignorado por git, línea explícita en `.gitignore`)
 

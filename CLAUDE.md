@@ -10,7 +10,7 @@ There is no local backend in this repo — Strapi is a remote service configured
 
 ## Commands
 
-Package manager is **pnpm** (`pnpm-workspace.yaml`; a stale `package-lock.json` is also present — ignore it). Node from `.nvmrc` (24.14.1; `engines` requires ≥20).
+Package manager is **pnpm**, pinned by `packageManager` in `package.json` (10.34.7; corepack picks it up — pnpm 9 aborts on the `allowBuilds` key of `pnpm-workspace.yaml`). A stale `package-lock.json` is also present — ignore it. Node from `.nvmrc` (24.14.1; `engines` requires ≥20).
 
 ```bash
 pnpm install          # postinstall runs patch-package (patches/) and prisma generate --generator app
