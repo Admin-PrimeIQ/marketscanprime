@@ -141,7 +141,11 @@ test("las acciones sobre Prisma solo corren en desarrollo con el backend prisma"
 test("un despliegue de staging corre las acciones solo si se marca y no trae credenciales de producción", () => {
   const staging = { NODE_ENV: "production", NEXT_PUBLIC_DATA_BACKEND: "prisma", MSP_STAGING_DEPLOY: "true" }
   assert.doesNotThrow(() => assertPrismaActionsAllowed(staging))
-  assert.throws(() => assertPrismaActionsAllowed({ ...staging, MSP_STAGING_DEPLOY: "1" }))
+  assert.throws(() => assertPrismaActionsAllowed({ ...staging, MSP_STAGING_DEPLOY: "1" }), /vale "1"/)
+  assert.throws(
+    () => assertPrismaActionsAllowed({ ...staging, MSP_STAGING_DEPLOY: undefined, VERCEL_ENV: "preview" }),
+    /no está definida \(entorno de Vercel: preview\)/,
+  )
   assert.throws(() => assertPrismaActionsAllowed({ ...staging, NEXT_PUBLIC_DATA_BACKEND: "strapi" }))
   assert.throws(() => assertPrismaActionsAllowed({ ...staging, STRAPI_PASSWORD: "x" }), /STRAPI_PASSWORD/)
   assert.throws(() => assertPrismaActionsAllowed({ ...staging, SYNC_API_KEY: "x" }), /SYNC_API_KEY/)
