@@ -38,16 +38,33 @@ function appUrl(env: Env): URL {
 }
 
 /**
+ * `DATABASE_CA_APP` tal como suele quedar al pegarlo en un panel: PEM con saltos de línea, PEM con
+ * `\n` literales o el PEM entero en base64 (una sola línea).
+ */
+export function normalizeCaPem(raw: string): string {
+  const value = raw.trim().replace(/^["']|["']$/g, "")
+  if (value.includes("-----BEGIN")) return value.replace(/\\n/g, "\n")
+  const decoded = Buffer.from(value, "base64").toString("utf8")
+  if (decoded.includes("-----BEGIN CERTIFICATE-----")) return decoded
+  throw new Error("DATABASE_CA_APP no es un certificado PEM (ni en texto ni en base64).")
+}
+
+/**
  * Railway emite el certificado del servidor para `localhost` con una raíz propia: la cadena se
  * valida contra esa raíz fijada y solo se omite la comprobación del nombre de host. La raíz llega
- * como PEM en `DATABASE_CA_APP` (entornos sin disco, como Vercel) o como archivo.
+ * en `DATABASE_CA_APP` (entornos sin disco, como Vercel; ver `normalizeCaPem`) o como archivo.
  */
 function appSsl(env: Env): ConnectionOptions {
-  let ca = env.DATABASE_CA_APP?.trim()
+  const fromEnv = env.DATABASE_CA_APP?.trim()
+  let ca = fromEnv ? normalizeCaPem(fromEnv) : undefined
   if (!ca) {
     const file = resolve(process.cwd(), env.DATABASE_CA_FILE_APP?.trim() || DEFAULT_CA_FILE)
     if (!existsSync(file)) {
-      throw new Error(`Falta la raíz del certificado (${file}). Obtenla con "npm run stage:cert" en etl/ o define DATABASE_CA_APP.`)
+      const where = env.VERCEL_ENV ? ` (entorno de Vercel: ${env.VERCEL_ENV})` : ""
+      throw new Error(
+        `Falta la raíz del certificado: DATABASE_CA_APP no está definida en este despliegue${where} y no existe ${file}. ` +
+          `Define DATABASE_CA_APP o, en local, corre "npm run stage:cert" en etl/.`,
+      )
     }
     ca = readFileSync(file, "utf8")
   }
