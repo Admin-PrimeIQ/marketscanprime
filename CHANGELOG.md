@@ -6,6 +6,27 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Actualización de seguridad: Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1)
+
+_2026-10-27_
+
+Sube Next.js de 16.0.10 a 16.4.3 y React / React DOM de 19.2.0 a 19.2.9, con versiones exactas, y fija Node en 24.22.1. Es un salto menor dentro de la 16: no cambia código de la app. **Producción no se despliega desde aquí**: este cambio queda en la rama `feat/data-facade` hasta que alguien lo suba y lo publique.
+
+- **Next.js 16.4.3** ([package.json](package.json), [pnpm-lock.yaml](pnpm-lock.yaml)): corrige todos los avisos publicados desde enero que afectaban a 16.0.10. Los que más importan aquí:
+  - [GHSA-mq59](https://github.com/vercel/next.js/security/advisories/GHSA-mq59-m269-xvcx): `Origin: null` saltaba la protección CSRF de Server Actions. Las acciones de catálogo y de login escriben con la cookie de sesión de Better Auth.
+  - [GHSA-p3m5](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r) (denegación de servicio en Server Actions), [GHSA-673q](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr) y [GHSA-2464](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw), corregidos en 16.4.1.
+  - Los saltos de `proxy.ts` de mayo y las denegaciones de servicio de Server Components; lista completa en los [avisos de Next.js](https://github.com/vercel/next.js/security/advisories).
+  - `sharp` pasa de 0.34.5 a 0.35.5 como dependencia opcional de Next.
+- **React 19.2.9**: corrige [GHSA-xqc2](https://github.com/facebook/react/security/advisories/GHSA-xqc2-xf4c-x3h3) y GHSA-h3gv (14 oct) en `react-server-dom-*`, que Next trae incluido.
+- **Node 24.22.1** ([.nvmrc](.nvmrc)) y `engines.node` de `>=20` a `24.x` ([package.json](package.json)): incluye los parches de seguridad de Node de junio, julio y [octubre](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases) (Brotli, undici, TLS). En Vercel, `engines` fija la versión mayor de Node por encima del ajuste del proyecto.
+- **Verificación**, igual que antes de actualizar:
+  - `npm test` 96/96;
+  - `tsc` con los mismos 38 errores previos y ninguno nuevo;
+  - build aislado (`__NEXT_PROCESSED_ENV=true`, backend `prisma`, sin `.env`) en verde, con las mismas 42 rutas y `Proxy (Middleware)` que con 16.0.10.
+  - `pnpm audit --prod` ya no muestra avisos de `next` ni `react`. Quedan 36 en otras dependencias, sin tocar en este cambio: `maplibre-gl` (crítico), `@n8n/chat`, `zod`, `luckysheet` y algunas transitivas de `@prisma/client` y `@glideapps/glide-data-grid`.
+  - Falta probarlo en el navegador con `pnpm dev:staging`: login, catálogos, logout y la hoja de unidades.
+- Documentación: [CLAUDE.md](CLAUDE.md) y la tabla de dependencias de [docs/migration/README.md](docs/migration/README.md).
+
 ## Sesión de servidor y permisos por rol en la base nueva (v1.30.0)
 
 _2026-10-22_
