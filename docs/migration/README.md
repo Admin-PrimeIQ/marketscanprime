@@ -22,9 +22,9 @@ Reglas que aplican siempre:
 
 Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 22 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Foco actual (22 oct, tarde): terminar de pulir el backend nuevo (Next.js + Prisma sobre `msp_app`).** Sesión y autorización ya están hechas con Better Auth (§14.9, sin commit); sigue endurecer (errores genéricos, límite de intentos, Zod) y `audit_log`. Qué hay, qué falta y en qué orden: **§14.8** y la lista con casillas [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15 y 16 (§3).
+**Foco actual (22 oct, tarde): terminar de pulir el backend nuevo (Next.js + Prisma sobre `msp_app`).** Sesión y autorización ya están hechas con Better Auth (§14.9; v1.30.0, commit `75541cb`, subido). **El usuario está corriendo pruebas de penetración** sobre eso; dónde quedó exactamente la conversación y qué sigue: **§14.10**. Después: endurecer (límite de intentos, errores genéricos, Zod) y `audit_log`. Qué hay, qué falta y en qué orden: **§14.8** y la lista con casillas [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15 y 16 (§3).
 
-**Para retomar rápido:** lee la sección 0, luego la §13 (dónde quedó la última conversación y qué está esperando respuesta) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Para retomar rápido:** lee la sección 0, luego la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración en curso, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -179,7 +179,7 @@ Al 22 oct 2026, 12:10 (UTC-6), comprobado con git. `main` coincide con `origin/m
 - **`feat/lib-domain`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, `FORMULAS.md`, documentos corregidos). Subida a `origin`.
 - **`feat/data-facade`**, que sale de la anterior: `6d5adec` y `9b39f51` (21 oct: código muerto fuera y fachada `dataClient`, v1.28.2), y encima los commits que hizo **el usuario** el 22 oct con el trabajo de catálogos, login, pnpm, `.env` único, despliegue en Vercel y certificado versionado (v1.29.0): `4a2d42f`, `fe5e52b`, `9dc8e36`, `04933ed`, `9c0ab82`, `a9baab4`, `2678ecf` (cuenta propia `app-engteam` y el cambio del ETL para no borrar cuentas `app-…`, §14.7) y `0cb1d02` (22 oct, 11:59: `.env` único sin variables de Strapi/n8n y lanzador que lee solo el `.env`, decisión 15, §14.7 puntos 9–10; archivos `scripts/dev-staging.mjs`, `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts`, `lib/api/strapi.ts`, `.env.staging.example`, `CLAUDE.md`, la skill `proteger-produccion`, `docs/migration/README.md` y `docs/migration/ROADMAP.md`). Subida a `origin` hasta `0cb1d02` (la rama local está al día con `origin/feat/data-facade`).
 
-**Sin commit** en `feat/data-facade` (22 oct, después de `0cb1d02`): la corrección de contradicciones de este documento, de `ROADMAP.md` (fase 3) y de `CHANGELOG.md` (§14.7 puntos 17 y 18); la lista `README_Backend_full.md`; y, desde las 14:06, la sesión y autorización con Better Auth (§14.9: código, migración ya aplicada en `msp_app`, ETL, `middleware.ts` borrado y `proxy.ts` nuevo, documentos). En `CHANGELOG.md`, el `.env` único quedó anotado dentro de la entrada del 22 oct de v1.29.0, sin subir la versión: **falta decidir con el usuario si sube la versión**. El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito; el usuario hace sus commits y push él mismo. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
+**Después de `0cb1d02`** (comprobado con git el 22 oct a las 14:41: árbol de trabajo limpio, `feat/data-facade` al día con `origin`), el usuario hizo y subió dos commits más: **`75541cb`** (sesión y autorización con Better Auth, v1.30.0: código, migración `20261022183000_better_auth`, ETL `account`, `middleware.ts` → `proxy.ts`, documentos; §14.9) y **`3720200`** (14:33, documentos: clave propia de `app-engteam`, §14.10). Ahí entraron también la corrección de contradicciones de los puntos 17 y 18 de la §14.7 y `README_Backend_full.md`. La versión subió a **v1.30.0** por decisión del usuario. El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito; el usuario hace sus commits y push él mismo. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -194,7 +194,7 @@ Al 22 oct 2026, 12:10 (UTC-6), comprobado con git. `main` coincide con `origin/m
 | **Fase 5 (inicio): fachada y limpieza** | 21 oct, rama **`feat/data-facade`** (sale de `feat/lib-domain`, commit `9b39f51`, v1.28.2). Borrado el código muerto de `ROADMAP.md` §4.1 (9 archivos). La UI pide los datos a `dataClient` (`lib/api/client.ts`, contrato `DataClient` de 31 métodos) en vez de `strapiClient`; detrás sigue el mismo cliente de Strapi, así que producción no cambia. Backend elegido con `NEXT_PUBLIC_DATA_BACKEND` (ese día solo existía `strapi`). Lo que siguió: implementación `prisma`, empezando por catálogos (decisión 11); ver las dos filas siguientes. |
 | **Fase 5: staging en Vercel** | 22 oct, commits del usuario hasta `a9baab4`. Proyecto de Vercel **nuevo** (no `admin.primeiqlatam.com`) con el backend `prisma`, funcionando: login y catálogos contra `msp_app`. Un solo `.env` local, guarda que acepta `MSP_STAGING_DEPLOY=true`, raíz TLS de Railway versionada y metida en cada función. Cuenta `app-engteam` en `msp_app.user` (el cambio del ETL que la protege tiene commit desde `2678ecf`). Detalle en §14.2, §14.2.1 y §14.7. |
 | **Fase 5: catálogos sobre Prisma** | 21–22 oct, misma rama, con commit desde el 22 oct (v1.29.0). Detalle para retomar en la §14. Las verificaciones de esta fila son del 21 oct; lo que cambió el 22 (staging en Vercel, `.env` único) está en la fila de arriba y ya está reflejado aquí. Prisma en la raíz (decisión 10): segundo generador `app` en `prisma/schema.prisma` → `lib/db/generated` (ignorado; lo crea `postinstall` o `pnpm db:generate`). `lib/db/`: conexión a `msp_app` solo con `DATABASE_URL_APP` (sin respaldo a `DATABASE_URL_DBO_STAGE`), repositorio genérico de los 12 catálogos y Server Actions. La implementación `prisma` de `dataClient` cubre los 5 métodos de catálogo; los demás fallan con un mensaje claro. Sin auth todavía: las Server Actions solo responden con `NEXT_PUBLIC_DATA_BACKEND=prisma` y, además, en `next dev` o en un despliegue con `MSP_STAGING_DEPLOY=true` (desde el 22 oct, §14.2.1), y el login valida contra `msp_app.user` con los hashes bcrypt (decisión 13), sin llamar a Strapi; la sesión queda en el navegador hasta Auth.js. Se corre con `pnpm dev:staging`, que lee solo el `.env` único de la raíz (decisión 15; el 21 oct usaba `.env.staging.local`, que ya no existe y no debe crearse). Verificado: lectura de los 12 catálogos contra `msp_app` en sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id), `npm test` 89/89, `tsc` sin errores nuevos, `next build` aislado OK, servidor levantado y proxy de Strapi sin salida a producción. Falta recorrer la lista "debe seguir funcionando" de `ROADMAP.md` §4.4 en el navegador. *Desde el 22 oct, 14:06 (sin commit), hay sesión de servidor y permisos por rol: fila siguiente.* |
-| **Fase 5: sesión y autorización (Better Auth)** | 22 oct por la tarde, **sin commit**. Better Auth 1.7.12 en vez de Auth.js (decisión 12): sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`, `/sync` en 503 con el backend `prisma`. Migración `20261022183000_better_auth` aplicada en `msp_app`; el ETL carga `account`. Verificado: `npm test` 96/96, ETL 53/53 y prueba de punta a punta 13/13 con usuarios temporales. Falta probarlo en el navegador (el usuario agrega `BETTER_AUTH_SECRET` al `.env`). Detalle en la §14.9. |
+| **Fase 5: sesión y autorización (Better Auth)** | 22 oct por la tarde, v1.30.0, commit `75541cb` (subido). Better Auth 1.7.12 en vez de Auth.js (decisión 12): sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`, `/sync` en 503 con el backend `prisma`. Migración `20261022183000_better_auth` aplicada en `msp_app`; el ETL carga `account`. Verificado: `npm test` 96/96, ETL 53/53, prueba de punta a punta 13/13 con usuarios temporales y `pnpm run build` del usuario con código 0. `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` ya están en el `.env` (comprobado por nombre). El usuario está haciendo pruebas de penetración; no se confirmó con él un recorrido completo en el navegador (§14.10). Detalle en la §14.9. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -724,7 +724,7 @@ Producción nunca usó Prisma: el backend era Strapi. El backend nuevo no es un 
 | Errores | `actionFailure` (`lib/db/action-result.ts`) devuelve `error.message` tal cual al navegador. | Un fallo de conexión puede mostrar host o usuario de Postgres. |
 | Rutas | *Resuelto el 22 oct:* `proxy.ts` (reemplaza a `middleware.ts`, que no hacía nada) manda a `/login` sin cookie de sesión, solo con el backend `prisma`. | Solo mira que exista la cookie; la sesión la valida cada Server Action. |
 | Auditoría | La tabla `audit_log` (modelo `AuditLog`: `userId`, `entity`, `entityId` Int, `action` create/update/delete, `before`/`after` Json) **ya existe** en `msp_app` desde la migración `init`. | Ningún código escribe en ella. `entityId` es el `id` numérico de `msp_app`; para reaplicar en Strapi (decisión 14) hace falta el `publicId` (= `documentId`): probablemente una columna nueva, con migración. |
-| Dependencias | `package.json`: Next 16.0.10, React 19.2.0, Prisma 7.10.0, `bcryptjs`, `zod` 3.25.76 y, desde el 22 oct, `better-auth` 1.7.12 (trae su propio zod 4 para uso interno). | — |
+| Dependencias | `package.json`: Next 16.4.3 y React 19.2.9 (desde el 27 oct, actualización de seguridad v1.30.1; antes Next 16.0.10 y React 19.2.0), Prisma 7.10.0, `bcryptjs`, `zod` 3.25.76 y, desde el 22 oct, `better-auth` 1.7.12 (trae su propio zod 4 para uso interno). Node 24.22.1 en `.nvmrc`, `engines` `24.x`. | — |
 | Conexiones | Pool de 2 por instancia (`lib/db/connection.ts`) contra un rol de Railway que ya tuvo límite bajo. | En Vercel cada instancia abre su pool; con más usuarios puede agotar conexiones. No urgente. |
 
 **Orden propuesto** (cada paso se puede probar solo):
@@ -749,7 +749,7 @@ Lo que **no** entra en este foco: respaldos (decisión 16: antes de que `msp_app
 
 ### 14.9 Bitácora del 22 oct (tarde): sesión y autorización con Better Auth
 
-Pasos 1 y 2 de la §14.8. **Sin commit** (el usuario hace sus commits); `middleware.ts` quedó borrado en el árbol de trabajo, sin `git add`.
+Pasos 1 y 2 de la §14.8. Commit `75541cb` del usuario (v1.30.0, subido), que incluye el borrado de `middleware.ts`.
 
 **Decisiones del usuario** (cuestionario del plan):
 
@@ -798,11 +798,54 @@ Pasos 1 y 2 de la §14.8. **Sin commit** (el usuario hace sus commits); `middlew
 - usuario bloqueado después del login: `requireUser` lo rechaza;
 - logout invalida la sesión y borra solo esa fila.
 
-**Sin probar**: la app en el navegador con `pnpm dev:staging` (falta `BETTER_AUTH_SECRET` en el `.env`) y el staging de Vercel.
+**Después** (14:16–14:33): el usuario vio en el navegador "Falta BETTER_AUTH_SECRET en el .env" (lo lanza `lib/auth/server.ts`; `getMe` lo mostró al cargar `AuthProvider`). Agregó `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` al `.env`, cambió la clave de `app-engteam` (§14.10), corrió `pnpm run build` (código 0; los avisos "Dynamic server usage" del i18n son los de siempre, y la tabla de rutas muestra `ƒ Proxy (Middleware)`), subió la versión a v1.30.0 e hizo commit y push (`75541cb`, `3720200`).
 
-**Pendiente** (lo hace el usuario):
+**Para cerrar la sesión de alguien desde el servidor**: borrar sus filas de `msp_app.session` o marcarlo `blocked` (las Server Actions lo rechazan aunque tenga cookie).
 
-- Agregar `BETTER_AUTH_SECRET` (mínimo 32 caracteres) y `BETTER_AUTH_URL=http://localhost:3000` al `.env`, y probar login, catálogos y logout con `pnpm dev:staging`.
-- En Vercel de staging: `BETTER_AUTH_SECRET` (otro valor) y `BETTER_AUTH_URL` (la URL del despliegue), y redeploy (§14.2.1).
-- Commit (incluye la eliminación de `middleware.ts`). La versión ya subió a **v1.30.0** (`package.json` y `CHANGELOG.md`, decidido por el usuario).
-- Para cerrar la sesión de alguien desde el servidor: borrar sus filas de `msp_app.session` o marcarlo `blocked` (las Server Actions lo rechazan aunque tenga cookie).
+### 14.10 Dónde quedó la conversación (22 oct, 14:41)
+
+**Qué está haciendo el usuario:** pruebas de penetración sobre la sesión y los permisos nuevos, con el backend `prisma` (local con `pnpm run dev` y/o el staging de Vercel). Pidió este traspaso mientras las corre. **Lo primero al retomar: preguntarle qué encontró** y no suponer resultados.
+
+**Estado comprobado a las 14:41:**
+
+- **Git**: rama `feat/data-facade`, árbol limpio, al día con `origin` (último commit `3720200`). Nada fusionado a `main`. El agente no hace commit ni push.
+- **Versión**: v1.30.0 (`package.json` y `CHANGELOG.md`).
+- **`msp_app`**: migración `20261022183000_better_auth` aplicada; 18 usuarios y 18 cuentas `credential`, todas con `account_id` = id del usuario. La última carga del ETL es el snapshot `20261022-172111-full` (COMMIT a las ~14:00, solo cambió `account`).
+- **`.env`** (solo nombres, 33 líneas): `DATABASE_*_STRAPI`, `MSP_STAGING_DEPLOY`, `DATABASE_URL_DBO_STAGE`, `NEXT_PUBLIC_DATA_BACKEND`, `DATABASE_URL_APP`, `# DATABASE_CA_FILE_APP` (comentada), `DEV_LOGIN_EMAIL`, `DEV_LOGIN_PASSWORD_HASH`, **`DEV_LOGIN_PASSWORD`** (nueva, línea 30) y `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL`.
+  - `DEV_LOGIN_PASSWORD` la agregó el usuario: es la clave de `app-engteam` **en texto plano**. Ningún código la lee (`app:local-user` usa el hash). Recomendarle quitarla; el `.env` está en `.gitignore`, pero no hace falta tenerla ahí. No imprimir su valor.
+
+**Cuenta `app-engteam` con clave propia** (14:26, pedido del usuario): ya no usa la clave del panel de Strapi. Se generó el hash bcrypt (costo 10) de la clave nueva, se reemplazó solo la línea `DEV_LOGIN_PASSWORD_HASH` del `.env` (mismo formato, entre comillas simples) y se corrió `npm run app:local-user -- --apply`, que actualiza `user.password_hash` y la cuenta `credential`. Comprobado en solo lectura: la clave nueva coincide en las dos tablas. La clave quedó escrita en el chat: sirve para staging, pero conviene cambiarla si la cuenta va a tener más alcance. Rotar la clave de Strapi ya no afecta a la app nueva.
+
+**Qué se le explicó al usuario sobre la superficie de ataque** (para contrastar con lo que encuentre la prueba):
+
+| Superficie | Qué pasa con el backend `prisma` |
+|---|---|
+| Server Actions de datos (`lib/db/catalog-actions.ts`, `getMeAction`) | **La protección real.** Cada una llama a `requireRole` / `requireUser` (`lib/db/session.ts`): sesión en `msp_app.session`, firma con `BETTER_AUTH_SECRET`, vencimiento, usuario no bloqueado y permiso del rol. Una Server Action se puede invocar con `POST` a **cualquier** URL (también `/login`, que es pública), por eso la validación va dentro de la acción. |
+| `loginAction` / `logoutAction` | Públicas por diseño. Tiempo constante (Better Auth calcula un hash cuando la cuenta no existe). **Sin límite de intentos.** |
+| `proxy.ts` | Solo comprueba que **exista** la cookie de sesión. Con una cookie inventada se ve el esqueleto HTML de las páginas, sin datos. Una prueba puede reportarlo como "bypass del proxy"; no da acceso a datos. Su `matcher` **excluye `/api/*`**. |
+| `/api/exchange-rates` | Pide sesión (`requireUser`). |
+| `/api/sync/*` (6 rutas) | 503. |
+| `/api/strapi/*` | Sin `NEXT_PUBLIC_STRAPI_URL` apunta a `localhost:1337`: 503. |
+| `/api/blocks/generate-code`, `/api/units/generate-code` | **No validan a quien llama**; sin credenciales de Strapi responden 500 "Admin credentials not configured". |
+| `/api/copilot/n8n-chat` | **No valida a quien llama**; sin URL de n8n responde 500. Si algún día se define esa variable en staging, queda abierta: protegerla antes. |
+| Registro y `/api/auth/*` de Better Auth | No existen (registro deshabilitado, ruta no montada). |
+
+**Lo que la prueba casi seguro va a encontrar** (punto 3 de `README_Backend_full.md`, pendiente):
+
+1. Sin límite de intentos de login: la fuerza bruta no se frena.
+2. Errores sin filtrar: `actionFailure` (`lib/db/action-result.ts`) devuelve `error.message` tal cual al navegador.
+3. Sin validación con Zod ni límite de largo en los campos de catálogos.
+
+Reglas que se le recordaron para la prueba: solo contra staging o local, **nunca** contra `admin.primeiqlatam.com` ni Strapi; lo que la prueba cree o borre en catálogos cae en `msp_app` (aceptable: la próxima carga del ETL lo restaura, salvo cuentas `app-…`); si desactiva la protección de despliegues de Vercel para probar, volver a activarla al terminar.
+
+**Siguiente paso propuesto** (el usuario no lo aprobó todavía): con los hallazgos de la prueba, atacar el punto 3. Preguntas que hay que hacerle antes de implementar ("no supongas nada"):
+
+- Límite de intentos: ¿cuántos y por cuánto tiempo, y por cuenta, por IP o ambos? Better Auth trae `rateLimit`, pero con almacenamiento en memoria no sirve en Vercel (cada instancia cuenta aparte); guardarlo en `msp_app` implica una migración nueva (receta en `etl/README.md`, aplicada con `npm run app:deploy` y su confirmación). Sin Redis todavía.
+- Errores genéricos: ¿qué mensajes ve el usuario (p. ej. "no se pudo completar la acción") y dónde queda el detalle (log del servidor con `lib/server-logger.ts`)?
+- ¿Proteger también las rutas `/api/*` que no validan a quien llama (las de `generate-code` y Copilot) con `requireUser` en modo `prisma`, o devolver 503 como en `/sync`?
+
+Después del punto 3: `audit_log` (punto 4) y el siguiente módulo (proyectos o perfiles, §14.6).
+
+**Pendientes de una persona** (no los hace el agente): variables `BETTER_AUTH_SECRET` (otro valor) y `BETTER_AUTH_URL` en el Vercel de staging y redeploy (§14.2.1); confirmar la protección de despliegues; quitar del Vercel cualquier variable de Strapi/n8n/ETL si se importó el `.env`; rotar la clave de `engteam@` en Strapi; aclarar el alcance de `j_stage_admin` (§9); borrar `.env.respaldo-20261022.local`.
+
+**Para repetir la prueba de punta a punta de la §14.9** (si se cambia algo de auth): script temporal fuera del repo, pasado por stdin a `etl\node_modules\.bin\tsx.cmd -` desde la raíz, con `process.loadEnvFile(".env")`, un `BETTER_AUTH_SECRET` aleatorio en memoria y `NODE_PATH` apuntando a un módulo `server-only` vacío (el agente lo dejó en `%TEMP%\msp-shim\node_modules\server-only`; se puede borrar y recrear: `package.json` con `{"name":"server-only","main":"index.js"}` e `index.js` vacío). Crea usuarios `app-qa-…` con cuenta `credential` (`accountId: String(user.id)`), los borra en `finally` (cascada a cuentas y sesiones) y nunca imprime la clave. Esas escrituras de prueba en `msp_app` las autorizó el usuario el 22 oct.
