@@ -7,6 +7,7 @@
  */
 
 import type { CatalogItem, CatalogListResponse, CatalogRequest } from "../api/strapi.ts"
+import { PublicError } from "./action-result.ts"
 
 /** Endpoint de `CATALOG_TYPES` → delegado del cliente Prisma. `block-types` no tiene tabla en `msp_app`. */
 export const CATALOG_MODELS = {
@@ -32,14 +33,11 @@ export const MAX_PAGE_SIZE = 1000
 
 const SORTABLE_FIELDS = new Set(["id", "name", "code", "createdAt", "updatedAt"])
 
-/** Error con el mismo contrato que los de `strapiClient`: `message` y, si hay, `details`. */
-export class CatalogError extends Error {
-  readonly details?: string[]
-
+/** Error con el mismo contrato que los de `strapiClient`: `message` y, si hay, `details`. Llega al navegador. */
+export class CatalogError extends PublicError {
   constructor(message: string, details?: string[]) {
-    super(message)
+    super(message, details)
     this.name = "CatalogError"
-    if (details && details.length > 0) this.details = details
   }
 }
 

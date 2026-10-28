@@ -20,11 +20,13 @@ Reglas que aplican siempre:
 
 ---
 
-Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer la conversación original (15 al 22 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
+Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer las conversaciones originales (15 al 22 oct y 27–28 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Foco actual (22 oct, tarde): terminar de pulir el backend nuevo (Next.js + Prisma sobre `msp_app`).** Sesión y autorización ya están hechas con Better Auth (§14.9; v1.30.0, commit `75541cb`, subido). **El usuario está corriendo pruebas de penetración** sobre eso; dónde quedó exactamente la conversación y qué sigue: **§14.10**. Después: endurecer (límite de intentos, errores genéricos, Zod) y `audit_log`. Qué hay, qué falta y en qué orden: **§14.8** y la lista con casillas [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15 y 16 (§3).
+**Foco actual (22 oct, tarde): terminar de pulir el backend nuevo (Next.js + Prisma sobre `msp_app`).** Sesión y autorización ya están hechas con Better Auth (§14.9; v1.30.0, commit `75541cb`, subido). **El usuario estaba corriendo pruebas de penetración** sobre eso; dónde quedó esa conversación y qué sigue: **§14.10**. Después: endurecer (límite de intentos, errores genéricos, Zod) y `audit_log`. Qué hay, qué falta y en qué orden: **§14.8** y la lista con casillas [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15 y 16 (§3).
 
-**Para retomar rápido:** lee la sección 0, luego la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración en curso, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Lo más reciente (27–28 oct): §14.11.** Actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, commit `d154426` del usuario). El 28 oct por la mañana, `pnpm run dev` falla con **`too many connections for role "j_stage_admin"`**: es lo primero que hay que resolver con el usuario.
+
+**Para retomar rápido:** lee la sección 0, luego la **§14.11** (27–28 oct: actualización de seguridad, error de conexiones abierto, pendientes), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -179,7 +181,7 @@ Al 22 oct 2026, 12:10 (UTC-6), comprobado con git. `main` coincide con `origin/m
 - **`feat/lib-domain`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, `FORMULAS.md`, documentos corregidos). Subida a `origin`.
 - **`feat/data-facade`**, que sale de la anterior: `6d5adec` y `9b39f51` (21 oct: código muerto fuera y fachada `dataClient`, v1.28.2), y encima los commits que hizo **el usuario** el 22 oct con el trabajo de catálogos, login, pnpm, `.env` único, despliegue en Vercel y certificado versionado (v1.29.0): `4a2d42f`, `fe5e52b`, `9dc8e36`, `04933ed`, `9c0ab82`, `a9baab4`, `2678ecf` (cuenta propia `app-engteam` y el cambio del ETL para no borrar cuentas `app-…`, §14.7) y `0cb1d02` (22 oct, 11:59: `.env` único sin variables de Strapi/n8n y lanzador que lee solo el `.env`, decisión 15, §14.7 puntos 9–10; archivos `scripts/dev-staging.mjs`, `lib/db/auth-actions.ts`, `lib/db/user-mapping.ts`, `lib/api/strapi.ts`, `.env.staging.example`, `CLAUDE.md`, la skill `proteger-produccion`, `docs/migration/README.md` y `docs/migration/ROADMAP.md`). Subida a `origin` hasta `0cb1d02` (la rama local está al día con `origin/feat/data-facade`).
 
-**Después de `0cb1d02`** (comprobado con git el 22 oct a las 14:41: árbol de trabajo limpio, `feat/data-facade` al día con `origin`), el usuario hizo y subió dos commits más: **`75541cb`** (sesión y autorización con Better Auth, v1.30.0: código, migración `20261022183000_better_auth`, ETL `account`, `middleware.ts` → `proxy.ts`, documentos; §14.9) y **`3720200`** (14:33, documentos: clave propia de `app-engteam`, §14.10). Ahí entraron también la corrección de contradicciones de los puntos 17 y 18 de la §14.7 y `README_Backend_full.md`. La versión subió a **v1.30.0** por decisión del usuario. El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito; el usuario hace sus commits y push él mismo. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
+**Después de `0cb1d02`** (comprobado con git el 22 oct a las 14:41: árbol de trabajo limpio, `feat/data-facade` al día con `origin`), el usuario hizo y subió dos commits más: **`75541cb`** (sesión y autorización con Better Auth, v1.30.0: código, migración `20261022183000_better_auth`, ETL `account`, `middleware.ts` → `proxy.ts`, documentos; §14.9) y **`3720200`** (14:33, documentos: clave propia de `app-engteam`, §14.10). Ahí entraron también la corrección de contradicciones de los puntos 17 y 18 de la §14.7 y `README_Backend_full.md`. La versión subió a **v1.30.0** por decisión del usuario. **El 27 oct a las 16:29** el usuario hizo **`d154426`** (actualización de seguridad, v1.30.1, §14.11). El 28 oct a las 8:46 el árbol está limpio y, según la referencia local, `feat/data-facade` está igual que `origin/feat/data-facade`. El agente **no hace commit ni `git push`** ni fusiona sin pedido explícito; el usuario hace sus commits y push él mismo. Los snapshots y reportes del ETL (`etl/.snapshots/`, `etl/reports/`) tienen datos reales: están en `.gitignore` y solo existen en la máquina donde se corrió el ETL.
 
 | Hecho | Detalle |
 |---|---|
@@ -208,7 +210,7 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | `npm run app:status` | "Database schema is up to date!" (2 migraciones: `init` y `etl_run`). |
 | `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 22 oct (unidades 238,449, bloques 1,688, proyectos 1,137) y **18 usuarios**: los 17 de Strapi más la cuenta propia `app-engteam` (22 oct, §14.7). |
 | `npm run app:local-user` | Sin `--apply` solo simula: debe decir `public_id app-engteam … ya existe: se actualizará`. |
-| `npm test` | 50 pruebas del ETL pasan (snapshot sintético, no se conecta a nada). Desde la raíz, `npm test` corre 92: el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, guarda, login y `normalizeCaPem`) y el resto de módulos puros. |
+| `npm test` | 53 pruebas del ETL pasan (snapshot sintético, no se conecta a nada; 22 oct). Desde la raíz, `npm test` corre 96 (comprobado el 27 oct con Next 16.4.3): el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, guarda, login y `normalizeCaPem`), `lib/auth/` y el resto de módulos puros. |
 | `npm run load:verify -- --snapshot 20261022-172111-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
 | `npm run warehouse:ping` | **Todavía no se ha corrido con éxito.** Necesita `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3). Debe mostrar solo `SELECT`/`SHOW VIEW` y las 11 tablas del push en `dbo_stage` y `dbo`. |
 
@@ -849,3 +851,117 @@ Después del punto 3: `audit_log` (punto 4) y el siguiente módulo (proyectos o 
 **Pendientes de una persona** (no los hace el agente): variables `BETTER_AUTH_SECRET` (otro valor) y `BETTER_AUTH_URL` en el Vercel de staging y redeploy (§14.2.1); confirmar la protección de despliegues; quitar del Vercel cualquier variable de Strapi/n8n/ETL si se importó el `.env`; rotar la clave de `engteam@` en Strapi; aclarar el alcance de `j_stage_admin` (§9); borrar `.env.respaldo-20261022.local`.
 
 **Para repetir la prueba de punta a punta de la §14.9** (si se cambia algo de auth): script temporal fuera del repo, pasado por stdin a `etl\node_modules\.bin\tsx.cmd -` desde la raíz, con `process.loadEnvFile(".env")`, un `BETTER_AUTH_SECRET` aleatorio en memoria y `NODE_PATH` apuntando a un módulo `server-only` vacío (el agente lo dejó en `%TEMP%\msp-shim\node_modules\server-only`; se puede borrar y recrear: `package.json` con `{"name":"server-only","main":"index.js"}` e `index.js` vacío). Crea usuarios `app-qa-…` con cuenta `credential` (`accountId: String(user.id)`), los borra en `finally` (cascada a cuentas y sesiones) y nunca imprime la clave. Esas escrituras de prueba en `msp_app` las autorizó el usuario el 22 oct.
+
+### 14.11 Bitácora del 27–28 oct: actualización de seguridad y error de conexiones
+
+**Lo primero al retomar: preguntarle al usuario**, sin suponer:
+
+1. ¿Sigue el error `too many connections for role "j_stage_admin"` (ver más abajo)? ¿Qué cambió en el `.env` el 27 oct a las 15:50? Esa es la fecha del archivo; el agente no leyó valores.
+2. ¿Qué encontró en las pruebas de penetración de la §14.10? Nunca se respondió.
+3. ¿Se desplegó `d154426` en algún proyecto de Vercel, y en cuál?
+
+**Estado comprobado el 28 oct a las 8:46:**
+
+- **Git**: rama `feat/data-facade`, árbol limpio. Último commit `d154426` (27 oct, 16:29, del usuario). Según la referencia local, está igual que `origin`. Nada fusionado a `main`.
+- **Versiones**: v1.30.1, Next 16.4.3, React y React DOM 19.2.9, `.nvmrc` 24.22.1, `engines.node` `24.x`.
+- **`.env`** (solo nombres): las mismas 33 líneas de la §14.10, con `DEV_LOGIN_PASSWORD` todavía en la línea 30. `.env.respaldo-20261022.local` ya no existe.
+
+#### Actualización de seguridad (27 oct, v1.30.1)
+
+El usuario pidió primero un análisis de solo lectura (versiones actuales y versión de destino), luego un plan y después que el agente lo implementara en `feat/data-facade`, sin commit ni push. El commit lo hizo él.
+
+**Decisiones del usuario:**
+
+- Next.js **16.4.3** con versión exacta, y React / React DOM **19.2.9** exactas.
+- `.nvmrc` 24.22.1 y `engines.node` `24.x`.
+- Versión 1.30.0 → 1.30.1, con entrada en `CHANGELOG.md`.
+- Actualizar `CLAUDE.md` y la fila "Dependencias" de la §14.8.
+
+**Por qué:** 16.0.10 tenía todos los avisos de Next publicados desde enero de 2026. Subir a 16.4 los corrige sin cambiar de versión mayor. Los que importan aquí:
+
+- [GHSA-mq59](https://github.com/vercel/next.js/security/advisories/GHSA-mq59-m269-xvcx): `Origin: null` saltaba la protección CSRF de Server Actions.
+- [GHSA-p3m5](https://github.com/vercel/next.js/security/advisories/GHSA-p3m5-59mp-jv5r), [GHSA-673q](https://github.com/vercel/next.js/security/advisories/GHSA-673q-mjm6-r5xr) y [GHSA-2464](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw). Este último exige `sharp` ≥ 0.35.5.
+- Los saltos de `proxy.ts` de mayo y las denegaciones de servicio de Server Components.
+- React [GHSA-xqc2](https://github.com/facebook/react/security/advisories/GHSA-xqc2-xf4c-x3h3) y GHSA-h3gv, en `react-server-dom-*`.
+- Node 24.14.1 no tenía los parches de seguridad de junio, julio y octubre de 2026 (Brotli, undici, TLS).
+
+Lista completa en la entrada v1.30.1 de [`CHANGELOG.md`](../../CHANGELOG.md).
+
+**Cómo se hizo:**
+
+- `pnpm add -E next@16.4.3 react@19.2.9 react-dom@19.2.9`. Nunca `npm install` en la raíz: regeneraría el `package-lock.json` viejo.
+- **`pnpm add` no corrió el `postinstall`.** Se corrió a mano con `pnpm run postinstall`, que aplicó el parche de `@n8n/chat` y regeneró `lib/db/generated`. Si se vuelven a cambiar dependencias, correrlo igual.
+- pnpm avisa "Ignored build scripts" (`@parcel/watcher`, `@prisma/engines`, `@swc/core`, `prisma`, `vue-demi`). **Ya pasaba con 16.0.10**: se comprobó instalando una copia limpia de `HEAD` (con `git archive`) en `%TEMP%`, ya borrada. El usuario eligió no aprobar nada y no tocar `allowBuilds` en `pnpm-workspace.yaml`, que sigue con valores de relleno. La CLI de Prisma funciona igual.
+
+**Verificado (27 oct), igual que antes de actualizar:**
+
+- `npm test` 96/96.
+- `npx tsc --noEmit` con los mismos 38 errores previos, ninguno nuevo.
+- Build aislado (`$env:__NEXT_PROCESSED_ENV="true"; $env:NEXT_PUBLIC_DATA_BACKEND="prisma"; pnpm build`): código 0, con las mismas 42 rutas y `ƒ Proxy (Middleware)` que el build de 16.0.10 hecho con la copia limpia.
+- Los 18 mensajes `Error loading i18n: Dynamic server usage … cookies` del build salen del `try/catch` de `app/layout.tsx` y son idénticos con 16.0.10.
+- `Environments: .env` en el build solo lista el archivo. Comprobado en `@next/env` 16.4.3: con `__NEXT_PROCESSED_ENV` puesto no aplica nada.
+- `sharp` 0.35.5.
+- `pnpm audit --prod`: 0 avisos de `next`, `react` o `react-dom`. Quedan 36 en otras dependencias, fuera de alcance y sin tocar: `maplibre-gl` (crítico, hay que subir a ≥ 6.4.1), `@n8n/chat` y sus transitivas (`markdown-it`, `linkify-it`, `nanoid`, `postcss`…), `zod` 3.25.76 (hay que subir a ≥ 4.6.6), `jquery` vía `luckysheet`, `mysql2` y `deepmerge-ts` vía `@prisma/client`, `brace-expansion` vía Glide Data Grid y `browserslist` vía `autoprefixer`. Si el usuario quiere atacarlos, es otro plan.
+
+**Pendientes de una persona** (no los hace el agente):
+
+- Confirmar qué proyecto de Vercel es `market-scan-back-office` (al que apunta `.vercel/repo.json`) y si despliega `admin.primeiqlatam.com`.
+- Revisar en el log de build de Vercel el Node real (debe ser 24.x).
+- El commit `d154426` es de `joshuacprime <joshuac@primeiqlatam.com>`. Según `CLAUDE.md`, Vercel solo despliega commits de `Admin-PrimeIQ` con `engteam@primeiqlatam.com`. Confirmar si eso aplica al proyecto que se quiera desplegar.
+- Revisar si el repo del backoffice de producción necesita la misma actualización.
+- Probar en el navegador. Login y catálogos ya se usaron el 28 oct con `pnpm run dev` (ver el error de abajo). **La hoja de unidades no se puede probar en local**: con `prisma` el módulo no está migrado, y con `strapi` el `.env` no tiene `NEXT_PUBLIC_STRAPI_URL` (y no debe agregarse, decisión 15). Se verá cuando el cambio llegue al proyecto de producción, que despliega una persona.
+
+#### Preguntas sobre claves (27 oct, 15:16–15:41)
+
+El usuario preguntó cómo "encodear" contraseñas. Se le dieron dos comandos, y ninguno lo corrió el agente:
+
+- **Hash bcrypt para `DEV_LOGIN_PASSWORD_HASH`** (costo 10, `bcryptjs`, igual que `lib/auth/server.ts`). Desde la raíz: `node --env-file=.env -e "console.log(require('bcryptjs').hashSync(process.env.DEV_LOGIN_PASSWORD, 10))"`. Luego, desde `etl/`, `npm run app:local-user` para simular y `-- --apply` para aplicar.
+- **Clave dentro de una URL de Postgres** (`DATABASE_URL_APP`, `DATABASE_URL_DBO_STAGE`): `[uri]::EscapeDataString('CLAVE')`, con comillas simples. Se codifica la clave entera: las tres conexiones (`lib/db/connection.ts`, `etl/src/app/connection.ts` y `etl/src/stage/connection.ts`) leen la URL con `new URL()` y aplican `decodeURIComponent` a la clave. Esto es más que lo que pide la plantilla (solo `%` y `#`), y funciona igual.
+
+El `.env` cambió a las 15:50 (fecha del archivo). Probablemente el usuario cambió una clave o URL, pero no se sabe cuál: hay que preguntarle.
+
+#### Error abierto (28 oct, ~8:38): `too many connections for role "j_stage_admin"`
+
+Visto en la terminal de `pnpm run dev` (backend `prisma`, Next 16.4.3). Prisma responde `P2037 TooManyConnections` de forma intermitente:
+
+- en `requireUser` (`lib/db/session.ts:19`, la lectura de la sesión de Better Auth), llamado desde `/api/exchange-rates`;
+- en `listCatalogAction` (`findMany` y `count` del repositorio de catálogos).
+
+Otras peticiones del mismo rato funcionan: `engteam@primeiqlatam.com` tenía sesión, `/catalogs` cargó y `/api/exchange-rates` respondió 200 algunas veces.
+
+**Efectos visibles:**
+
+- `/api/exchange-rates` responde **401**: al fallar la lectura de la sesión, el usuario parece anónimo.
+- Los catálogos muestran "Error al cargar items" con **el mensaje completo de Prisma en el navegador**, incluidos el nombre del rol y rutas de archivo. Confirma el hallazgo 2 de la §14.10: `actionFailure` (`lib/db/action-result.ts`) devuelve `error.message` tal cual.
+
+**Lo que se sabe del código** (sin conectarse a la base):
+
+- La app usa un solo `PrismaClient` por proceso, guardado en `globalThis` (`lib/db/client.ts`), con un pool de `max: APP_MAX_CONNECTIONS` (2) en `lib/db/connection.ts`.
+- Better Auth usa ese mismo cliente (`prismaAdapter(getAppPrisma())` en `lib/auth/server.ts`).
+- Así, un proceso de `next dev` no debería pasar de unas pocas conexiones.
+- El límite es **del rol**: cuenta todas las conexiones de `j_stage_admin` en el servidor de Railway. Eso incluye `next dev` local, cada instancia del staging de Vercel (pool de 2 cada una), el ETL, cualquier cliente SQL abierto y conexiones colgadas. La §14.8 ya decía que ese rol tuvo un límite bajo.
+
+**Hipótesis sin comprobar:**
+
+- instancias del staging de Vercel con conexiones abiertas;
+- otro cliente SQL o un proceso del ETL abierto;
+- el límite del rol cambió;
+- relación con el cambio del `.env` del 27 oct.
+
+**Siguiente paso propuesto** (preguntarle antes): cuando haya un hueco libre, una lectura de solo lectura:
+
+- `SELECT rolconnlimit FROM pg_roles WHERE rolname = 'j_stage_admin'`;
+- `SELECT application_name, client_addr, state, count(*) FROM pg_stat_activity WHERE usename = 'j_stage_admin' GROUP BY 1, 2, 3`.
+
+La app se identifica como `application_name = 'msp-app-next'`. **No** terminar conexiones (`pg_terminate_backend`) ni cambiar el rol (`ALTER ROLE … CONNECTION LIMIT`) sin permiso del usuario. Ese servidor también tiene el esquema `dbo`, que está en producción (sección 0, §11).
+
+Después, con el usuario, decidir si se baja el pool, se cierra el staging o se pide más límite en Railway. Y adelantar los errores genéricos del punto 3 de la §14.8, porque este error ya muestra datos de la conexión en el navegador.
+
+**Diagnóstico del 28 oct (8:50–9:10), autorizado por el usuario:**
+
+- El usuario confirmó que fuera de su `pnpm dev` usa `j_stage_admin` **el staging de Vercel** (mismo `DATABASE_URL_APP`), y que el 27 oct cambió o codificó la clave en `DATABASE_URL_APP` / `DATABASE_URL_DBO_STAGE`.
+- Con `next dev` en reposo, la PC no tenía **ninguna** conexión `ESTABLISHED` al puerto de Railway (`Get-NetTCPConnection`), y aun así 7 intentos de **una** conexión de solo lectura (`application_name = msp-diag-readonly`, `default_transaction_read_only=on`) en ~1 minuto fallaron con `53300 too many connections for role "j_stage_admin"`. **El rol está saturado de forma continua por conexiones que no salen de esta máquina.** No se pudo leer `rolconnlimit` ni `pg_stat_activity`.
+- Sospechoso principal: las instancias del staging de Vercel. Cada una abre un pool de hasta 2 (`lib/db/connection.ts`) y, al congelarse la función, sus conexiones quedan abiertas del lado de Postgres. Sin descartar: conexiones colgadas de procesos `next dev`/ETL anteriores.
+- Lo que tiene que hacer **una persona** (no el agente): desde el panel de Railway (usuario administrador, que tiene conexiones reservadas) correr las dos consultas de arriba; si son de Vercel, pausar o redeplegar el staging; decidir si se terminan las conexiones inactivas de `j_stage_admin` o se sube su `CONNECTION LIMIT`.
+- **Hecho en código (sin commit):** errores genéricos hacia el navegador. `actionFailure` (`lib/db/action-result.ts`) solo deja pasar el mensaje de un `PublicError` (sesión, permiso y `CatalogError`, que ahora hereda de él); cualquier otro error se registra en el servidor con `console.error` y el navegador recibe el texto genérico, o "La base de datos está ocupada…" si el código es `P2037`/`53300`. Pruebas en `lib/db/action-result.test.ts`; `npm test` 99/99 y `tsc` con los mismos 38 errores previos. Los errores de la guarda (`lib/db/guard.ts`) ya no se ven en el navegador, solo en la terminal o en los logs de Vercel.
+- **Hecho en código (28 oct, 9:05, sin commit), a pedido del usuario:** el pool de la app cierra las conexiones inactivas a los 5 s (`APP_IDLE_TIMEOUT_MS`, `idleTimeoutMillis` en `lib/db/connection.ts`; antes, el valor por defecto de `pg`, 10 s). `lib/db/client.ts` crea el `pg.Pool` y lo pasa a `PrismaPg`, y lo registra con `attachDatabasePool` de `@vercel/functions` (nueva dependencia, 3.10.4 exacta): en Vercel mantiene viva la función hasta que el pool suelta las conexiones; fuera de Vercel (sin `VERCEL_URL`/`VERCEL_REGION`) no hace nada. `onPoolError` registra en el servidor las conexiones que Postgres cierra (p. ej. con `idle_session_timeout`). `npm test` 99/99, `tsc` 38 errores previos. Para que el staging lo use hay que desplegarlo (lo hace una persona); en local, reiniciar `pnpm dev`. Del lado del servidor sigue pendiente lo de arriba (diagnóstico desde Railway y, si se decide, `ALTER ROLE j_stage_admin SET idle_session_timeout = '10min'`).

@@ -15,6 +15,11 @@ export const APP_SCHEMA = "msp_app"
 // Mismo tope que el ETL: el servidor de Railway también aloja el `dbo` de producción.
 export const APP_MAX_CONNECTIONS = 2
 
+// El límite de conexiones es del rol (`j_stage_admin`) y lo comparten `next dev`, cada instancia de
+// Vercel y el ETL: una conexión inactiva se devuelve pronto. En Vercel, `attachDatabasePool`
+// (`lib/db/client.ts`) mantiene viva la función ese tiempo para que el cierre ocurra antes de congelarla.
+export const APP_IDLE_TIMEOUT_MS = 5_000
+
 const DEFAULT_CA_FILE = "etl/certs/dbo-stage-ca.pem"
 
 type Env = Record<string, string | undefined>
@@ -83,6 +88,7 @@ export function appPoolConfig(env: Env = process.env): PoolConfig {
     options: `-c search_path=${APP_SCHEMA}`,
     application_name: "msp-app-next",
     max: APP_MAX_CONNECTIONS,
+    idleTimeoutMillis: APP_IDLE_TIMEOUT_MS,
     connectionTimeoutMillis: 10_000,
     statement_timeout: 30_000,
   }
