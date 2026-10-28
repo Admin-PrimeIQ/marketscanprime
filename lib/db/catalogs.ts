@@ -1,4 +1,5 @@
 import type { CatalogItem, CatalogListResponse, CatalogRequest } from "@/lib/api/strapi"
+import { writeAudit, type AuditActor } from "./audit"
 import type { PrismaClient } from "./generated/client"
 import {
   buildCatalogSearch,
@@ -33,8 +34,11 @@ interface CatalogDelegate {
   delete(args: { where: CatalogWhereUnique }): Promise<CatalogRow>
 }
 
-function delegateFor(prisma: PrismaClient, model: CatalogModel): CatalogDelegate {
-  return prisma[model] as unknown as CatalogDelegate
+/** El cliente o el de una transacción: los dos tienen los doce delegados. */
+type CatalogDb = { [K in CatalogModel]: unknown }
+
+function delegateFor(db: CatalogDb, model: CatalogModel): CatalogDelegate {
+  return db[model] as unknown as CatalogDelegate
 }
 
 async function translateErrors<T>(work: () => Promise<T>): Promise<T> {
@@ -45,8 +49,11 @@ async function translateErrors<T>(work: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Los cinco métodos de catálogo de `DataClient`, sobre `msp_app`. */
-export function createCatalogRepository(prisma: PrismaClient) {
+/**
+ * Los cinco métodos de catálogo de `DataClient`, sobre `msp_app`. Cada escritura deja su fila en
+ * `audit_log`, en la misma transacción, a nombre de `actor`.
+ */
+export function createCatalogRepository(prisma: PrismaClient, actor: AuditActor) {
   return {
     list(endpoint: string, params?: CatalogListParams): Promise<CatalogListResponse> {
       return translateErrors(async () => {
@@ -72,25 +79,42 @@ export function createCatalogRepository(prisma: PrismaClient) {
     create(endpoint: string, data: CatalogRequest): Promise<CatalogItem> {
       return translateErrors(async () => {
         const model = resolveCatalogModel(endpoint)
-        const row = await delegateFor(prisma, model).create({ data: toCatalogWriteData(model, data, "create") })
-        return toCatalogItem(row)
+        const writeData = toCatalogWriteData(model, data, "create")
+        return prisma.$transaction(async (tx) => {
+          const after = await delegateFor(tx, model).create({ data: writeData })
+          await writeAudit(tx, { userId: actor.userId, model, action: "create", after })
+          return toCatalogItem(after)
+        })
       })
     },
 
     update(endpoint: string, id: string | number, data: CatalogRequest): Promise<CatalogItem> {
       return translateErrors(async () => {
         const model = resolveCatalogModel(endpoint)
-        const row = await delegateFor(prisma, model).update({
-          where: catalogWhereUnique(id),
-          data: toCatalogWriteData(model, data, "update"),
+        const where = catalogWhereUnique(id)
+        const writeData = toCatalogWriteData(model, data, "update")
+        return prisma.$transaction(async (tx) => {
+          const delegate = delegateFor(tx, model)
+          const before = await delegate.findUnique({ where })
+          if (!before) throw new CatalogError("El elemento del catálogo no existe.")
+          const after = await delegate.update({ where, data: writeData })
+          await writeAudit(tx, { userId: actor.userId, model, action: "update", before, after })
+          return toCatalogItem(after)
         })
-        return toCatalogItem(row)
       })
     },
 
     remove(endpoint: string, id: string | number): Promise<void> {
       return translateErrors(async () => {
-        await delegateFor(prisma, resolveCatalogModel(endpoint)).delete({ where: catalogWhereUnique(id) })
+        const model = resolveCatalogModel(endpoint)
+        const where = catalogWhereUnique(id)
+        await prisma.$transaction(async (tx) => {
+          const delegate = delegateFor(tx, model)
+          const before = await delegate.findUnique({ where })
+          if (!before) throw new CatalogError("El elemento del catálogo no existe.")
+          await delegate.delete({ where })
+          await writeAudit(tx, { userId: actor.userId, model, action: "delete", before })
+        })
       })
     },
   }

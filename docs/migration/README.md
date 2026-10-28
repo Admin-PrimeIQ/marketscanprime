@@ -22,11 +22,11 @@ Reglas que aplican siempre:
 
 Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer las conversaciones originales (15 al 22 oct y 27–28 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Foco actual (22 oct, tarde): terminar de pulir el backend nuevo (Next.js + Prisma sobre `msp_app`).** Sesión y autorización ya están hechas con Better Auth (§14.9; v1.30.0, commit `75541cb`, subido). **El usuario estaba corriendo pruebas de penetración** sobre eso; dónde quedó esa conversación y qué sigue: **§14.10**. Después: endurecer (límite de intentos, errores genéricos, Zod) y `audit_log`. Qué hay, qué falta y en qué orden: **§14.8** y la lista con casillas [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15 y 16 (§3).
+**Foco actual (28 oct, 11:47): el pulido del backend nuevo (Next.js + Prisma sobre `msp_app`) está terminado en código.** Los pasos 1 a 4 de la **§14.8** están hechos: sesión y autorización con Better Auth (§14.9), errores genéricos (§14.12), límite de intentos de login y Zod (§14.13), y `audit_log` en cada escritura (§14.14). Falta que el usuario los pruebe en el navegador y haga el commit de la v1.32.0. Lo siguiente es el **primer módulo nuevo** (perfiles de tipo de cambio o proyectos, sin elegir todavía), con la receta de la §14.5. **Dónde quedó la conversación, qué preguntar y cómo seguir: §14.15.** Lista con casillas: [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15, 16 y 17 (§3).
 
-**Lo más reciente (28 oct, después de las 9:15): §14.13** (límite de intentos de login y Zod, v1.31.0, sin commit; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
+**Lo más reciente (28 oct, después de las 10:40): §14.15** (traspaso) **y §14.14** (`audit_log` en las escrituras de catálogos, v1.32.0, sin commit; migración `audit_log_public_id` aplicada y prueba de punta a punta 15/15; falta el navegador). Antes, **§14.13** (límite de intentos de login y Zod, v1.31.0, commit `7bef959`; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
 
-**Para retomar rápido:** lee la sección 0, luego la **§14.12** (28 oct: dónde quedó la conversación, qué se hizo, qué falta y qué preguntar), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Para retomar rápido:** lee la sección 0, luego la **§14.15** (28 oct, 11:47: dónde quedó la conversación, qué preguntar primero, cómo seguir y las trampas del entorno), la **§14.14** y la **§14.13** (lo hecho el 28 oct: `audit_log`, límite de intentos y Zod), la §14.8 (plan del pulido y su estado), la §14.5 (receta para migrar un módulo), la **§14.12** (28 oct, 9:10: el error de conexiones y lo que tiene que hacer una persona en Railway y Vercel), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -112,6 +112,7 @@ Dejar de depender de Strapi y n8n, en un proyecto propio y optimizado:
 | 14 | (22 oct 2026) **Sin fallback automático a Strapi.** El usuario propuso usar Strapi si el backend nuevo cae; se descartó porque (1) el backend es el mismo proceso de Next que sirve la UI, (2) dos bases con escrituras divergen y el ETL espejo borraría lo guardado en `msp_app`, y (3) el staging tendría que llevar credenciales de Strapi (la guarda lo prohíbe) y Strapi se apaga en las fases 7–8. Elegido: **reversa manual** = `NEXT_PUBLIC_DATA_BACKEND=strapi` + redeploy + reaplicar `audit_log` (lo ejecuta una persona) + respaldos de `msp_app`. *Reabierta el 22 oct, 11:12: el usuario dejó el tema del fallback pendiente de decidir (§9). Mientras tanto no se implementa ningún fallback.* |
 | 15 | (22 oct 2026) **Un solo `.env`, en la raíz.** Todo programa del repo que necesite credenciales (la app, `scripts/dev-staging.mjs`, `etl/`) lee ese archivo; no se crean `.env.local`, `.env.staging.local` ni `.env` por carpeta. No contiene variables de Strapi ni n8n de producción, ni siquiera comentadas. Vercel usa sus propias variables (§14.2.1). `.migration/` (congelado) es la única excepción: lee su propio `.migration/.env`, que no existe y no debe crearse. |
 | 16 | (22 oct 2026) **Prioridad: pulir el backend antes que los respaldos.** Mientras `msp_app` sea espejo de Strapi, perderla se repara recargando el ETL (§14.8); el riesgo real hoy son las Server Actions sin autenticación en el staging de Vercel. Los respaldos probados van **antes** de que `msp_app` deje de ser espejo. |
+| 17 | (28 oct 2026) **`audit_log` antes del corte del espejo.** El usuario eligió activar la auditoría ya, con `msp_app` todavía como copia de Strapi: la próxima carga del ETL borra lo creado en la app, pero `audit_log` queda (el ETL no la toca), así que sirve como registro de lo hecho en staging. Cada fila guarda también el `publicId` (= `documentId` de Strapi), para poder reaplicar el cambio en Strapi (decisión 14). Sigue pendiente escribir cuándo `msp_app` deja de ser espejo. |
 
 ### Propuestas descartadas durante la conversación (no retomar sin motivo)
 
@@ -625,7 +626,7 @@ Totales esperados en `/catalogs` (carga del 16 oct; contados otra vez en `msp_ap
 1. `graphify query` sobre el módulo y leer su inventario en `ROADMAP.md` §4 (pantallas, métodos, "debe seguir funcionando").
 2. Reglas puras en `lib/db/<modulo>-mapping.ts`: fila de Prisma → la misma forma que devuelve Strapi (`documentId` = `publicId`, relaciones anidadas, `{ data, meta }` en listas). Sin `@/` ni React, imports relativos con `.ts`, para que corran con `node --test`. Pruebas en `lib/db/<modulo>-mapping.test.ts`.
 3. Repositorio en `lib/db/<modulo>.ts` que recibe el `PrismaClient` (así se puede probar con un cliente de solo lectura).
-4. Server Actions en `lib/db/<modulo>-actions.ts` (`"use server"`): cada una llama a `requireRole(permiso)` (`lib/db/session.ts`, que incluye la guarda `assertPrismaActionsAllowed()`), valida su entrada con un esquema Zod en `lib/db/<modulo>-schemas.ts` (patrón de `catalog-schemas.ts` con `parseInput` de `lib/db/input.ts`) y devuelve `ActionResult` (`lib/db/action-result.ts`), nunca lanza. Los errores pensados para el usuario son `PublicError`; el resto llega al navegador como mensaje genérico.
+4. Server Actions en `lib/db/<modulo>-actions.ts` (`"use server"`): cada una llama a `requireRole(permiso)` (`lib/db/session.ts`, que incluye la guarda `assertPrismaActionsAllowed()`), valida su entrada con un esquema Zod en `lib/db/<modulo>-schemas.ts` (patrón de `catalog-schemas.ts` con `parseInput` de `lib/db/input.ts`) y devuelve `ActionResult` (`lib/db/action-result.ts`), nunca lanza. Los errores pensados para el usuario son `PublicError`; el resto llega al navegador como mensaje genérico. Cada escritura corre en `prisma.$transaction` y llama a `writeAudit(tx, …)` (`lib/db/audit.ts`) con el `id` del usuario que devolvió `requireRole`, como `lib/db/catalogs.ts` (desde el 28 oct, §14.14).
 5. En `lib/api/prisma-client.ts`, reemplazar los `notMigrated(...)` del módulo por llamadas a las acciones con `unwrap()`.
 6. Prueba de humo contra `msp_app` en **sesión de solo lectura**: script temporal `scripts/tmp-*.mts` (extensión `.mts`, la raíz no es ESM) corrido con `etl\node_modules\.bin\tsx.cmd`, con `options: "-c search_path=msp_app -c default_transaction_read_only=on"` y `process.loadEnvFile(".env")` (`.env.staging.local` ya no existe desde el 22 oct). Borrarlo después. No imprimir hashes ni credenciales.
 7. `npm test`, `npx tsc --noEmit` (la línea base es de **38 errores** previos; ninguno debe estar en archivos nuevos), y si se tocó el empaquetado, un `next build` aislado: `$env:__NEXT_PROCESSED_ENV="true"; $env:NEXT_PUBLIC_DATA_BACKEND="prisma"; npx next build` (no carga ningún `.env`; los avisos "Dynamic server usage" del i18n son previos).
@@ -725,7 +726,7 @@ Producción nunca usó Prisma: el backend era Strapi. El backend nuevo no es un 
 | Login | Better Auth (`loginAction` en `lib/db/auth-actions.ts`), con un hash ficticio cuando la cuenta no existe (tiempo constante, 22 oct). *Desde el 28 oct (§14.13, v1.31.0):* límite de intentos por cuenta y por IP en `msp_app.login_attempt` y entrada validada con Zod. | Migración aplicada y prueba de punta a punta 13/13 (28 oct, §14.13). Falta probarlo en el navegador. |
 | Errores | *Resuelto el 28 oct (§14.12, `25871a7`):* `actionFailure` solo deja pasar el mensaje de un `PublicError` (sesión, permiso, `CatalogError`); lo demás va al log del servidor y el navegador recibe un texto genérico. Antes devolvía `error.message` tal cual. | — |
 | Rutas | *Resuelto el 22 oct:* `proxy.ts` (reemplaza a `middleware.ts`, que no hacía nada) manda a `/login` sin cookie de sesión, solo con el backend `prisma`. | Solo mira que exista la cookie; la sesión la valida cada Server Action. |
-| Auditoría | La tabla `audit_log` (modelo `AuditLog`: `userId`, `entity`, `entityId` Int, `action` create/update/delete, `before`/`after` Json) **ya existe** en `msp_app` desde la migración `init`. | Ningún código escribe en ella. `entityId` es el `id` numérico de `msp_app`; para reaplicar en Strapi (decisión 14) hace falta el `publicId` (= `documentId`): probablemente una columna nueva, con migración. |
+| Auditoría | La tabla `audit_log` (modelo `AuditLog`: `userId`, `entity`, `entityId` Int, `action` create/update/delete, `before`/`after` Json) existe en `msp_app` desde la migración `init`. *Desde el 28 oct (§14.14, v1.32.0):* cada escritura de catálogos deja su fila en la misma transacción, con el usuario de la sesión y la columna nueva `public_id` (decisión 17). | Migración aplicada y prueba de punta a punta 15/15 (28 oct, §14.14); falta el navegador. Los módulos que se migren después deben usar `writeAudit` (receta §14.5). |
 | Dependencias | `package.json`: Next 16.4.3 y React 19.2.9 (desde el 27 oct, actualización de seguridad v1.30.1; antes Next 16.0.10 y React 19.2.0), Prisma 7.10.0, `bcryptjs`, `zod` 3.25.76 y, desde el 22 oct, `better-auth` 1.7.12 (trae su propio zod 4 para uso interno). Node 24.22.1 en `.nvmrc`, `engines` `24.x`. | — |
 | Conexiones | Pool de 2 por instancia (`lib/db/connection.ts`) contra un rol de Railway con límite bajo. *Desde el 28 oct (§14.12, `25871a7`):* cierra las inactivas a los 5 s y, en Vercel, `attachDatabasePool` las suelta antes de congelar la función. | **Pasó el 28 oct:** el rol quedó saturado (§14.12). Falta liberar las conexiones en Railway, desplegar el staging y, si se decide, `idle_session_timeout` en el rol o un rol propio para la app. |
 
@@ -733,8 +734,8 @@ Producción nunca usó Prisma: el backend era Strapi. El backend nuevo no es un 
 
 1. ~~**Sesión real**~~: hecho el 22 oct con Better Auth en vez de Auth.js (decisión 12; §14.9). Variable nueva `BETTER_AUTH_SECRET` (en vez de `AUTH_SECRET`).
 2. ~~**Autorización en cada Server Action**~~: hecho el 22 oct (`requireUser` / `requireRole` en `lib/db/session.ts`, `proxy.ts`; §14.9).
-3. **Endurecer**: ~~errores genéricos al navegador y detalle solo en el log del servidor~~ (hecho el 28 oct, §14.12); ~~login en tiempo constante~~ (hecho el 22 oct); ~~límite de intentos y Zod~~ (código hecho el 28 oct, §14.13; falta aplicar la migración y probarlo).
-4. **`audit_log` en cada escritura**, en la misma transacción que el cambio, con el usuario de la sesión. Si hace falta el `publicId`, migración nueva aplicada solo en `msp_app` con `npm run app:deploy` desde `etl/` y con confirmación del usuario (receta en `etl/README.md`).
+3. **Endurecer**: ~~errores genéricos al navegador y detalle solo en el log del servidor~~ (hecho el 28 oct, §14.12); ~~login en tiempo constante~~ (hecho el 22 oct); ~~límite de intentos y Zod~~ (hecho el 28 oct, §14.13; migración aplicada y prueba de punta a punta 13/13; falta el navegador).
+4. **`audit_log` en cada escritura**, en la misma transacción que el cambio, con el usuario de la sesión. *Hecho el 28 oct (§14.14, v1.32.0), con `publicId` (decisión 17); migración aplicada y prueba de punta a punta 15/15; falta el navegador.*
 5. Después, el siguiente módulo (proyectos o perfiles, §14.6) con la receta de la §14.5, ya con sesión y auditoría.
 
 Criterio de "hecho" de los pasos 1–3: en el staging de Vercel, una Server Action llamada sin sesión responde "no autorizado"; con sesión de un rol sin permiso, "prohibido"; el login responde igual de rápido exista o no la cuenta; ningún error muestra datos de la conexión. `npm test` y `tsc` sin errores nuevos (línea base de 38).
@@ -1077,4 +1078,125 @@ Limpieza en `finally`: 0 filas de prueba en `login_attempt` y 0 usuarios `app-qa
 1. ~~`npm run app:deploy`~~ y ~~prueba de punta a punta~~: hechos (arriba).
 2. El commit lo hace el usuario.
 3. El usuario prueba en el navegador con `pnpm dev:staging`: `/login` con clave mala seis veces y `/catalogs` (crear con un nombre de más de 255 caracteres → "name: máximo 255 caracteres").
-4. Después: `audit_log` (paso 4 de la §14.8), que antes necesita decidir cuándo `msp_app` deja de ser espejo de Strapi.
+4. Después: `audit_log` (paso 4 de la §14.8). Hecho a continuación: §14.14.
+
+### 14.14 Bitácora del 28 oct (10:40–): `audit_log` en las escrituras (v1.32.0)
+
+La v1.31.0 ya tenía commit del usuario (`7bef959`). A las 10:40 el usuario eligió (cuestionario):
+
+- **`audit_log` ya**, con `msp_app` todavía como copia de Strapi (decisión 17);
+- **con `publicId`**, mediante una migración nueva en `msp_app`.
+
+El trabajo quedó **sin commit**.
+
+**Qué se hizo:**
+
+- **Reglas puras** en `lib/db/audit-entry.ts`, con pruebas en `audit-entry.test.ts`:
+  - `entity` es el nombre de tabla (`securityType` → `security_type`);
+  - `entityId` y `publicId` salen de la fila nueva o, al borrar, de la anterior;
+  - `create` guarda solo `after`, `delete` solo `before` y `update` las dos, en JSON (fechas en ISO).
+- **Escritura** en `lib/db/audit.ts` (`writeAudit(tx, …)`), siempre con el cliente de la transacción del cambio.
+- **Catálogos** (`lib/db/catalogs.ts`):
+  - crear, editar y borrar corren en `prisma.$transaction` y escriben la auditoría ahí mismo; si algo falla, no queda ni el cambio ni la fila;
+  - editar y borrar leen la fila anterior dentro de la transacción.
+  - El repositorio recibe el usuario: `catalog-actions.ts` le pasa el `id` que devuelve `requireRole`.
+- **Migración `20261028170000_audit_log_public_id`**:
+  - generada con `migrate diff --from-config-datasource` contra `msp_app` (solo lectura); el diff trajo **solo** la columna y el índice;
+  - SQL: `ALTER TABLE "audit_log" ADD COLUMN "public_id" TEXT` y el índice `(entity, public_id)`; no menciona `dbo_stage` ni `dbo`;
+  - **Aplicada** el 28 oct, 11:08, con `npm run app:deploy` desde `etl/`, con confirmación del usuario ("1 y 2 sí"). `npm run app:status`: 5 migraciones, "Database schema is up to date!".
+- **Efecto del ETL**: `audit_log` no está en `etl/src/load/specs.ts`, así que la carga no la toca. Lo creado en catálogos se borra en la próxima carga, pero su fila de auditoría queda. Si la carga borra un usuario, sus filas quedan con `user_id` en `NULL` (`onDelete: SetNull`).
+- **Documentación**: decisión 17 (§3), fila Auditoría y paso 4 de la §14.8, receta de la §14.5, `CHANGELOG.md` v1.32.0, `README_Backend_full.md`.
+
+**Verificado**:
+
+- `npm test` de la raíz 116/116 (antes 110);
+- `npx tsc --noEmit` con los mismos 38 errores previos, ninguno en archivos tocados;
+- `prisma generate --generator app` regenerado.
+
+**Prueba de punta a punta contra `msp_app`** (28 oct, 11:10, autorizada; receta de la §14.10): **15/15**.
+
+- Usó un usuario temporal `app-qa-audit` (supervisor, sin cuenta ni clave) con un script en `%TEMP%`, ya borrado.
+- Llama al repositorio (`createCatalogRepository`) con ese usuario, como hace `catalog-actions.ts` después de `requireRole`; no llama a la Server Action, porque fuera de Next no hay `headers()`.
+- Resultados:
+  - crear una amenidad deja 1 fila `create`, con el usuario, el `public_id` del elemento y solo `after`;
+  - editarla deja la fila `update`, con el nombre viejo en `before` y el nuevo en `after`;
+  - editar un elemento que no existe da "El elemento del catálogo no existe." y no deja fila;
+  - borrarla deja la fila `delete`, con solo `before` y el `public_id`, y el elemento ya no existe;
+  - borrar un país en uso falla con "No se puede eliminar: el elemento está en uso.". El país sigue y no queda fila de auditoría, porque la transacción se revirtió entera. Antes de intentarlo, el script comprobó en `pg_constraint` que `project.country_id` es `RESTRICT`, así que Postgres garantizaba el rechazo.
+- Un primer intento se cortó en el paso 5 por un error **del script**: leía `confdeltype`, de tipo `char`, que el adaptador no deserializa. El `finally` limpió todo y la segunda corrida pasó completa.
+- Limpieza comprobada al final: `audit_log` con 0 filas en total, 0 amenidades `qa-` y 0 usuarios `app-qa-`.
+
+**Para cerrar este paso:** el usuario prueba en el navegador con `pnpm dev:staging` (crear, editar y borrar un elemento en `/catalogs`) y hace el commit.
+
+### 14.15 Dónde quedó la conversación (28 oct, 11:47)
+
+Conversación del 28 oct, de 9:15 a 11:47 (UTC-6), en la rama `feat/data-facade`. El usuario pidió primero un análisis "como senior dev" de este documento y luego avanzar con el plan. Al final pidió dejar este documento listo para que otro agente continúe.
+
+#### Estado al cerrar
+
+- **Git**: el último commit es `7bef959` (v1.31.0, del usuario). La v1.32.0 (`audit_log`) está **sin commit**. Archivos:
+  - modificados: `CHANGELOG.md`, `package.json` (1.32.0), `prisma/schema.prisma`, `lib/db/catalogs.ts`, `lib/db/catalog-actions.ts`, `docs/migration/README.md`, `README_Backend_full.md`, `ROADMAP.md`;
+  - nuevos: `lib/db/audit.ts`, `lib/db/audit-entry.ts`, `lib/db/audit-entry.test.ts`, `prisma/migrations/20261028170000_audit_log_public_id/`.
+
+  `.next/` y `graphify-out/` aparecen en `git status` como sin seguimiento: no son parte del trabajo.
+- **`msp_app`** tiene las 5 migraciones aplicadas (`init`, `etl_run`, la de Better Auth, `login_attempt` y `audit_log_public_id`). `app:status`: "Database schema is up to date!".
+- **Datos de prueba**: no quedó ninguno. `audit_log` tiene 0 filas, no hay usuarios `app-qa-…` ni amenidades `qa-…`, y en `login_attempt` no quedan filas de prueba.
+- **Verificación**: `npm test` de la raíz 116/116; `npx tsc --noEmit` con los mismos 38 errores previos, ninguno en archivos tocados; `graphify update .` corrido.
+- **Conexión a la base**: a las 9:17 el usuario dijo que el error de conexiones de la §14.12 "ya está arreglado". El agente no comprobó cómo se resolvió, pero todas las conexiones del día funcionaron (`migrate diff`, `app:deploy` y las pruebas). Dato sin explicar: `app:deploy` mostró el datasource como `localhost:57223`, mientras que la §14.12 da `altaria.proxy.rlwy.net:18692`. No se averiguó si es un túnel o proxy local. Leer el `.env` para verlo fue bloqueado por la revisión automática, y está bien que así sea: no leer valores del `.env`.
+
+#### Lo primero al retomar: preguntarle al usuario
+
+1. ¿Probó en el navegador con `pnpm dev:staging`?
+   - `/login`: una clave mala seis veces; la sexta debe responder "Demasiados intentos de inicio de sesión…" (v1.31.0).
+   - `/catalogs`: crear, editar y borrar un elemento (cada acción deja su fila en `audit_log`), y crear uno con un nombre de más de 255 caracteres, que debe responder "name: máximo 255 caracteres".
+2. ¿Hizo el commit de la v1.32.0? El agente **no** hace commit ni push.
+3. ¿Qué módulo sigue? Opciones (§14.6 y `README_Backend_full.md` §8):
+   - **perfiles de tipo de cambio**: 5 métodos, el más corto;
+   - **proyectos**: 4 métodos, pero el más pesado en relaciones (país, desarrolladora, NSE, amenidades, servicios, perfil, financiamiento);
+   - **cuenta**: `forgotPassword`, `resetPassword`, `updateMe` y `changePassword`; recuperar la clave por correo necesita decidir un proveedor (Resend o SES).
+4. ¿Qué es `localhost:57223` y cómo se resolvió el error de conexiones? Sirve para actualizar la §14.12. La parte de una persona (diagnóstico en Railway, staging de Vercel, rol propio) sigue sin confirmar.
+5. Siguen abiertas de antes: cuándo `msp_app` deja de ser copia de Strapi (decisiones 16 y 17; debe quedar decidido con los respaldos antes de usar la app en serio), las preguntas de la §14.12 y de la §9, y el `Agente.md` que no existe.
+
+#### Cómo trabaja el usuario
+
+- Responde corto (por ejemplo "1 y 2 sí" o "ejecuta"). A veces pide **un plan antes** ("crea un plan primero"); para cambios grandes, ofrecerlo.
+- Cuando el agente pregunta con un cuestionario y el usuario lo cancela, hay que repetir la pregunta en texto.
+- Autoriza por separado cada escritura en `msp_app`: aplicar una migración (`npm run app:deploy`) y cada prueba de punta a punta con datos temporales. **Preguntar antes de cada una**, aunque ya haya autorizado otras.
+- Hace él los commits; a veces con mensajes que no cubren todo (por eso el `CHANGELOG.md` de la v1.31.0 incluye `25871a7`).
+
+#### Cómo seguir con el siguiente módulo
+
+1. Plan con la receta de la §14.5 y la lista "debe seguir funcionando" del módulo en `ROADMAP.md` §4. Mostrárselo al usuario antes de escribir código.
+2. Cada Server Action:
+   - `requireRole(permiso)`, que ya incluye la guarda;
+   - un esquema Zod en `lib/db/<modulo>-schemas.ts`;
+   - cada escritura en `prisma.$transaction`, con `writeAudit(tx, { userId, model, action, before, after })`;
+   - devuelve `ActionResult`, y los mensajes para el usuario van como `PublicError`.
+3. Si el módulo necesita cambiar el esquema:
+   - generar la migración con `migrate diff --from-config-datasource` desde `etl/`, que solo lee (comando abajo);
+   - revisar que el SQL **solo** traiga lo esperado y no mencione `dbo_stage` ni `dbo`;
+   - agregarle un encabezado en español;
+   - aplicarla con `npm run app:deploy` solo con confirmación del usuario.
+4. Pruebas puras con `node --test` (imports relativos con `.ts`, sin `@/`), `npm test`, `tsc` filtrado a los archivos tocados, y una prueba de punta a punta autorizada.
+5. Subir la versión en `package.json`, agregar una entrada al `CHANGELOG.md` y una bitácora nueva aquí (§14.16 en adelante), y actualizar la §14.8, `README_Backend_full.md` y `ROADMAP.md`.
+6. `graphify update .` después de tocar código.
+
+#### Comandos y trampas del entorno (Windows, PowerShell)
+
+- **Generar una migración** (desde `etl/`):
+  ```powershell
+  New-Item -ItemType Directory -Force "..\prisma\migrations\<fecha>_<nombre>" | Out-Null
+  cmd /c "npx tsx src/app/prisma-cli.ts migrate diff --from-config-datasource --to-schema ../prisma/schema.prisma --script --output ../prisma/migrations/<fecha>_<nombre>/migration.sql"
+  ```
+  Después, desde la raíz, `npx prisma generate --generator app`. `pnpm db:generate` falló con "Command not found" cuando el directorio actual era otro.
+- **Aplicar y comprobar** (desde `etl/`): `cmd /c "npm run app:deploy"` y `cmd /c "npm run app:status"`. El aviso `npm warn Unknown env config "devdir"` es ruido.
+- **Pruebas de punta a punta**:
+  - un script `.mts` en `C:\Users\Joshua C\AppData\Local\Temp\` (la ruta larga: con `$env:TEMP`, que da `JOSHUA~1`, `tsx` no encuentra el archivo);
+  - se corre desde la raíz con `.\etl\node_modules\.bin\tsx.cmd --tsconfig tsconfig.json <script>`, con `$env:NODE_PATH` apuntando a `...\Temp\msp-shim\node_modules`, donde está el módulo `server-only` vacío (§14.10);
+  - dentro del script: `process.chdir(<raíz>)`, `process.loadEnvFile(".env")` e imports por `pathToFileURL`;
+  - para Better Auth, un `BETTER_AUTH_SECRET` aleatorio en memoria antes de importar `lib/auth/server.ts`;
+  - limpieza en `finally`, nunca imprimir claves, y borrar el script al terminar;
+  - **escribir el script y correrlo en pasos separados**, no en paralelo: el 28 oct se corrió antes de que existiera el archivo.
+- **`$queryRaw` con `@prisma/adapter-pg`** no lee columnas de tipo `char`, como `pg_constraint.confdeltype` (error `UnsupportedNativeDataType`): convertirlas con `::text`. En la prueba también se convirtió `pg_attribute.attname` (tipo `name`) por precaución, sin comprobar si hacía falta.
+- **Salida larga de `npm test`**: redirigirla a un archivo (`npm test *> "$env:TEMP\msp-test.txt"`) y leer el final; pasada directamente a `Select-String`, no mostraba nada.
+- La shell a veces queda con `etl/` como directorio actual: indicar siempre el directorio de trabajo.

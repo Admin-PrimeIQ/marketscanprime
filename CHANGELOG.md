@@ -6,6 +6,21 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Auditoría de las escrituras en la base nueva (v1.32.0)
+
+_2026-10-28_
+
+Paso 4 de la §14.8 de `docs/migration/README.md`. **Producción no cambia**: solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+
+- **`audit_log` en cada escritura de catálogos** ([catalogs.ts](lib/db/catalogs.ts)):
+  - crear, editar y borrar corren en una transacción que también escribe la fila de auditoría; si una de las dos falla, no se guarda ninguna;
+  - la fila lleva el usuario de la sesión (`requireRole` en [catalog-actions.ts](lib/db/catalog-actions.ts)), la tabla, el `id`, el `publicId` (`documentId` de Strapi) y las filas antes y después en JSON;
+  - editar o borrar un elemento que no existe da "El elemento del catálogo no existe.", como antes.
+- **Reglas puras** en [audit-entry.ts](lib/db/audit-entry.ts), con pruebas; la escritura, en [audit.ts](lib/db/audit.ts).
+- **Migración `20261028170000_audit_log_public_id`** ([prisma/migrations](prisma/migrations/20261028170000_audit_log_public_id/migration.sql)): agrega la columna `public_id` (admite `NULL`) y un índice `(entity, public_id)`. No toca filas.
+- **Con `msp_app` todavía como copia de Strapi** (decisión 17): la próxima carga del ETL borra lo creado en la app, pero las filas de `audit_log` quedan.
+- **Verificación**: `npm test` 116/116 y `tsc` con los mismos 38 errores previos, ninguno en archivos tocados. Migración aplicada en `msp_app` y prueba de punta a punta 15/15 (crear, editar y borrar, más los casos de error), sin datos de prueba al final.
+
 ## Límite de intentos de login, validación con Zod y errores genéricos en la base nueva (v1.31.0)
 
 _2026-10-28_

@@ -12,15 +12,16 @@ import { requireRole } from "./session"
 /**
  * Server Actions de catálogos para la implementación `prisma` de `dataClient` (`lib/api/prisma-client.ts`).
  * Cada una exige sesión y el permiso de su operación (`requireRole`, que también revisa la guarda) y
- * después valida la entrada con Zod (`catalog-schemas.ts`).
+ * después valida la entrada con Zod (`catalog-schemas.ts`). Las escrituras quedan en `audit_log` a
+ * nombre del usuario de la sesión.
  */
 async function run<T>(
   permission: Permission,
   work: (repo: ReturnType<typeof createCatalogRepository>) => Promise<T>,
 ): Promise<ActionResult<T>> {
   try {
-    await requireRole(permission)
-    return { ok: true, data: await work(createCatalogRepository(getAppPrisma())) }
+    const user = await requireRole(permission)
+    return { ok: true, data: await work(createCatalogRepository(getAppPrisma(), { userId: user.id })) }
   } catch (error) {
     return actionFailure(error, "Error inesperado en la base nueva")
   }

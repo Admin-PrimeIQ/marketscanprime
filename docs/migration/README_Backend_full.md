@@ -30,15 +30,15 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 ## 4. Auditoría
 
-- [ ] Escribir en `audit_log` en cada escritura, en la misma transacción, con el usuario de la sesión. La tabla existe desde la migración `init`; ningún código escribe en ella.
-- [ ] Guardar el `publicId` además del `entityId` numérico, para poder reaplicar cambios en Strapi (reversa manual, decisión 14). Implica una migración nueva, aplicada solo en `msp_app` con `npm run app:deploy` desde `etl/` y con confirmación del usuario.
+- [x] Escribir en `audit_log` en cada escritura, en la misma transacción, con el usuario de la sesión (28 oct, v1.32.0, sin commit): catálogos, con `writeAudit` de `lib/db/audit.ts`. Decidido hacerlo con `msp_app` todavía como espejo (decisión 17). Prueba de punta a punta contra `msp_app` 15/15; falta el navegador. Ver `README.md` §14.14.
+- [x] Guardar el `publicId` además del `entityId` numérico, para poder reaplicar cambios en Strapi (reversa manual, decisión 14) (28 oct, v1.32.0). Migración `20261028170000_audit_log_public_id` aplicada el 28 oct.
 
 ## 5. Calidad y operación
 
 - [ ] Bajar la línea base de 38 errores de `npx tsc --noEmit` y quitar `typescript.ignoreBuildErrors` de `next.config.mjs`.
 - [ ] Linter que funcione (`pnpm lint` falla: `eslint` no está instalado).
 - [ ] Revisar el pool de conexiones: cada instancia de Vercel abre su propio pool de 2 (`lib/db/connection.ts`). *En la app, hecho el 28 oct (`25871a7`):* las conexiones inactivas se cierran a los 5 s y `attachDatabasePool` (`@vercel/functions`) las suelta antes de congelar la función. **Falta** (una persona): liberar el rol saturado en Railway, desplegar el staging y decidir `idle_session_timeout` / rol propio. Ver `README.md` §14.12.
-- [ ] Escribir cuándo `msp_app` deja de ser espejo de Strapi. Hoy el ETL borra lo que se crea en la app, salvo las cuentas `app-…`. Debe quedar decidido antes de activar `audit_log`.
+- [ ] Escribir cuándo `msp_app` deja de ser espejo de Strapi. Hoy el ETL borra lo que se crea en la app, salvo las cuentas `app-…`. *El 28 oct el usuario decidió activar `audit_log` antes de esto (decisión 17); el corte sigue sin fecha y debe quedar decidido, con los respaldos (decisión 16), antes de que la app se use en serio.*
 
 ## 6. Fuera del código (lo hace una persona, no el agente)
 
