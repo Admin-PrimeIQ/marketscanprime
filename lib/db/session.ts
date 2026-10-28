@@ -3,6 +3,7 @@ import "server-only"
 import { headers } from "next/headers"
 import { can, type Permission } from "@/lib/auth/permissions"
 import { getAuth } from "@/lib/auth/server"
+import { PublicError } from "./action-result"
 import { assertPrismaActionsAllowed } from "./guard"
 import { fromAuthUser, type UserRow } from "./user-mapping"
 
@@ -17,15 +18,15 @@ export const FORBIDDEN = "Tu rol no tiene permiso para esta acción."
 export async function requireUser(): Promise<UserRow> {
   assertPrismaActionsAllowed()
   const session = await getAuth().api.getSession({ headers: await headers() })
-  if (!session) throw new Error(NO_SESSION)
+  if (!session) throw new PublicError(NO_SESSION)
   const user = fromAuthUser(session.user)
-  if (user.blocked) throw new Error(NO_SESSION)
+  if (user.blocked) throw new PublicError(NO_SESSION)
   return user
 }
 
 /** Igual que `requireUser`, y además exige el permiso según la matriz de roles (`lib/auth/permissions.ts`). */
 export async function requireRole(permission: Permission): Promise<UserRow> {
   const user = await requireUser()
-  if (!can(user.role, permission)) throw new Error(FORBIDDEN)
+  if (!can(user.role, permission)) throw new PublicError(FORBIDDEN)
   return user
 }
