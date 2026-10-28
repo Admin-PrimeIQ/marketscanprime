@@ -23,10 +23,10 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 ## 3. Endurecer
 
-- [ ] Errores genéricos hacia el navegador. Hoy `actionFailure` (`lib/db/action-result.ts`) devuelve `error.message` tal cual; el detalle debe quedar solo en el log del servidor.
+- [x] Errores genéricos hacia el navegador (28 oct, `25871a7`): `actionFailure` (`lib/db/action-result.ts`) solo deja pasar el mensaje de un `PublicError` (sesión, permiso, `CatalogError`); el resto queda en el log del servidor. Si no hay conexiones libres, "La base de datos está ocupada…". Ver `README.md` §14.12.
 - [x] Login en tiempo constante (22 oct): Better Auth calcula un hash bcrypt de costo 10 (el mismo de los hashes de Strapi) cuando la cuenta no existe, por correo y por usuario. Excepción menor: un usuario de menos de 3 o más de 30 caracteres se rechaza antes, sin hash.
-- [ ] Límite de intentos de login. Hoy no hay. Sin Redis, iría en `msp_app` (migración nueva).
-- [ ] Validación de entrada con Zod en `lib/db/`. `zod` está instalado pero no se usa ahí; los catálogos aceptan solo campos conocidos (`toCatalogWriteData`), sin límite de largo.
+- [x] Límite de intentos de login (28 oct, v1.31.0, sin commit): 5 por cuenta y 20 por IP en 15 minutos, bloqueo de 15 minutos, contadores en la tabla nueva `msp_app.login_attempt` (`lib/auth/login-throttle.ts`, `lib/db/login-throttle.ts`). Migración `20261028153000_login_attempt` aplicada el 28 oct y prueba de punta a punta contra `msp_app` 13/13. Falta probarlo en el navegador. Ver `README.md` §14.13.
+- [x] Validación de entrada con Zod en `lib/db/` (28 oct, v1.31.0, sin commit): `auth-schemas.ts` (login) y `catalog-schemas.ts` (endpoint, id, parámetros y cuerpo, con largos máximos); `input.ts` arma los detalles en español.
 
 ## 4. Auditoría
 
@@ -37,7 +37,7 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 - [ ] Bajar la línea base de 38 errores de `npx tsc --noEmit` y quitar `typescript.ignoreBuildErrors` de `next.config.mjs`.
 - [ ] Linter que funcione (`pnpm lint` falla: `eslint` no está instalado).
-- [ ] Revisar el pool de conexiones: cada instancia de Vercel abre su propio pool de 2 (`lib/db/connection.ts`).
+- [ ] Revisar el pool de conexiones: cada instancia de Vercel abre su propio pool de 2 (`lib/db/connection.ts`). *En la app, hecho el 28 oct (`25871a7`):* las conexiones inactivas se cierran a los 5 s y `attachDatabasePool` (`@vercel/functions`) las suelta antes de congelar la función. **Falta** (una persona): liberar el rol saturado en Railway, desplegar el staging y decidir `idle_session_timeout` / rol propio. Ver `README.md` §14.12.
 - [ ] Escribir cuándo `msp_app` deja de ser espejo de Strapi. Hoy el ETL borra lo que se crea en la app, salvo las cuentas `app-…`. Debe quedar decidido antes de activar `audit_log`.
 
 ## 6. Fuera del código (lo hace una persona, no el agente)
@@ -51,7 +51,7 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 - [x] Qué puede hacer cada rol: la matriz de Strapi (punto 2; 22 oct).
 - [x] Sesión guardada en la base (Better Auth, `msp_app.session`; 22 oct).
 - [x] Duración de la sesión: 7 días renovados con el uso; no se cierra al cerrar el navegador (22 oct).
-- [ ] Límite de intentos de login: cuántos y por cuánto tiempo.
+- [x] Límite de intentos de login: 5 por cuenta y 20 por IP en 15 minutos, bloqueo de 15 minutos, guardado en `msp_app` (valores del plan del 28 oct, aceptados por el usuario).
 - [ ] Si recuperar contraseña por correo entra ahora (necesita proveedor de correo: Resend o SES).
 
 ## 8. Después del pulido: módulos sin migrar

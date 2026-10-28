@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server"
 import { resolveDataBackend } from "@/lib/api/data-backend"
+import { PublicError } from "@/lib/db/action-result"
 import { isValidStrapiBearer } from "@/lib/auth/verify-strapi-bearer"
 import { logApi, userFromBearer } from "@/lib/server-logger"
 import {
@@ -13,35 +14,52 @@ import { loadExchangeRatesFromWebhook } from "@/lib/exchange-rates"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
+type Caller =
+  | { status: "ok"; user: string }
+  | { status: "unauthorized"; user: string }
+  | { status: "unavailable"; user: string; error: string }
+
 /**
  * Quién llama. Backend `prisma`: el usuario de la sesión de Better Auth (cookie), cargado con
  * `import()` para que el backend `strapi` nunca toque la base nueva. Si no, el bearer de Strapi.
+ * Sin sesión es 401; si la base no responde no se sabe quién es, y es 503 (no un falso "sin sesión").
  */
-async function caller(request: NextRequest): Promise<{ ok: boolean; user: string }> {
+async function caller(request: NextRequest): Promise<Caller> {
   if (resolveDataBackend() === "prisma") {
     const { requireUser } = await import("@/lib/db/session")
     try {
-      return { ok: true, user: (await requireUser()).email }
-    } catch {
-      return { ok: false, user: "anon" }
+      return { status: "ok", user: (await requireUser()).email }
+    } catch (error) {
+      if (error instanceof PublicError) return { status: "unauthorized", user: "anon" }
+      const code = (error as { code?: unknown } | null)?.code
+      const message = error instanceof Error ? error.message : String(error)
+      return { status: "unavailable", user: "anon", error: code ? `${String(code)}: ${message}` : message }
     }
   }
   const authorization = request.headers.get("authorization")
-  return { ok: await isValidStrapiBearer(authorization), user: userFromBearer(authorization) }
+  const user = userFromBearer(authorization)
+  return (await isValidStrapiBearer(authorization)) ? { status: "ok", user } : { status: "unauthorized", user }
+}
+
+/** Respuesta de 401/503 cuando no se pudo identificar a quien llama; `null` si puede seguir. */
+function rejectCaller(who: Caller, tag: string, path: string, t0: number): Response | null {
+  if (who.status === "ok") return null
+  if (who.status === "unauthorized") {
+    logApi({ tag, path, user: who.user, status: 401, durationMs: Date.now() - t0, error: "Unauthorized" })
+    return Response.json({ error: "Unauthorized" }, { status: 401, headers: { "cache-control": "no-store" } })
+  }
+  logApi({ tag, path, user: who.user, status: 503, durationMs: Date.now() - t0, error: who.error })
+  return Response.json({ error: "Service unavailable" }, { status: 503, headers: { "cache-control": "no-store" } })
 }
 
 export async function GET(request: NextRequest) {
   const t0   = Date.now()
   const path = request.nextUrl.pathname
 
-  const { ok, user } = await caller(request)
-  if (!ok) {
-    logApi({ tag: "route:GET", path, user, status: 401, durationMs: Date.now() - t0, error: "Unauthorized" })
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: { "cache-control": "no-store" } }
-    )
-  }
+  const who = await caller(request)
+  const rejected = rejectCaller(who, "route:GET", path, t0)
+  if (rejected) return rejected
+  const { user } = who
 
   const fresh = getFreshExchangeRatesFromCache()
   if (fresh) {
@@ -80,14 +98,10 @@ export async function DELETE(request: NextRequest) {
   const t0   = Date.now()
   const path = request.nextUrl.pathname
 
-  const { ok, user } = await caller(request)
-  if (!ok) {
-    logApi({ tag: "route:DELETE", path, user, status: 401, durationMs: Date.now() - t0, error: "Unauthorized" })
-    return Response.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: { "cache-control": "no-store" } }
-    )
-  }
+  const who = await caller(request)
+  const rejected = rejectCaller(who, "route:DELETE", path, t0)
+  if (rejected) return rejected
+  const { user } = who
 
   clearExchangeRatesServerCache()
   logApi({ tag: "route:DELETE", path, user, status: 204, durationMs: Date.now() - t0, detail: "cache cleared" })

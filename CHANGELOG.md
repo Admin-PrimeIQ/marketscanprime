@@ -6,6 +6,32 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Límite de intentos de login, validación con Zod y errores genéricos en la base nueva (v1.31.0)
+
+_2026-10-28_
+
+Paso 3 de la §14.8 de `docs/migration/README.md` ("endurecer"). **Producción no cambia**: todo esto solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+
+- **Límite de intentos de login**:
+  - Reglas puras en [lib/auth/login-throttle.ts](lib/auth/login-throttle.ts), con pruebas; contadores en [lib/db/login-throttle.ts](lib/db/login-throttle.ts); uso en [auth-actions.ts](lib/db/auth-actions.ts).
+  - Por cuenta: 5 intentos en 15 minutos y luego 15 minutos de bloqueo. Por IP: 20 en 15 minutos.
+  - Cada intento suma antes de comprobar la clave, en un solo `INSERT … ON CONFLICT`, así que una ráfaga en paralelo no pasa del límite. Pasado el límite se rechaza sin llegar a bcrypt, exista o no la cuenta.
+  - El login correcto borra el contador de la cuenta y le resta uno al de la IP.
+  - No usa el `rateLimit` de Better Auth: ese solo aplica a su ruta HTTP, que no está montada.
+- **Migración `20261028153000_login_attempt`** ([prisma/migrations](prisma/migrations/20261028153000_login_attempt/migration.sql)): solo agrega la tabla `login_attempt`. El ETL no la carga ni la borra.
+- **Validación con Zod** de la entrada de las Server Actions:
+  - Login ([auth-schemas.ts](lib/db/auth-schemas.ts)): identificador de hasta 255 caracteres y clave de hasta 256. Una entrada inválida da el mismo mensaje que una clave mala.
+  - Catálogos ([catalog-schemas.ts](lib/db/catalog-schemas.ts), con ayuda de [input.ts](lib/db/input.ts)):
+    - endpoint, id, parámetros de lista y cuerpo, con tipos y largos;
+    - las claves desconocidas se descartan;
+    - `null` vacía el campo (antes se habría guardado el texto `"null"`);
+    - los errores llegan como detalles en español (`name: máximo 255 caracteres`).
+- **`/api/exchange-rates`** ([route.ts](app/api/exchange-rates/route.ts)): responde 401 solo sin sesión. Si la base no responde, responde 503 y deja el detalle en el log; antes daba un falso 401.
+- **Incluye el commit `25871a7` (28 oct)**, que salió sin entrada:
+  - Errores genéricos hacia el navegador: `PublicError` en [action-result.ts](lib/db/action-result.ts). El detalle de Prisma o `pg` queda en el log del servidor, y `P2037`/`53300` dan "La base de datos está ocupada…".
+  - Pool que cierra las conexiones inactivas a los 5 s, con `attachDatabasePool` de `@vercel/functions` 3.10.4 ([client.ts](lib/db/client.ts), [connection.ts](lib/db/connection.ts)).
+- **Verificación**: `npm test` 110/110 y `tsc` con los mismos 38 errores previos, ninguno en archivos nuevos.
+
 ## Actualización de seguridad: Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1)
 
 _2026-10-27_

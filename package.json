@@ -1,6 +1,6 @@
 {
   "name": "market-scan-back-office",
-  "version": "1.30.1",
+  "version": "1.31.0",
   "private": true,
   "description": "Prime IQ web back office for real-estate market scan: projects, blocks, units datasheet, exchange rates, and Strapi-backed catalogs (Next.js, ES/EN).",
   "keywords": [

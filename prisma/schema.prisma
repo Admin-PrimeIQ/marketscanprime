@@ -789,6 +789,19 @@ model Verification {
   @@map("verification")
 }
 
+/// Intentos de login por cuenta (`acct:<identificador>`) o por IP (`ip:<dirección>`), en una ventana
+/// fija. Lo escribe `loginAction` (`lib/db/login-throttle.ts`); el ETL no la carga ni la borra.
+model LoginAttempt {
+  key         String    @id
+  failCount   Int       @default(0) @map("fail_count")
+  windowStart DateTime  @map("window_start") @db.Timestamptz(6)
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedAt])
+  @@map("login_attempt")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Operación: sincronización con el warehouse, tipo de cambio, auditoría
 // ─────────────────────────────────────────────────────────────────────────────
