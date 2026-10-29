@@ -2,10 +2,11 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { parseArgs } from "node:util"
 import pg from "pg"
-import { daysInRange, parseDmy, todayInGuatemala } from "../../../lib/domain/exchange-rates/dates.ts"
+import { fetchTipoCambioRango } from "../../../lib/domain/exchange-rates/banguat-client.ts"
+import { daysInRange, parseDmy, rangeCoverage, todayInGuatemala } from "../../../lib/domain/exchange-rates/dates.ts"
+import { EXCHANGE_RATES_LOCK_KEY } from "../../../lib/domain/exchange-rates/upsert-sql.ts"
 import { APP_SCHEMA, appPoolConfig } from "../app/connection"
 import { ETL_ROOT } from "../db/env"
-import { fetchTipoCambioRango } from "./banguat-client"
 import { fetchN8nHistory } from "./n8n-get"
 import { compareParity, numericOrNull, type ParityRate } from "./parity"
 import { upsertExchangeRates } from "./upsert"
@@ -29,7 +30,6 @@ import { upsertExchangeRates } from "./upsert"
 
 const USAGE = "Uso: tsx src/exchange-rates/index.ts <load|parity> [--from DD/MM/AAAA] [--to DD/MM/AAAA] [--dry-run] [--size N]"
 const HISTORY_START = "2006-11-30"
-const LOCK_KEY = "msp_app_exchange_rates"
 const REPORTS_DIR = resolve(ETL_ROOT, "reports")
 
 function writeReport(command: string, report: unknown): string {
@@ -48,13 +48,13 @@ async function load(fromArg: string | undefined, toArg: string | undefined, dryR
   const startedAt = new Date().toISOString()
 
   console.log(`Banguat TipoCambioRango ${from} → ${to} (${n(expected.length)} días)…`)
-  const { rows, totalItems, ms } = await fetchTipoCambioRango(from, to)
+  const { rows, totalItems, ms } = await fetchTipoCambioRango(from, to, {
+    onRetry: (attempt, attempts, error) => console.warn(`Banguat: intento ${attempt}/${attempts} falló: ${error.message}`),
+  })
   console.log(`  ${n(rows.length)} filas (TotalItems ${n(totalItems)}) en ${n(ms)} ms`)
 
-  const outside = rows.filter((r) => r.date < from || r.date > to).map((r) => r.date)
+  const { missing, outside } = rangeCoverage(rows.map((r) => r.date), from, to)
   if (outside.length > 0) throw new Error(`Banguat devolvió ${outside.length} días fuera del rango pedido: ${outside.slice(0, 5).join(", ")}…`)
-  const got = new Set(rows.map((r) => r.date))
-  const missing = expected.filter((d) => !got.has(d))
   const withBuySell = rows.filter((r) => r.referenceRate == null).map((r) => r.date)
   if (missing.length > 0) console.warn(`  AVISO: Banguat no trae ${missing.length} días del rango: ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? "…" : ""}`)
   if (withBuySell.length > 0) console.log(`  Días con compra ≠ venta (se guardan compra y venta, sin referencia): ${withBuySell.join(", ")}`)
@@ -67,7 +67,7 @@ async function load(fromArg: string | undefined, toArg: string | undefined, dryR
   let error: string | null = null
   try {
     await client.query("BEGIN")
-    const { rows: lock } = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_xact_lock(hashtext($1)) AS locked", [LOCK_KEY])
+    const { rows: lock } = await client.query<{ locked: boolean }>("SELECT pg_try_advisory_xact_lock(hashtext($1)) AS locked", [EXCHANGE_RATES_LOCK_KEY])
     if (!lock[0].locked) throw new Error("Otra carga del tipo de cambio está en curso sobre msp_app")
     await client.query("SET LOCAL statement_timeout = '2min'")
     await client.query("SET LOCAL lock_timeout = '30s'")

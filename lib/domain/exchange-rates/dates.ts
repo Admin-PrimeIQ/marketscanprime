@@ -60,3 +60,19 @@ export function daysInRange(from: string, to: string): string[] {
 export function todayInGuatemala(now: Date = new Date()): string {
   return isoFromMs(now.getTime() - 6 * 3_600_000)
 }
+
+/** Qué días del rango faltan en `dates` y cuáles de `dates` caen fuera del rango. */
+export function rangeCoverage(dates: string[], from: string, to: string): { missing: string[]; outside: string[] } {
+  const got = new Set(dates)
+  return {
+    missing: daysInRange(from, to).filter((d) => !got.has(d)),
+    outside: dates.filter((d) => d < from || d > to),
+  }
+}
+
+/** Los últimos `days` días hasta hoy en Guatemala, hoy incluido. */
+export function recentRange(days: number, now: Date = new Date()): { from: string; to: string } {
+  if (!Number.isInteger(days) || days < 1) throw new Error(`Cantidad de días inválida: ${days}`)
+  const to = todayInGuatemala(now)
+  return { from: isoFromMs(isoToUtcMs(to) - (days - 1) * DAY_MS), to }
+}

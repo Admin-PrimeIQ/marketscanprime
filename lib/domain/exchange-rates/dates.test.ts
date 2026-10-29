@@ -7,7 +7,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { daysInRange, formatDmy, parseDmy, todayInGuatemala } from "./dates.ts"
+import { daysInRange, formatDmy, parseDmy, rangeCoverage, recentRange, todayInGuatemala } from "./dates.ts"
 
 test("DD/MM/AAAA: el día va primero, también cuando el mes podría ser día", () => {
   assert.equal(parseDmy("09/10/2026"), "2026-10-09")
@@ -40,4 +40,21 @@ test("daysInRange incluye ambos extremos y cruza fin de mes y año bisiesto", ()
 test("hoy en Guatemala es UTC-6", () => {
   assert.equal(todayInGuatemala(new Date("2026-10-30T05:59:59Z")), "2026-10-29")
   assert.equal(todayInGuatemala(new Date("2026-10-30T06:00:00Z")), "2026-10-30")
+})
+
+test("rangeCoverage: días faltantes y días fuera del rango", () => {
+  assert.deepEqual(rangeCoverage(["2026-10-27", "2026-10-28"], "2026-10-27", "2026-10-29"), { missing: ["2026-10-29"], outside: [] })
+  assert.deepEqual(rangeCoverage(["2026-10-26", "2026-10-27"], "2026-10-27", "2026-10-27"), { missing: [], outside: ["2026-10-26"] })
+  assert.deepEqual(rangeCoverage([], "2026-10-28", "2026-10-29"), { missing: ["2026-10-28", "2026-10-29"], outside: [] })
+})
+
+test("recentRange: los últimos N días hasta hoy en Guatemala, hoy incluido", () => {
+  const now = new Date("2026-10-29T13:00:00Z")
+  const { from, to } = recentRange(15, now)
+  assert.equal(to, "2026-10-29")
+  assert.equal(from, "2026-10-15")
+  assert.equal(daysInRange(from, to).length, 15)
+  assert.deepEqual(recentRange(1, now), { from: "2026-10-29", to: "2026-10-29" })
+  assert.deepEqual(recentRange(3, new Date("2026-03-01T12:00:00Z")), { from: "2026-02-27", to: "2026-03-01" })
+  for (const bad of [0, -1, 1.5]) assert.throws(() => recentRange(bad, now), /inválida/)
 })

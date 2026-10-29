@@ -6,6 +6,18 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Ruta del cron del tipo de cambio para Vercel de staging (v1.35.0)
+
+_2026-10-29_
+
+Sigue el paso 1 de la §7 de [`docs/migration/N8N_WORKFLOWS.md`](docs/migration/N8N_WORKFLOWS.md): la tabla `exchange_rate` se actualiza sola desde Banguat. **Producción no cambia**: con el backend `strapi`, fuera de un despliegue con `MSP_STAGING_DEPLOY=true` o sin `CRON_SECRET`, la ruta responde 404. El cron de GitHub que la dispara queda para después: su archivo tiene que estar en `main`, que despliega producción.
+
+- **Ruta** [app/api/cron/exchange-rates/route.ts](app/api/cron/exchange-rates/route.ts), solo `POST` con `Authorization: Bearer <CRON_SECRET>`, `maxDuration` 60 s. Trae los últimos 15 días de Banguat (si una corrida falla, la siguiente rellena el hueco) y responde los conteos y los días que Banguat todavía no publicó. Códigos: 401 secreto inválido, 409 otra carga en curso, 502 Banguat caído o con datos inválidos, 503 base.
+- **Servicio** [lib/db/exchange-rate-sync.ts](lib/db/exchange-rate-sync.ts): consulta Banguat fuera de la transacción (20 s, 2 intentos) y hace el upsert con Prisma, con el mismo candado (`pg_try_advisory_xact_lock`) que la carga de `etl/`.
+- **Una sola copia** en [lib/domain/exchange-rates/](lib/domain/exchange-rates/): el cliente SOAP ([banguat-client.ts](lib/domain/exchange-rates/banguat-client.ts), antes en `etl/src/exchange-rates/`) y el SQL del upsert ([upsert-sql.ts](lib/domain/exchange-rates/upsert-sql.ts)), que usan `etl/` y la ruta. En [dates.ts](lib/domain/exchange-rates/dates.ts), `recentRange` y `rangeCoverage`. Secreto comparado en tiempo constante en [lib/cron-secret.ts](lib/cron-secret.ts).
+- **Variable nueva** `CRON_SECRET` (al menos 32 caracteres), documentada en [.env.staging.example](.env.staging.example). Va en el `.env` local y en el proyecto de Vercel de staging, nunca en producción.
+- **Verificación**: `npm test` 169/169 (antes 162), `etl` 57/57, `tsc` sin errores en archivos tocados. `rates:load --dry-run` de 15 días: 0 cambios. Ruta local: 404 sin `CRON_SECRET` configurado; con él, 401 sin secreto o con uno incorrecto, y 200 con el correcto (15 días recibidos, 0 insertados, 0 cambiados, 15 iguales, Banguat en 327 ms).
+
 ## Tipo de cambio desde Banguat en la base nueva (v1.34.0)
 
 _2026-10-29_
