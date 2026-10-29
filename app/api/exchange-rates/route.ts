@@ -61,6 +61,25 @@ export async function GET(request: NextRequest) {
   if (rejected) return rejected
   const { user } = who
 
+  // Backend `prisma`: la tabla `exchange_rate` (la llena etl/src/exchange-rates desde Banguat). Sin
+  // caché en memoria: la tabla ya guarda el último dato conocido aunque Banguat no responda.
+  if (resolveDataBackend() === "prisma") {
+    try {
+      const { getLatestExchangeRateComparison } = await import("@/lib/db/exchange-rates")
+      const data = await getLatestExchangeRateComparison()
+      if (!data) {
+        logApi({ tag: "route:GET", path, user, status: 503, durationMs: Date.now() - t0, error: "exchange_rate vacía" })
+        return Response.json({ error: "exchange rates: empty table" }, { status: 503, headers: { "cache-control": "no-store" } })
+      }
+      logApi({ tag: "route:GET", path, user, status: 200, durationMs: Date.now() - t0, detail: "db" })
+      return Response.json(data, { headers: { "cache-control": "no-store", "x-exchange-rates-source": "db" } })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "exchange rates error"
+      logApi({ tag: "route:GET", path, user, status: 503, durationMs: Date.now() - t0, error: message })
+      return Response.json({ error: "Service unavailable" }, { status: 503, headers: { "cache-control": "no-store" } })
+    }
+  }
+
   const fresh = getFreshExchangeRatesFromCache()
   if (fresh) {
     logApi({ tag: "route:GET", path, user, status: 200, durationMs: Date.now() - t0, detail: "cache:hit" })

@@ -6,6 +6,23 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Tipo de cambio desde Banguat en la base nueva (v1.34.0)
+
+_2026-10-29_
+
+Paso 1 de la §7 de [`docs/migration/N8N_WORKFLOWS.md`](docs/migration/N8N_WORKFLOWS.md) (workflow 7, Banguat Exchange Rate). **Producción no cambia**: la ruta solo lee la tabla con `NEXT_PUBLIC_DATA_BACKEND=prisma`; con `strapi` sigue leyendo el webhook de n8n. Sin migraciones: `exchange_rate` ya existía en `msp_app`. La tarea periódica (cada 6 h) queda para después.
+
+- **Fuente: el servicio SOAP oficial de Banguat** (`TipoCambio.asmx`, operación `TipoCambioRango`), no la página HTML que lee n8n. Todo el histórico (7,274 días desde el 30/11/2006) llega en una sola respuesta.
+- **Reglas puras** en [lib/domain/exchange-rates/](lib/domain/exchange-rates/), con pruebas sobre respuestas reales de Banguat guardadas en `fixtures/`:
+  - [dates.ts](lib/domain/exchange-rates/dates.ts): `DD/MM/AAAA` ↔ `AAAA-MM-DD` sin pasar por `new Date(texto)`, que lee `09/10` como 10 de septiembre;
+  - [banguat.ts](lib/domain/exchange-rates/banguat.ts): el sobre SOAP y la traducción a filas. Misma regla que n8n: si compra = venta se guarda solo la referencia; si difieren (solo el 30/11/2006 y el 01/12/2006) se guardan compra y venta, sin referencia. Lanza ante un `TotalItems` que no cuadra, fechas repetidas, otra moneda o números inválidos;
+  - [compare.ts](lib/domain/exchange-rates/compare.ts): la tendencia de la barra (`comparableRate`, `compareDirection`, `compareSnapshots`), movida desde [lib/exchange-rates.ts](lib/exchange-rates.ts), que la reexporta.
+- **Carga y paridad** en [etl/src/exchange-rates/](etl/src/exchange-rates/):
+  - `npm run rates:load [-- --from DD/MM/AAAA --to DD/MM/AAAA --dry-run]`: upsert idempotente por `(date, currency)` en una transacción con candado; un día igual no se toca, uno distinto se sobrescribe;
+  - `npm run rates:parity`: compara la tabla día por día con el GET público de n8n (la única llamada a n8n permitida), en una transacción de solo lectura. Ese GET pagina con `page`/`size`; los `page[number]`/`page[size]` del manual y de sus propios `links` se ignoran.
+- **Ruta** [app/api/exchange-rates/route.ts](app/api/exchange-rates/route.ts): con el backend `prisma` lee los dos días más recientes de la tabla ([lib/db/exchange-rates.ts](lib/db/exchange-rates.ts), forma en [exchange-rate-mapping.ts](lib/db/exchange-rate-mapping.ts)) y entrega el mismo objeto que daba n8n, sin caché en memoria; tabla vacía es 503. La barra lateral no cambia.
+- **Verificación**: `npm test` 162/162 (antes 143) y `etl` 4/4 nuevas; `tsc` sin errores en archivos tocados. Carga real autorizada en `msp_app`: 7,274 filas; repetida, 0 cambios. **Paridad contra n8n: 7,274 de 7,274 días iguales.** Ruta probada en `dev:staging`: 200 desde la tabla con sesión, 401 sin ella, y la barra lateral muestra el tipo de cambio.
+
 ## Perfiles de tipo de cambio y listado de proyectos en la base nueva (v1.33.0)
 
 _2026-10-28_

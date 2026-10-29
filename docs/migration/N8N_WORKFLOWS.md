@@ -158,8 +158,9 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 
 - **Hoy:** cron cada 6 h. Baja el histórico de S3 (`exchange-rate.json`), consulta el formulario `HistoricoRango` de banguat.gob.gt, lee la tabla (fecha, compra, venta, TCR), une, quita duplicados y guarda en S3. Sus `GET` públicos sirven el histórico paginado en formato JSON:API y un día por fecha `DD-MM-AAAA`.
 - **Lo llaman:** `app/api/exchange-rates/route.ts` (con caché en memoria que sirve el dato viejo si n8n falla; `DELETE` la vacía al cerrar sesión) y el Copilot.
-- **Contrato:** manual, líneas 7079–7198.
-- **Reemplazo:** worker programado cada 6 h que guarda en `msp_app.exchange_rate` (ya existe, único por `(date, currency)`); la ruta lee la tabla y mantiene la forma de respuesta. Carga inicial del histórico: desde el `GET` público de n8n (lectura permitida), no desde S3.
+- **Contrato:** manual, líneas 7079–7198. Dos correcciones verificadas el 29 oct: el `GET` pagina con `page` y `size` (o `pageNumber`/`pageSize`); los `page[number]`/`page[size]` del manual y de sus propios `links` se ignoran y siempre devuelven la página 1 con 10 filas. El histórico tiene 7,274 días (30/11/2006 → hoy), no 2,475.
+- **Fuente nueva:** el servicio SOAP oficial de Banguat (`https://www.banguat.gob.gt/variables/ws/TipoCambio.asmx`, operación `TipoCambioRango`), sin credenciales. Da los 7,274 días en una sola respuesta. Para el dólar devuelve compra = venta = la referencia de n8n, salvo el 30/11/2006 y el 01/12/2006, donde difieren: ahí n8n guarda `buy`/`sell` con `referenceRate` en null, y el reemplazo hace lo mismo.
+- **Reemplazo:** reglas puras en `lib/domain/exchange-rates/`, carga y paridad en `etl/src/exchange-rates/` (`npm run rates:load`, `npm run rates:parity`), y la ruta lee `msp_app.exchange_rate` con el backend `prisma` manteniendo la forma de respuesta. Falta la tarea periódica cada 6 h (Vercel Cron en staging, cron en Railway o el servicio de workers: sin decidir).
 - **Hecho cuando:** una semana en sombra con los mismos valores que el `GET` de n8n, y la lista de `ROADMAP.md` §4.10 pasa (incluido «si Banguat no responde, se muestra el último dato»).
 - **Es el mejor primer paso:** no depende de decisiones de negocio ni del warehouse, y sirve para montar el servicio de workers.
 
@@ -224,7 +225,7 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 
 Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha en la §8.
 
-1. [ ] **Tipo de cambio** (workflow 7): worker Banguat → `exchange_rate`, carga del histórico desde el `GET` público de n8n, ruta `/api/exchange-rates` leyendo la tabla en modo `prisma`, una semana en sombra. Monta la base del servicio de workers.
+1. [ ] **Tipo de cambio** (workflow 7), sin workers. Hecho el 29 oct (v1.34.0): reglas puras, carga del histórico desde el SOAP de Banguat (7,274 días en `msp_app.exchange_rate`), paridad 7,274 de 7,274 contra el `GET` de n8n y ruta `/api/exchange-rates` leyendo la tabla en modo `prisma`. La ruta se probó con sesión en `pnpm dev:staging`: 200 desde la tabla y barra lateral correcta. Falta: decidir dónde corre la tarea cada 6 h y la semana en sombra.
 2. [ ] **Contadores de bloque** (workflow 6): conseguir el JSON del workflow, `computeBlockCounters` en `lib/domain/` con pruebas, paridad contra los bloques de `msp_app` en solo lectura, y entregar la función al agente de módulos.
 3. [ ] **Acceso al warehouse:** `npm run warehouse:ping` en verde (README §13.3) y respuesta a la identidad de filas (§6).
 4. [ ] **Mapeador del push** (workflow 4): `lib/domain/warehouse/`, puro, con prueba de paridad celda por celda contra el `dbo_stage` de MySQL.
@@ -241,6 +242,23 @@ Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 ## 8. Bitácora
 
 Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6), qué se hizo, qué se verificó, migraciones aplicadas en `msp_app`, commits del usuario y qué quedó pendiente o por preguntar.
+
+### 29 oct 2026, 9:15–9:40
+
+- Ruta probada en `pnpm dev:staging` con sesión: `/api/exchange-rates` responde 200 desde la tabla (`| db` en el log) y la barra lateral muestra el tipo de cambio; sin sesión, 401.
+- Por qué daba 503: en el `.env`, `DEV_LOGIN_PASSWORD=` seguida de espacios hace que `util.parseEnv` de Node (el lector de `dev:staging`) tome la línea siguiente (`BETTER_AUTH_SECRET=…`) como su valor. Un valor vacío no debe terminar en espacios.
+- A pedido del usuario, clave nueva para `app-engteam`: hash bcrypt nuevo en `DEV_LOGIN_PASSWORD_HASH` y `npm run app:local-user -- --apply` (escribe solo esa cuenta en `msp_app`).
+- Pendiente: dónde corre la tarea cada 6 h, la semana en sombra, el commit y borrar `DEV_LOGIN_PASSWORD` (clave en texto plano) del `.env`.
+
+### 29 oct 2026, 7:00–9:30
+
+- Paso 1 de la §7 (tipo de cambio), v1.34.0, sin commit. Decisiones del usuario: guardar como n8n (solo referencia si compra = venta; compra y venta si difieren), scripts en `etl/`, histórico desde el 30/11/2006, el histórico paginado queda para el paso 8.
+- Verificado con lecturas: el SOAP de Banguat da los mismos valores que n8n y acepta todo el histórico en una consulta; el `GET` de n8n pagina con `page`/`size` (ver ficha del workflow 7).
+- Escrito en `msp_app` con autorización del usuario: `npm run rates:load` insertó 7,274 filas en `exchange_rate`; repetido, 0 cambios. Sin migraciones.
+- `npm run rates:parity`: 7,274 de 7,274 días iguales a n8n. `npm test` 162/162, pruebas de `etl` 4/4, `tsc` sin errores en archivos tocados.
+- Ruta en `pnpm dev:staging`: responde 503 sin llegar a la tabla porque falta `BETTER_AUTH_SECRET` en el `.env`. El objeto que arma con la tabla se verificó con una lectura directa: igual al de n8n (29/10/2026, 7.64382, tendencia a la baja).
+- `next dev` crea `AGENTS.md` en la raíz al arrancar; se borró.
+- Pendiente: `BETTER_AUTH_SECRET` en el `.env` (lo agrega el usuario), dónde corre la tarea cada 6 h, la semana en sombra y el commit.
 
 ### 28 oct 2026
 

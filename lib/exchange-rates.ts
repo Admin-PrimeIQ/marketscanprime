@@ -1,28 +1,20 @@
+import {
+  compareSnapshots,
+  type ExchangeRateComparison,
+  type ExchangeRateSnapshot,
+} from "./domain/exchange-rates/compare.ts"
+
+// La tendencia vive en lib/domain/exchange-rates/compare.ts (pura); se reexporta para que la
+// barra lateral y la ruta sigan importando de acá.
+export { comparableRate, compareDirection, compareSnapshots } from "./domain/exchange-rates/compare.ts"
+export type {
+  ExchangeRateComparison,
+  ExchangeRateDirection,
+  ExchangeRateSnapshot,
+} from "./domain/exchange-rates/compare.ts"
+
 const DEFAULT_EXCHANGE_RATES_URL =
   "https://n8n.primeiqlatam.com/webhook/primeiq/exchange-rates"
-
-export type ExchangeRateSnapshot = {
-  date: string
-  currency: string
-  unit: string
-  buy: number | null
-  sell: number | null
-  referenceRate: number | null
-  source?: string
-  lastUpdatedUtc?: string
-}
-
-/** Tendencia respecto a `data[1]` (posición 1 del arreglo). */
-export type ExchangeRateDirection = "up" | "down" | "flat" | "unknown"
-
-export type ExchangeRateComparison = {
-  current: ExchangeRateSnapshot
-  /** Registro en `data[1]` para comparar con `data[0]`. */
-  previous: ExchangeRateSnapshot | null
-  direction: ExchangeRateDirection
-  /** Valor comparable actual − anterior (misma lógica que `comparableRate`). */
-  delta: number | null
-}
 
 type JsonApiResource = {
   type?: string
@@ -61,33 +53,6 @@ function snapshotFromResource(
     source: meta?.source,
     lastUpdatedUtc: meta?.lastUpdatedUtc,
   }
-}
-
-/**
- * Valor único para comparar días: referencia si existe; si no, promedio compra/venta; si no, compra o venta.
- */
-export function comparableRate(s: ExchangeRateSnapshot): number | null {
-  if (s.referenceRate != null && !Number.isNaN(s.referenceRate)) {
-    return s.referenceRate
-  }
-  if (s.buy != null && s.sell != null) {
-    return (s.buy + s.sell) / 2
-  }
-  const one = s.buy ?? s.sell
-  return one != null && !Number.isNaN(one) ? one : null
-}
-
-const DELTA_EPS = 1e-5
-
-function compareDirection(
-  current: number,
-  previous: number
-): { direction: ExchangeRateDirection; delta: number } {
-  const delta = current - previous
-  if (Math.abs(delta) < DELTA_EPS) {
-    return { direction: "flat", delta: 0 }
-  }
-  return { direction: delta > 0 ? "up" : "down", delta }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -137,26 +102,7 @@ export async function loadExchangeRatesFromWebhook(): Promise<ExchangeRateCompar
       const row1 = body.data?.[1]
       const previous = row1 ? snapshotFromResource(row1, body.meta) : null
 
-      const c = comparableRate(current)
-      const p = previous ? comparableRate(previous) : null
-
-      if (c == null || p == null) {
-        return {
-          current,
-          previous,
-          direction: "unknown",
-          delta: null,
-        }
-      }
-
-      const { direction, delta } = compareDirection(c, p)
-
-      return {
-        current,
-        previous,
-        direction,
-        delta,
-      }
+      return compareSnapshots(current, previous)
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
       if (attempt < maxAttempts - 1) {
