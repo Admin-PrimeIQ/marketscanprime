@@ -9,11 +9,21 @@ import {
   listCatalogAction,
   updateCatalogItemAction,
 } from "@/lib/db/catalog-actions"
+import {
+  createExchangeRateProfileAction,
+  deleteExchangeRateProfileAction,
+  getExchangeRateProfileAction,
+  listExchangeRateProfilesAction,
+  updateExchangeRateProfileAction,
+} from "@/lib/db/exchange-rate-profile-actions"
+import { listProjectsAction } from "@/lib/db/project-actions"
 
 /**
  * Implementación `prisma` de `dataClient` (`NEXT_PUBLIC_DATA_BACKEND=prisma`).
  *
- * - Catálogos: reales, contra `msp_app` vía Server Actions, con permiso por rol.
+ * - Catálogos y perfiles de tipo de cambio: reales, contra `msp_app` vía Server Actions, con permiso por rol.
+ * - Proyectos: solo el listado (`getProjects`) con búsqueda, orden y filtros rápidos; los filtros
+ *   avanzados y el de fase responden con un error claro.
  * - Sesión: Better Auth (`lib/auth/server.ts`) con cookie httpOnly; nunca llama a Strapi. El
  *   navegador no ve la cookie: `getMe` la valida en el servidor.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
@@ -66,8 +76,8 @@ export const prismaDataClient: DataClient = {
     notMigrated("changePassword")
   },
 
-  async getProjects() {
-    notMigrated("getProjects")
+  async getProjects(params) {
+    return unwrap(await listProjectsAction(params))
   },
   async getProjectById() {
     notMigrated("getProjectById")
@@ -108,20 +118,20 @@ export const prismaDataClient: DataClient = {
     notMigrated("createUnit")
   },
 
-  async getExchangeRateProfiles() {
-    notMigrated("getExchangeRateProfiles")
+  async getExchangeRateProfiles(params) {
+    return unwrap(await listExchangeRateProfilesAction(params))
   },
-  async getExchangeRateProfileById() {
-    notMigrated("getExchangeRateProfileById")
+  async getExchangeRateProfileById(id) {
+    return unwrap(await getExchangeRateProfileAction(id))
   },
-  async createExchangeRateProfile() {
-    notMigrated("createExchangeRateProfile")
+  async createExchangeRateProfile(data) {
+    return unwrap(await createExchangeRateProfileAction(data))
   },
-  async updateExchangeRateProfile() {
-    notMigrated("updateExchangeRateProfile")
+  async updateExchangeRateProfile(id, data) {
+    return unwrap(await updateExchangeRateProfileAction(id, data))
   },
-  async deleteExchangeRateProfile() {
-    notMigrated("deleteExchangeRateProfile")
+  async deleteExchangeRateProfile(id) {
+    unwrap(await deleteExchangeRateProfileAction(id))
   },
 
   async getCatalogList(endpoint, params) {

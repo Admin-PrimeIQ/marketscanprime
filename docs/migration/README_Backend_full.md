@@ -56,10 +56,10 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 ## 8. Después del pulido: módulos sin migrar
 
-En `lib/api/prisma-client.ts`, 22 métodos fallan con "todavía no está migrado". Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
+En `lib/api/prisma-client.ts`, 16 métodos fallan con "todavía no está migrado" (eran 22 hasta la v1.33.0). Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
 
 - [ ] Cuenta (4): `forgotPassword`, `resetPassword`, `updateMe`, `changePassword`.
-- [ ] Perfiles de tipo de cambio (5): `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile`.
-- [ ] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`.
+- [x] Perfiles de tipo de cambio (5): `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile` (28 oct, v1.33.0, sin commit; prueba de punta a punta 8/8; falta el navegador). Ver `README.md` §14.16.
+- [ ] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`. *`getProjects` hecho el 28 oct (v1.33.0) con búsqueda, orden, paginación y filtros rápidos; los filtros avanzados y el de fase responden con un error claro.*
 - [ ] Bloques (5): `getBlocks`, `getBlocksLite`, `getBlockById`, `createBlock`, `updateBlock`.
 - [ ] Unidades (4): `getUnitsAllPages`, `updateUnit`, `updateUnitBatch`, `createUnit`.

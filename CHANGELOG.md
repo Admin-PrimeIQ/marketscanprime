@@ -6,6 +6,25 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Perfiles de tipo de cambio y listado de proyectos en la base nueva (v1.33.0)
+
+_2026-10-28_
+
+Primer módulo después del pulido (§14.16 de `docs/migration/README.md`). **Producción no cambia**: solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`. Sin migraciones: las tablas ya existían en `msp_app`.
+
+- **Perfiles de tipo de cambio** (los 5 métodos de `dataClient`), en [exchange-rate-profiles.ts](lib/db/exchange-rate-profiles.ts) y [exchange-rate-profile-actions.ts](lib/db/exchange-rate-profile-actions.ts):
+  - la forma de Strapi se arma en [exchange-rate-profile-mapping.ts](lib/db/exchange-rate-profile-mapping.ts): las monedas (una fila por moneda en `exchange_rate_profile_currency`) vuelven como el objeto `currencies`, y los proyectos vinculados como `projects`;
+  - crear y editar reemplazan las monedas y vinculan o desvinculan proyectos, en una sola transacción. `currencies: null` las borra todas. `projects` acepta un arreglo (reemplaza la lista) o `{ connect, disconnect }`;
+  - vincular un proyecto que tenía otro perfil lo pasa a este; un proyecto que no existe da error y no se guarda nada;
+  - **borrar un perfil con proyectos se impide** ("No se puede eliminar: el perfil está en uso."). Strapi lo dejaba borrar y los proyectos quedaban sin perfil;
+  - auditoría: una fila del perfil (con monedas y proyectos) y **una fila `update` de `project` por cada proyecto vinculado o desvinculado**, con `writeAuditMany` nuevo en [audit.ts](lib/db/audit.ts);
+  - validación con Zod en [exchange-rate-profile-schemas.ts](lib/db/exchange-rate-profile-schemas.ts): solo las 7 monedas, tasas positivas de hasta 10 dígitos enteros y hasta 5,000 proyectos por escritura.
+- **Listado de proyectos** (`getProjects`), que piden el formulario de perfiles y el de bloques, en [projects.ts](lib/db/projects.ts), [project-actions.ts](lib/db/project-actions.ts) y [project-list-mapping.ts](lib/db/project-list-mapping.ts):
+  - paginación, orden, búsqueda (nombre, código y desarrolladora) y los filtros rápidos de dominio, región GAM/Interior y país, con las mismas relaciones que poblaba Strapi;
+  - los filtros avanzados responden "todavía no están migrados", y el de fase "no está disponible en la base nueva" (los proyectos no tienen ese campo; la UI hoy no lo manda).
+- **Orden compartido** en [list-query.ts](lib/db/list-query.ts): los vacíos de `code` y `department` quedan donde los ponía el MySQL de Strapi (primeros en ascendente, últimos en descendente).
+- **Verificación**: `npm test` 143/143 (antes 116) y `tsc` con los mismos 38 errores previos, ninguno en archivos tocados. Lectura de humo en sesión de solo lectura contra `msp_app` (2 perfiles, 1,137 proyectos, filtros y orden) y prueba de punta a punta autorizada con 8 casos, sin datos de prueba al final.
+
 ## Auditoría de las escrituras en la base nueva (v1.32.0)
 
 _2026-10-28_
