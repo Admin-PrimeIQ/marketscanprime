@@ -1,0 +1,86 @@
+# Tipo de cambio de Banguat → msp_app.exchange_rate, a través de la ruta del cron del Vercel de
+# STAGING (nunca el de producción: ahí la ruta responde 404). Reemplaza el workflow 7 de n8n.
+# Detalle en docs/migration/README_TIPO_DE_CAMBIO.md.
+#
+# Secretos del repo (Settings → Secrets and variables → Actions):
+#   MSP_STAGING_URL    dominio estable de staging (con o sin https://), no la URL de un despliegue
+#   MSP_CRON_SECRET    el mismo CRON_SECRET del proyecto de staging en Vercel (≥ 32 caracteres)
+#   MSP_VERCEL_BYPASS  token de "Protection Bypass for Automation" del proyecto de staging
+name: Tipo de cambio (Banguat)
+
+on:
+  schedule:
+    # 7:17 de Guatemala (UTC-6, sin horario de verano). GitHub puede retrasar las corridas
+    # programadas; la ruta pide los últimos 15 días, así que un retraso o un fallo se recupera solo.
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: exchange-rates
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'Admin-PrimeIQ/marketscanprime'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: POST a /api/cron/exchange-rates en staging
+        env:
+          STAGING_URL: ${{ secrets.MSP_STAGING_URL }}
+          CRON_SECRET: ${{ secrets.MSP_CRON_SECRET }}
+          BYPASS: ${{ secrets.MSP_VERCEL_BYPASS }}
+        run: |
+          set -euo pipefail
+
+          for name in STAGING_URL CRON_SECRET BYPASS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta el secreto de $name (ver la cabecera del workflow)."
+              exit 1
+            fi
+          done
+
+          url="${STAGING_URL%/}"
+          case "$url" in
+            http://*|https://*) ;;
+            *) url="https://$url" ;;
+          esac
+
+          # Solo se reintenta lo pasajero: 409 (otra carga en curso), 5xx y fallos de red (000).
+          # El upsert es idempotente, así que repetir el POST no duplica nada.
+          status=000
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o body.json -w '%{http_code}' --max-time 75 -X POST "$url/api/cron/exchange-rates" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H "x-vercel-protection-bypass: $BYPASS") || status=000
+            echo "Intento $attempt: HTTP $status"
+            head -c 1000 body.json 2>/dev/null || true
+            echo
+            case "$status" in
+              200) break ;;
+              409|500|502|503|504|000) if [ "$attempt" -lt 3 ]; then sleep 60; fi ;;
+              *) break ;;
+            esac
+          done
+
+          case "$status" in
+            200) ;;
+            401) echo "::error::401: MSP_CRON_SECRET no coincide con CRON_SECRET de staging."; exit 1 ;;
+            404) echo "::error::404: la ruta está apagada en ese despliegue (revisar NEXT_PUBLIC_DATA_BACKEND=prisma, MSP_STAGING_DEPLOY=true y CRON_SECRET en staging) o MSP_STAGING_URL no es el dominio de staging."; exit 1 ;;
+            301|302|303|307|308) echo "::error::HTTP $status: Vercel Authentication bloqueó la llamada; revisar MSP_VERCEL_BYPASS."; exit 1 ;;
+            *) echo "::error::La sincronización falló con HTTP $status."; exit 1 ;;
+          esac
+
+          # Banguat repite el último día hábil los fines de semana: no debería faltar ningún día.
+          # Se tolera uno (el de hoy, si a esta hora aún no está publicado).
+          missing=$(jq '.missingDays | length' body.json)
+          {
+            echo "### Tipo de cambio (Banguat)"
+            jq -r '"Rango \(.from) a \(.to): recibidos \(.received), insertados \(.inserted), cambiados \(.updated), iguales \(.unchanged), faltan \(.missingDays | length) (\(.missingDays | join(", "))). Banguat \(.banguatMs) ms, total \(.ms) ms."' body.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$missing" -gt 1 ]; then
+            echo "::error::Faltan $missing días en la respuesta de Banguat: $(jq -c '.missingDays' body.json)"
+            exit 1
+          fi
