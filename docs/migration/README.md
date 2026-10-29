@@ -22,11 +22,11 @@ Reglas que aplican siempre:
 
 Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer las conversaciones originales (15 al 22 oct y 27–28 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Foco actual (28 oct, tarde): primer módulo nuevo hecho en código: perfiles de tipo de cambio y un `getProjects` básico (v1.33.0, sin commit, §14.16).** El pulido del backend (pasos 1 a 4 de la **§14.8**) ya estaba terminado y la v1.32.0 tiene commit (`a78dbc2`). Falta que el usuario pruebe `/exchange-rate-profiles` en el navegador y haga el commit. Lo siguiente lógico es **proyectos** (vista, crear, editar y filtros avanzados). **Dónde quedó la conversación: §14.16** (y, antes, §14.15). Lista con casillas: [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15, 16 y 17 (§3).
+**Foco actual (29 oct, 14:00): el siguiente módulo a migrar es PROYECTOS (`getProjectById`, `createProject`, `updateProject` y los filtros avanzados de `getProjects`). Por dónde empezar, qué preguntar y qué no tocar: §14.17.** Todo lo anterior tiene commit y está fusionado a `main` (PR #9 y #10, 29 oct): perfiles de tipo de cambio y `getProjects` básico (v1.33.0, §14.16) y, del **otro agente** (el de workflows de n8n), el tipo de cambio de Banguat (v1.34.0 y v1.35.0, [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md)). Hay **dos agentes** trabajando en paralelo: este README (§14) es del agente de **módulos**; el de **workflows** escribe en `N8N_WORKFLOWS.md` (reparto en su §1 y reglas de coordinación en su §2). Lista con casillas: [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15, 16 y 17 (§3).
 
-**Lo más reciente (28 oct, tarde): §14.16** (perfiles de tipo de cambio y `getProjects` básico, v1.33.0, sin commit; prueba de punta a punta 8/8; falta el navegador). Antes, **§14.15** (traspaso de las 11:47) **y §14.14** (`audit_log` en las escrituras de catálogos, v1.32.0, sin commit; migración `audit_log_public_id` aplicada y prueba de punta a punta 15/15; falta el navegador). Antes, **§14.13** (límite de intentos de login y Zod, v1.31.0, commit `7bef959`; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
+**Lo más reciente (29 oct, 14:00): §14.17** (traspaso para el agente de módulos: estado tras la fusión a `main`, siguiente módulo y coordinación con el agente de workflows). Antes, **§14.16** (28 oct, perfiles de tipo de cambio y `getProjects` básico, v1.33.0, commit `16e15f5`; prueba de punta a punta 8/8; el navegador no está confirmado). Antes, **§14.15** (traspaso de las 11:47) **y §14.14** (`audit_log` en las escrituras de catálogos, v1.32.0, sin commit; migración `audit_log_public_id` aplicada y prueba de punta a punta 15/15; falta el navegador). Antes, **§14.13** (límite de intentos de login y Zod, v1.31.0, commit `7bef959`; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
 
-**Para retomar rápido:** lee la sección 0, luego la **§14.15** (28 oct, 11:47: dónde quedó la conversación, qué preguntar primero, cómo seguir y las trampas del entorno), la **§14.14** y la **§14.13** (lo hecho el 28 oct: `audit_log`, límite de intentos y Zod), la §14.8 (plan del pulido y su estado), la §14.5 (receta para migrar un módulo), la **§14.12** (28 oct, 9:10: el error de conexiones y lo que tiene que hacer una persona en Railway y Vercel), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Para retomar rápido:** lee la sección 0, luego la **§14.17** (29 oct, 14:00: dónde seguir migrando), la §1 y la §2 de [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md) (reparto y coordinación con el otro agente), la **§14.16** (cómo se hizo el último módulo, para copiar el patrón) y la **§14.15** (28 oct, 11:47: dónde quedó la conversación, qué preguntar primero, cómo seguir y las trampas del entorno), la **§14.14** y la **§14.13** (lo hecho el 28 oct: `audit_log`, límite de intentos y Zod), la §14.8 (plan del pulido y su estado), la §14.5 (receta para migrar un módulo), la **§14.12** (28 oct, 9:10: el error de conexiones y lo que tiene que hacer una persona en Railway y Vercel), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -179,6 +179,8 @@ Los factores de varas del warehouse (1.4342 / 1.1976) **difieren a propósito** 
 
 ## 6. Estado actual del trabajo
 
+**Al 29 oct 2026, 14:00 (UTC-6), comprobado con git:** rama `feat/data-facade` al día con `origin/feat/data-facade`, último commit `f6cdc03`. El usuario la **fusionó a `main`** con [PR #9](https://github.com/Admin-PrimeIQ/marketscanprime/pull/9) (`b5a9b65`) y [PR #10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10) (`27c614d`), así que `origin/main` contiene todo hasta la v1.35.0. **Un merge a `main` despliega `admin.primeiqlatam.com`**: el código de la migración tiene que seguir apagado ahí (backend `strapi` por defecto y la guarda de `lib/db/guard.ts`). Commits del 28–29 oct: `a78dbc2` (v1.32.0), `16e15f5` (v1.33.0, perfiles), `e08fcfb` (v1.34.0, tipo de cambio de Banguat), `3d02c40` (v1.35.0, ruta del cron), `ed0ec93`, `535ee5f` y `f6cdc03` (documentos y workflow de GitHub). Cambios locales sin commit a esa hora: `docs/migration/README_TIPO_DE_CAMBIO.md` **borrado por el usuario** a propósito (traspaso ya cerrado; sigue en git: `git show 27c614d:docs/migration/README_TIPO_DE_CAMBIO.md`), y `.github/workflows/exchange-rates.yml` y `N8N_WORKFLOWS.md`, que son del **agente de workflows** (no tocarlos), más este README. El texto que sigue es el historial de antes.
+
 Al 22 oct 2026, 12:10 (UTC-6), comprobado con git. `main` coincide con `origin/main` (último commit `fa54fe4`). Nada está fusionado a `main`. Hay dos ramas encadenadas:
 
 - **`feat/lib-domain`**: `87809d4` y `05b0cdb` (19 oct: `lib/domain/`, reporte y recálculo de fórmulas) y `f8c8ea6` (21 oct: copia tal cual de los campos de fórmula, `warehouse:ping`, `FORMULAS.md`, documentos corregidos). Subida a `origin`.
@@ -201,7 +203,8 @@ Al 22 oct 2026, 12:10 (UTC-6), comprobado con git. `main` coincide con `origin/m
 | **Fase 5: catálogos sobre Prisma** | 21–22 oct, misma rama, con commit desde el 22 oct (v1.29.0). Detalle para retomar en la §14. Las verificaciones de esta fila son del 21 oct; lo que cambió el 22 (staging en Vercel, `.env` único) está en la fila de arriba y ya está reflejado aquí. Prisma en la raíz (decisión 10): segundo generador `app` en `prisma/schema.prisma` → `lib/db/generated` (ignorado; lo crea `postinstall` o `pnpm db:generate`). `lib/db/`: conexión a `msp_app` solo con `DATABASE_URL_APP` (sin respaldo a `DATABASE_URL_DBO_STAGE`), repositorio genérico de los 12 catálogos y Server Actions. La implementación `prisma` de `dataClient` cubre los 5 métodos de catálogo; los demás fallan con un mensaje claro. Sin auth todavía: las Server Actions solo responden con `NEXT_PUBLIC_DATA_BACKEND=prisma` y, además, en `next dev` o en un despliegue con `MSP_STAGING_DEPLOY=true` (desde el 22 oct, §14.2.1), y el login valida contra `msp_app.user` con los hashes bcrypt (decisión 13), sin llamar a Strapi; la sesión queda en el navegador hasta Auth.js. Se corre con `pnpm dev:staging`, que lee solo el `.env` único de la raíz (decisión 15; el 21 oct usaba `.env.staging.local`, que ya no existe y no debe crearse). Verificado: lectura de los 12 catálogos contra `msp_app` en sesión de solo lectura (totales, `documentId` de 24 caracteres, ida y vuelta por id), `npm test` 89/89, `tsc` sin errores nuevos, `next build` aislado OK, servidor levantado y proxy de Strapi sin salida a producción. Falta recorrer la lista "debe seguir funcionando" de `ROADMAP.md` §4.4 en el navegador. *Desde el 22 oct, 14:06 (sin commit), hay sesión de servidor y permisos por rol: fila siguiente.* |
 | **Fase 5: sesión y autorización (Better Auth)** | 22 oct por la tarde, v1.30.0, commit `75541cb` (subido). Better Auth 1.7.12 en vez de Auth.js (decisión 12): sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`, `/sync` en 503 con el backend `prisma`. Migración `20261022183000_better_auth` aplicada en `msp_app`; el ETL carga `account`. Verificado: `npm test` 96/96, ETL 53/53, prueba de punta a punta 13/13 con usuarios temporales y `pnpm run build` del usuario con código 0. `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` ya están en el `.env` (comprobado por nombre). El usuario está haciendo pruebas de penetración; no se confirmó con él un recorrido completo en el navegador (§14.10). Detalle en la §14.9. |
 | **Fase 5: endurecer y auditar** | 28 oct: errores genéricos (`25871a7`), límite de intentos de login y Zod (v1.31.0, `7bef959`) y `audit_log` en las escrituras (v1.32.0, `a78dbc2`), con dos migraciones aplicadas. Detalle en §14.12 a §14.14. |
-| **Fase 5: perfiles de tipo de cambio y `getProjects` básico** | 28 oct por la tarde, v1.33.0, **sin commit**. Los 5 métodos de perfiles con monedas, vínculos de proyectos y auditoría por proyecto; `getProjects` con búsqueda, orden, paginación y filtros rápidos. Sin migraciones. Verificado: `npm test` 143/143, `tsc` sin errores nuevos, lectura de humo de solo lectura y prueba de punta a punta 8/8. Falta el navegador. Detalle en la §14.16. |
+| **Fase 5: perfiles de tipo de cambio y `getProjects` básico** | 28 oct por la tarde, v1.33.0, commit `16e15f5` (29 oct, 8:50), fusionado a `main`. Los 5 métodos de perfiles con monedas, vínculos de proyectos y auditoría por proyecto; `getProjects` con búsqueda, orden, paginación y filtros rápidos. Sin migraciones. Verificado: `npm test` 143/143, `tsc` sin errores nuevos, lectura de humo de solo lectura y prueba de punta a punta 8/8. No está confirmado que el usuario lo probara en el navegador. Detalle en la §14.16. |
+| **Workflows: tipo de cambio de Banguat** (otro agente) | 29 oct, v1.34.0 (`e08fcfb`) y v1.35.0 (`3d02c40`), fusionado a `main`. Tabla `msp_app.exchange_rate` con el histórico completo (7,274 días, paridad 7,274/7,274 contra n8n); `/api/exchange-rates` lee la tabla con el backend `prisma`; ruta `POST /api/cron/exchange-rates` en el Vercel de staging, disparada a diario por [`.github/workflows/exchange-rates.yml`](../../.github/workflows/exchange-rates.yml). Falta la semana en sombra (30 oct–5 nov). Es trabajo del agente de workflows: detalle en [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md) §7 paso 1 y §8. |
 
 ### 6.1 Chequeos de solo lectura para confirmar el estado
 
@@ -215,7 +218,7 @@ Desde `etl/` (requieren el `.env` de la raíz; ninguno escribe):
 | `npm run app:status` | "Database schema is up to date!" (5 migraciones: `init`, `etl_run`, `better_auth`, `login_attempt` y `audit_log_public_id`; 28 oct). |
 | `npm run app:ping` | `current_schema = msp_app`, con los conteos de la carga del 22 oct (unidades 238,449, bloques 1,688, proyectos 1,137) y **18 usuarios**: los 17 de Strapi más la cuenta propia `app-engteam` (22 oct, §14.7). |
 | `npm run app:local-user` | Sin `--apply` solo simula: debe decir `public_id app-engteam … ya existe: se actualizará`. |
-| `npm test` | 53 pruebas del ETL pasan (snapshot sintético, no se conecta a nada; 22 oct). Desde la raíz, `npm test` corre 143 (comprobado el 28 oct, v1.33.0): el motor de fórmulas (`lib/domain/`), `lib/db/` (catálogos, perfiles, listado de proyectos, auditoría, guarda, login y `normalizeCaPem`), `lib/auth/` y el resto de módulos puros. |
+| `npm test` | 53 pruebas del ETL pasan (snapshot sintético, no se conecta a nada; 22 oct). Desde la raíz, `npm test` corre 169 (comprobado el 29 oct a las 14:00, v1.35.0): el motor de fórmulas (`lib/domain/`, incluido `exchange-rates/`), `lib/db/` (catálogos, perfiles, listado de proyectos, auditoría, guarda, login y `normalizeCaPem`), `lib/auth/`, `lib/cron-secret` y el resto de módulos puros. `npx tsc --noEmit`: 38 errores, la misma línea base. |
 | `npm run load:verify -- --snapshot 20261022-172111-full` | «Verificación: OK» (25/25, 19/19, 1/1). Solo en la máquina que tiene ese snapshot; si no, ver §12.2. |
 | `npm run warehouse:ping` | **Todavía no se ha corrido con éxito.** Necesita `DATABASE_HOST_WAREHOUSE` en el `.env` (§13.3). Debe mostrar solo `SELECT`/`SHOW VIEW` y las 11 tablas del push en `dbo_stage` y `dbo`. |
 
@@ -619,7 +622,8 @@ Los 17 usuarios reales de `msp_app` (los del panel de usuarios de Strapi, p. ej.
 - **Completo:** `/catalogs` (los 12 catálogos: listar, buscar, paginar, crear, editar, borrar, según el rol desde el 22 oct), login (correo o usuario) y logout. Desde el 28 oct (v1.33.0), `/exchange-rate-profiles`: lista, búsqueda, ver, crear, editar, clonar y borrar, con el selector de proyectos (salvo el enlace a la vista de cada proyecto, que falla porque `getProjectById` no está migrado).
 - **Parcial:** `/projects` (desde el 28 oct: lista con búsqueda, orden, paginación y filtros rápidos; los filtros avanzados dan "todavía no están migrados"; ver, crear y editar fallan), `/projects/new` (los selectores de país, desarrolladora, tipo de seguridad, NSE, amenidades y servicios; **no guardar**, `createProject` no está migrado), `/blocks/new` (categoría, enfoque, estado y, desde el 28 oct, la lista del selector de proyecto; al elegir uno, `getProjectById` falla en silencio y el bloque no recibe las monedas del proyecto; guardar falla), `/settings` (muestra el usuario; guardar falla).
 - **Falla al cargar (no migrado):** vistas y edición de proyectos; listas, vistas y edición de bloques; `/units` y la hoja; olvidé y restablecer contraseña.
-- **No abrir:** `/sync` (desde el 22 oct sus 6 rutas de API responden 503 con el backend `prisma`). `/copilots` ya no llama a n8n de producción con el backend `prisma` (desde el 22 oct `productionN8nDefault` deja vacía la URL por defecto), pero tampoco funciona: da error. La barra de tipo de cambio puede hacer un `GET` al webhook público; es lectura y la skill lo permite.
+- **Barra lateral de tipo de cambio:** desde el 29 oct (v1.34.0, agente de workflows) lee `msp_app.exchange_rate` con el backend `prisma` (pide sesión); ya no llama a n8n.
+- **No abrir:** `/sync` (desde el 22 oct sus 6 rutas de API responden 503 con el backend `prisma`). `/copilots` ya no llama a n8n de producción con el backend `prisma` (desde el 22 oct `productionN8nDefault` deja vacía la URL por defecto), pero tampoco funciona: da error.
 - Lo mismo vale para el staging de Vercel (§14.2.1).
 - Lo que se crea en los catálogos cae en `msp_app` y la próxima carga del ETL lo borra (espejo de Strapi). La excepción son los usuarios con `public_id` `app-…` (§14.7).
 
@@ -637,6 +641,8 @@ Totales esperados en `/catalogs` (carga del 16 oct; contados otra vez en `msp_ap
 8. `CHANGELOG.md` y versión, `CLAUDE.md` si cambia la arquitectura, casillas de `ROADMAP.md`, la fila de la §6 y esta §14; `graphify update .`.
 
 ### 14.6 Siguiente paso
+
+> Historial del 22 oct. El siguiente paso vigente está en la **§14.17** (29 oct).
 
 1. El usuario recorre `/catalogs` (lista de `ROADMAP.md` §4.4), en local o en el staging de Vercel. Si algo falla en local, revisar la salida de `pnpm dev:staging` / `pnpm run dev` en su terminal; en Vercel, pedirle el mensaje que ve (los errores de la guarda y del certificado dicen qué ven y en qué entorno corren).
 2. El trabajo de catálogos, login, `app-engteam` y el `.env` único **ya tiene commit y push** (el usuario, hasta `0cb1d02`). Faltan el commit de las correcciones de documentos y decidir si sube la versión (§6). Nunca `.env` ni `.env.respaldo-*.local`.
@@ -1218,7 +1224,7 @@ El usuario eligió **perfiles de tipo de cambio** como primer módulo, pidió un
 - vincular o desvincular proyectos deja **una fila `update` de `project` por cada proyecto afectado**, además de la del perfil;
 - versión 1.33.0, propuesta por el agente; el usuario puede cambiarla.
 
-El trabajo quedó **sin commit**. No hizo falta migración.
+El trabajo quedó sin commit esa tarde; el usuario lo commiteó el 29 oct a las 8:50 (`16e15f5`) y lo fusionó a `main` (§14.17). No hizo falta migración.
 
 **Qué se hizo:**
 
@@ -1256,4 +1262,85 @@ El trabajo quedó **sin commit**. No hizo falta migración.
   - `audit_log` quedó con perfil create 1, update 3 y delete 1, y `project` update 6, una por cada vínculo que cambió, con el `exchangeRateProfileId` antes y después.
   - En el `finally`, los 3 proyectos volvieron a no tener perfil, con su `updatedAt` original. Se borraron el perfil y las 11 filas de auditoría. Una lectura posterior dio otra vez 2 perfiles y 2 filas de moneda.
 
-**Para cerrar este paso:** el usuario prueba `/exchange-rate-profiles` con `pnpm dev:staging`: listar, buscar, crear con monedas y proyectos, editar, clonar, intentar borrar uno con proyectos ("está en uso") y borrar uno vacío. Lo que se cree ahí lo borra la próxima carga del ETL; sus filas de `audit_log` quedan. Ojo: si se desvinculan proyectos de los perfiles reales, quedan así hasta la próxima carga. Después hace el commit. **Siguiente módulo sugerido:** proyectos (`getProjectById`, crear y editar con sus 7 pestañas, filtros avanzados), que además desbloquea la vista de proyecto desde los perfiles y las monedas en `/blocks/new`.
+**Para cerrar este paso:** el usuario prueba `/exchange-rate-profiles` con `pnpm dev:staging`: listar, buscar, crear con monedas y proyectos, editar, clonar, intentar borrar uno con proyectos ("está en uso") y borrar uno vacío. Lo que se cree ahí lo borra la próxima carga del ETL; sus filas de `audit_log` quedan. Ojo: si se desvinculan proyectos de los perfiles reales, quedan así hasta la próxima carga. Después hace el commit. **Siguiente módulo sugerido:** proyectos (`getProjectById`, crear y editar con sus pestañas, filtros avanzados), que además desbloquea la vista de proyecto desde los perfiles y las monedas en `/blocks/new`. Alcance comprobado en el código: §14.17.
+
+### 14.17 Dónde seguir migrando (29 oct, 14:00): traspaso para el agente de módulos
+
+Para el agente que siga migrando módulos (no el de workflows de n8n). Todo lo que sigue se comprobó en el código y en git el 29 oct a las 14:00; lo que no se comprobó lo dice.
+
+#### Estado
+
+- **Git:** rama `feat/data-facade`, último commit `f6cdc03`, todo fusionado a `main` (PR #9 y #10). Detalle en la §6. **Un merge a `main` despliega producción**: lo migrado tiene que seguir apagado ahí (backend `strapi` por defecto y la guarda de `lib/db/guard.ts`). No hacer commit, `push` ni merge: los hace el usuario.
+- **Cambios sin commit que no son de este agente:** `.github/workflows/exchange-rates.yml` y `docs/migration/N8N_WORKFLOWS.md` (del agente de workflows, que trabaja en paralelo) y el borrado de `README_TIPO_DE_CAMBIO.md` (lo hizo el usuario a propósito). No tocarlos ni revertirlos.
+- **Versión:** 1.35.0. Las v1.34.0 y v1.35.0 son del agente de workflows (tipo de cambio de Banguat: tabla `msp_app.exchange_rate` con 7,274 días, ruta de cron en el staging de Vercel, workflow diario de GitHub y semana en sombra del 30 oct al 5 nov). Lo último de este agente es la v1.33.0 (§14.16).
+- **`msp_app`:** 5 migraciones en `prisma/migrations/` (`init`, `etl_run`, `better_auth`, `login_attempt`, `audit_log_public_id`); las v1.34 y v1.35 no agregaron ninguna. Comprobar con `npm run app:status` en `etl/` antes de generar otra.
+- **Pruebas:** `npm test` 169/169 y `npx tsc --noEmit` con los 38 errores de siempre (29 oct, 14:00).
+- **Modo `prisma`:** funcionan login y sesión, catálogos, perfiles de tipo de cambio, `getProjects` básico y la barra de tipo de cambio (lee la tabla). Quedan **16 `notMigrated`** en `lib/api/prisma-client.ts`:
+
+| Módulo | Métodos |
+|---|---|
+| Proyectos (3) | `getProjectById`, `createProject`, `updateProject` (+ filtros avanzados y de fase de `getProjects`, que hoy responden con error) |
+| Bloques (5) | `getBlocks`, `getBlocksLite`, `getBlockById`, `createBlock`, `updateBlock` |
+| Unidades (4) | `getUnitsAllPages`, `updateUnit`, `updateUnitBatch`, `createUnit` |
+| Cuenta (4) | `forgotPassword`, `resetPassword`, `updateMe`, `changePassword` |
+
+#### Lo primero: preguntarle al usuario
+
+1. Si ya probó la v1.33.0 en el navegador (`/exchange-rate-profiles` con `pnpm dev:staging`, lista en el último párrafo de la §14.16). No está confirmado; si falla algo, se corrige antes de abrir otro módulo.
+2. En qué rama trabajar: `N8N_WORKFLOWS.md` §2 pide una rama por agente, que salga de la rama vigente de la migración.
+3. Que confirme **proyectos** como siguiente módulo y las decisiones de la lista de abajo. No suponer ninguna.
+
+#### Siguiente módulo: proyectos
+
+Inventario y lista "debe seguir funcionando": `ROADMAP.md` §4.6.
+
+**Quién lo llama** (con `getProjectById` sin migrar, todas estas pantallas fallan en modo `prisma`):
+
+- `app/(main)/projects/view/[documentId]`, `edit/[documentId]` y `clone/[id]`;
+- `components/blocks/block-form.tsx` (al elegir proyecto en `/blocks/new` carga sus monedas; hoy falla sin avisar);
+- `app/(main)/blocks/page.tsx` y `components/units/datasheet-units-table.tsx` (estas dos dependen además de bloques y unidades);
+- la vista de un perfil enlaza a la vista de cada proyecto.
+
+**`getProjectById` en Strapi** (`lib/api/strapi.ts`, cerca de la línea 2325) puebla desarrolladora, país, amenidades, servicios, NSE, tipo de seguridad, `exchangeRateProfile` con sus `currencies` y los bloques, y pasa la respuesta por `normalizeProjectCurrenciesFromExchangeProfile` (copia las monedas del perfil a `project.currencies`). `createProject` (~2365) y `updateProject` (~2406) devuelven el proyecto normalizado igual.
+
+**Lo que manda el formulario** (`components/projects/project-form.tsx`, líneas ~195–256; pestañas general, ubicación, amenidades, servicios, financiamiento y monedas):
+
+- textos `code`, `name`, `department`, `municipality`, `zone`, `subzone`, `imageUrl`;
+- números `latitude` y `longitude` (`parseFloat`), `downPaymentPercentage` y `accessQuantity` (`parseInt`);
+- booleanos `fha`, `muvi`, `fractionalDownPayment`, `showroom`, `modelHouse`;
+- relaciones por `documentId`: `developer`, `securityType`, `country`, `nse`, `exchangeRateProfile` (al editar manda `null` para desvincular) y los arreglos `amenities` y `services`.
+- Crear exige `code` y `name` y después redirige a `/projects/edit/<documentId>`. Proyectos no tiene ruta `generate-code` (solo bloques y unidades), y en `schema.prisma` `Project.code` **no** es único.
+
+**En `schema.prisma`:** las FK de `Project` (`countryId`, `developerId`, `nseId`, `securityTypeId`, `exchangeRateProfileId`) son `Restrict`; amenidades y servicios van en `ProjectAmenity` y `ProjectService`, con `sortOrder` (conservar el orden que manda la UI). `BlockFinancing` y `BlockBankRate` son del bloque, no del proyecto. No debería hacer falta migración; si hace falta, seguir `N8N_WORKFLOWS.md` §2 (traer antes las migraciones del otro agente y ningún `DROP`).
+
+**Filtros avanzados** (`components/projects/advanced-filters.tsx`, traducidos a Strapi en `strapi.ts` ~1328–1600): campos `code`, `name`, `developer`, `country`, `department`, `amenities`, `services`, `createdAt` y `updatedAt`; operadores `equals`, `notEquals`, `contains`, `notContains` (sin distinguir mayúsculas), `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `in`, `notIn`, `between`, `isNull` e `isNotNull`; lógica `AND` u `OR`. Las relaciones se filtran por `documentId`. El componente también llama a `getCatalogList` y `getCatalogItem`, que ya están migrados. Hoy `buildProjectWhere` (`lib/db/project-list-mapping.ts`) lanza error con filtros avanzados y con el de fase.
+
+**Decisiones para el usuario** (no suponer):
+
+- Si `code` debe ser único al crear y editar: Strapi no lo exige y la base nueva tampoco.
+- En modo `OR`, Strapi convierte `between` en dos condiciones sueltas (`>= a` **o** `<= b`), que dejan pasar casi todo. ¿Copiarlo igual o corregirlo?
+- El filtro de fase (`availability`) sigue con error hasta la v2 (decidido en la §14.16); confirmar que no cambió.
+- Clonar: qué copia la pantalla `clone/[id]` (leerla antes de preguntar) y si el clon conserva el perfil de tipo de cambio.
+- Auditoría: una fila por proyecto con amenidades y servicios como lista de `publicId`, igual que las monedas de los perfiles.
+
+**Qué reutilizar:** `lib/db/list-query.ts` (`parseSort`, `splitRefs`, `refsWhere`, `missingRefs`, `whereUnique`), `toStrapiProject` y `PROJECT_LIST_INCLUDE` (ampliarlos con NSE, tipo de seguridad y perfil), `toCurrenciesComponent` y `decimalToNumber` de `exchange-rate-profile-mapping.ts`, y `writeAudit` / `writeAuditMany`. El repositorio de perfiles (`lib/db/exchange-rate-profiles.ts`) es el modelo más cercano: transacción con `TX_OPTIONS`, referencias que no existen = `PublicError` y se revierte todo. Seguir la receta de la §14.5 y hacer la prueba de punta a punta como en la §14.16: pedir autorización antes de escribir en `msp_app`, usar como actor `app-engteam` y borrar al final lo creado y sus filas de `audit_log`.
+
+#### Después de proyectos
+
+1. **Bloques** (5 métodos, `ROADMAP.md` §4.7): incluye `BlockFinancing` y `BlockBankRate`. `getBlocksLite` lo usa `/sync`, que es del agente de workflows: preguntar antes de tocarlo.
+2. **Unidades** (4, §4.8): `saveUnitChanges` tiene que llamar a `computeBlockCounters` (`lib/domain/blocks/counters.ts`), que entrega el agente de workflows (su paso 6, Block Edit Queue). Esa función todavía no existe: preguntar en qué estado está antes de empezar.
+3. **Cuenta** (4): `forgotPassword` y `resetPassword` necesitan un proveedor de correo, que no está decidido.
+
+#### Coordinación con el agente de workflows (`N8N_WORKFLOWS.md` §1–§2)
+
+- **Son suyos y no se tocan:** workers, sincronización con el warehouse (`/sync`, `app/api/sync/*`, `sync_run*`), tipo de cambio (`app/api/exchange-rates`, `app/api/cron/exchange-rates`, `lib/exchange-rates.ts`, la tabla `exchange_rate`, `.github/workflows/`) y el cálculo de contadores del bloque.
+- **Son de este agente:** proyectos, bloques, unidades, perfiles, cuenta y catálogos, y la llamada a los contadores dentro del guardado de unidades.
+- **`schema.prisma`:** ver arriba. Los modelos `SyncRun`, `SyncRunBlock` y `ExchangeRate` los extiende el otro agente.
+- **Versión y `CHANGELOG.md`:** los dos agentes los tocan. Proponer la siguiente (1.36.0) y que el usuario decida el número al juntar ramas.
+- **Documentos:** este agente escribe aquí (§14 y la fila de la §6), en `README_Backend_full.md` y en `ROADMAP.md` §4.3–4.8. `N8N_WORKFLOWS.md` solo se lee.
+
+#### Trampas nuevas del entorno (del 29 oct, además de las de la §14.15)
+
+- En el `.env`, una clave vacía seguida de espacios (`CLAVE=   `) hace que `util.parseEnv` de Node (el lector de `pnpm dev:staging`) tome la línea siguiente como su valor; así se rompió `BETTER_AUTH_SECRET` y el login dio 503. Si algo de la sesión falla de golpe, pedirle al usuario que revise eso (sin leer el `.env`).
+- `next dev` crea `AGENTS.md` en la raíz al arrancar. No es del repo: el otro agente lo borró; preguntarle al usuario antes de borrarlo.
+- El staging de Vercel tiene Vercel Authentication: una llamada sin el token de bypass responde con redirección al login de Vercel, no con un error de la app.
