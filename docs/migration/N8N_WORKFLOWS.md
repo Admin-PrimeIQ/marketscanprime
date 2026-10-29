@@ -251,7 +251,7 @@ Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha 
 2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Construido el 29 oct (v1.36.0); falta que el agente de módulos lo llame.** Detalle en la ficha del workflow 6 (§4).
    - Hecho: `computeBlockCounters` (`lib/domain/blocks/counters.ts`, copia exacta de n8n), `lockBlockForUpdate` y `recalculateBlockCounters` (`lib/db/block-counters.ts`), el bloqueo optimista de unidades (`findStaleUnits` en `lib/domain/units/concurrency.ts`) y la paridad de solo lectura (`npm run counters:parity` en `etl/`).
    - Para cerrar la casilla: `saveUnitChanges` los usa (`ROADMAP.md` §4.8), y el usuario decide en el corte si se recalculan de una vez los ~580 bloques del warehouse. Apagar el workflow 6 en n8n lo hace una persona en el corte.
-   - `recalculateBlockCounters` no tiene prueba contra la base todavía: escribe, así que necesita autorización del usuario (en una transacción que se revierta al final).
+   - Probado contra `msp_app` el 29 oct con autorización del usuario, en una transacción revertida (bitácora del 29 oct, 15:30–15:45).
 3. [ ] **Acceso al warehouse:** `npm run warehouse:ping` en verde (README §13.3) y respuesta a la identidad de filas (§6).
 4. [ ] **Mapeador del push** (workflow 4): `lib/domain/warehouse/`, puro, con prueba de paridad celda por celda contra el `dbo_stage` de MySQL.
 5. [ ] **Cliente de escritura de la copia sombra** con lista cerrada de las 11 tablas, y worker `warehouse-push` sobre BullMQ.
@@ -267,6 +267,22 @@ Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 ## 8. Bitácora
 
 Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6), qué se hizo, qué se verificó, migraciones aplicadas en `msp_app`, commits del usuario y qué quedó pendiente o por preguntar.
+
+### 29 oct 2026, 15:30–15:45
+
+- Prueba de `recalculateBlockCounters` contra `msp_app`, **autorizada por el usuario**, con un script temporal (ya borrado) que corrió todo en una transacción y la revirtió al final. Actor: el usuario de pruebas (`engteam`, id 137).
+- Bloques: `ciudad-buenaventura-fase-1` (id 3374, contadores al día) y `lotificacion-caserio-navidad` (id 3383, 13 guardadas contra 14 unidades).
+- Resultado, 6 de 6:
+  - El bloque al día devuelve `changed: false` y no escribe en `audit_log`.
+  - El bloque desactualizado devuelve `changed: true`; las 10 columnas quedan iguales al cálculo y se escribe una fila en `audit_log` (`block`, `update`, antes 13 y después 14).
+  - Una segunda llamada sobre el mismo bloque ya devuelve `changed: false`.
+  - Mientras dura la transacción, otra conexión no puede tomar ese bloque (`FOR UPDATE NOWAIT` da 55P03), pero sí uno distinto.
+  - Un id inexistente da `PublicError` "El bloque no existe.".
+  - Después del `ROLLBACK`, los dos bloques (incluido `updatedAt`) y el conteo de `audit_log` quedaron iguales.
+- La secuencia del id de `audit_log` avanzó (Postgres no la revierte): es un hueco inofensivo en la numeración.
+- Una corrida intermedia falló dentro de la transacción por un error del script (comprobaba el bloque libre con un bloque que la propia transacción tenía tomado). Se revirtió sola, y la corrida final lo confirmó al inicio: el bloque 3383 seguía con 13.
+- Sin migraciones. Sin cambios de código.
+- Pendiente: lo mismo que la entrada anterior, salvo esta prueba.
 
 ### 29 oct 2026, 14:30–15:30
 
