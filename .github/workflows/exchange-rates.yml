@@ -1,6 +1,6 @@
 # Tipo de cambio de Banguat → msp_app.exchange_rate, a través de la ruta del cron del Vercel de
 # STAGING (nunca el de producción: ahí la ruta responde 404). Reemplaza el workflow 7 de n8n.
-# Detalle en docs/migration/README_TIPO_DE_CAMBIO.md.
+# Detalle en docs/migration/N8N_WORKFLOWS.md (ficha del workflow 7).
 #
 # Secretos del repo (Settings → Secrets and variables → Actions):
 #   MSP_STAGING_URL    dominio estable de staging (con o sin https://), no la URL de un despliegue
