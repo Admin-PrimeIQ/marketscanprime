@@ -28,6 +28,8 @@
     "load:validate": "tsx src/load/index.ts validate",
     "load:verify": "tsx src/load/index.ts verify",
     "load:formulas": "tsx src/load/index.ts formulas",
+    "rates:load": "tsx src/exchange-rates/index.ts load",
+    "rates:parity": "tsx src/exchange-rates/index.ts parity",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },

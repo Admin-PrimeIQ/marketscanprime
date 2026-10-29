@@ -6,6 +6,95 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Ruta del cron del tipo de cambio para Vercel de staging (v1.35.0)
+
+_2026-10-29_
+
+Sigue el paso 1 de la §7 de [`docs/migration/N8N_WORKFLOWS.md`](docs/migration/N8N_WORKFLOWS.md): la tabla `exchange_rate` se actualiza sola desde Banguat. **Producción no cambia**: con el backend `strapi`, fuera de un despliegue con `MSP_STAGING_DEPLOY=true` o sin `CRON_SECRET`, la ruta responde 404. El cron de GitHub que la dispara queda para después: su archivo tiene que estar en `main`, que despliega producción.
+
+- **Ruta** [app/api/cron/exchange-rates/route.ts](app/api/cron/exchange-rates/route.ts), solo `POST` con `Authorization: Bearer <CRON_SECRET>`, `maxDuration` 60 s. Trae los últimos 15 días de Banguat (si una corrida falla, la siguiente rellena el hueco) y responde los conteos y los días que Banguat todavía no publicó. Códigos: 401 secreto inválido, 409 otra carga en curso, 502 Banguat caído o con datos inválidos, 503 base.
+- **Servicio** [lib/db/exchange-rate-sync.ts](lib/db/exchange-rate-sync.ts): consulta Banguat fuera de la transacción (20 s, 2 intentos) y hace el upsert con Prisma, con el mismo candado (`pg_try_advisory_xact_lock`) que la carga de `etl/`.
+- **Una sola copia** en [lib/domain/exchange-rates/](lib/domain/exchange-rates/): el cliente SOAP ([banguat-client.ts](lib/domain/exchange-rates/banguat-client.ts), antes en `etl/src/exchange-rates/`) y el SQL del upsert ([upsert-sql.ts](lib/domain/exchange-rates/upsert-sql.ts)), que usan `etl/` y la ruta. En [dates.ts](lib/domain/exchange-rates/dates.ts), `recentRange` y `rangeCoverage`. Secreto comparado en tiempo constante en [lib/cron-secret.ts](lib/cron-secret.ts).
+- **Variable nueva** `CRON_SECRET` (al menos 32 caracteres), documentada en [.env.staging.example](.env.staging.example). Va en el `.env` local y en el proyecto de Vercel de staging, nunca en producción.
+- **Verificación**: `npm test` 169/169 (antes 162), `etl` 57/57, `tsc` sin errores en archivos tocados. `rates:load --dry-run` de 15 días: 0 cambios. Ruta local: 404 sin `CRON_SECRET` configurado; con él, 401 sin secreto o con uno incorrecto, y 200 con el correcto (15 días recibidos, 0 insertados, 0 cambiados, 15 iguales, Banguat en 327 ms).
+
+## Tipo de cambio desde Banguat en la base nueva (v1.34.0)
+
+_2026-10-29_
+
+Paso 1 de la §7 de [`docs/migration/N8N_WORKFLOWS.md`](docs/migration/N8N_WORKFLOWS.md) (workflow 7, Banguat Exchange Rate). **Producción no cambia**: la ruta solo lee la tabla con `NEXT_PUBLIC_DATA_BACKEND=prisma`; con `strapi` sigue leyendo el webhook de n8n. Sin migraciones: `exchange_rate` ya existía en `msp_app`. La tarea periódica (cada 6 h) queda para después.
+
+- **Fuente: el servicio SOAP oficial de Banguat** (`TipoCambio.asmx`, operación `TipoCambioRango`), no la página HTML que lee n8n. Todo el histórico (7,274 días desde el 30/11/2006) llega en una sola respuesta.
+- **Reglas puras** en [lib/domain/exchange-rates/](lib/domain/exchange-rates/), con pruebas sobre respuestas reales de Banguat guardadas en `fixtures/`:
+  - [dates.ts](lib/domain/exchange-rates/dates.ts): `DD/MM/AAAA` ↔ `AAAA-MM-DD` sin pasar por `new Date(texto)`, que lee `09/10` como 10 de septiembre;
+  - [banguat.ts](lib/domain/exchange-rates/banguat.ts): el sobre SOAP y la traducción a filas. Misma regla que n8n: si compra = venta se guarda solo la referencia; si difieren (solo el 30/11/2006 y el 01/12/2006) se guardan compra y venta, sin referencia. Lanza ante un `TotalItems` que no cuadra, fechas repetidas, otra moneda o números inválidos;
+  - [compare.ts](lib/domain/exchange-rates/compare.ts): la tendencia de la barra (`comparableRate`, `compareDirection`, `compareSnapshots`), movida desde [lib/exchange-rates.ts](lib/exchange-rates.ts), que la reexporta.
+- **Carga y paridad** en [etl/src/exchange-rates/](etl/src/exchange-rates/):
+  - `npm run rates:load [-- --from DD/MM/AAAA --to DD/MM/AAAA --dry-run]`: upsert idempotente por `(date, currency)` en una transacción con candado; un día igual no se toca, uno distinto se sobrescribe;
+  - `npm run rates:parity`: compara la tabla día por día con el GET público de n8n (la única llamada a n8n permitida), en una transacción de solo lectura. Ese GET pagina con `page`/`size`; los `page[number]`/`page[size]` del manual y de sus propios `links` se ignoran.
+- **Ruta** [app/api/exchange-rates/route.ts](app/api/exchange-rates/route.ts): con el backend `prisma` lee los dos días más recientes de la tabla ([lib/db/exchange-rates.ts](lib/db/exchange-rates.ts), forma en [exchange-rate-mapping.ts](lib/db/exchange-rate-mapping.ts)) y entrega el mismo objeto que daba n8n, sin caché en memoria; tabla vacía es 503. La barra lateral no cambia.
+- **Verificación**: `npm test` 162/162 (antes 143) y `etl` 4/4 nuevas; `tsc` sin errores en archivos tocados. Carga real autorizada en `msp_app`: 7,274 filas; repetida, 0 cambios. **Paridad contra n8n: 7,274 de 7,274 días iguales.** Ruta probada en `dev:staging`: 200 desde la tabla con sesión, 401 sin ella, y la barra lateral muestra el tipo de cambio.
+
+## Perfiles de tipo de cambio y listado de proyectos en la base nueva (v1.33.0)
+
+_2026-10-28_
+
+Primer módulo después del pulido (§14.16 de `docs/migration/README.md`). **Producción no cambia**: solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`. Sin migraciones: las tablas ya existían en `msp_app`.
+
+- **Perfiles de tipo de cambio** (los 5 métodos de `dataClient`), en [exchange-rate-profiles.ts](lib/db/exchange-rate-profiles.ts) y [exchange-rate-profile-actions.ts](lib/db/exchange-rate-profile-actions.ts):
+  - la forma de Strapi se arma en [exchange-rate-profile-mapping.ts](lib/db/exchange-rate-profile-mapping.ts): las monedas (una fila por moneda en `exchange_rate_profile_currency`) vuelven como el objeto `currencies`, y los proyectos vinculados como `projects`;
+  - crear y editar reemplazan las monedas y vinculan o desvinculan proyectos, en una sola transacción. `currencies: null` las borra todas. `projects` acepta un arreglo (reemplaza la lista) o `{ connect, disconnect }`;
+  - vincular un proyecto que tenía otro perfil lo pasa a este; un proyecto que no existe da error y no se guarda nada;
+  - **borrar un perfil con proyectos se impide** ("No se puede eliminar: el perfil está en uso."). Strapi lo dejaba borrar y los proyectos quedaban sin perfil;
+  - auditoría: una fila del perfil (con monedas y proyectos) y **una fila `update` de `project` por cada proyecto vinculado o desvinculado**, con `writeAuditMany` nuevo en [audit.ts](lib/db/audit.ts);
+  - validación con Zod en [exchange-rate-profile-schemas.ts](lib/db/exchange-rate-profile-schemas.ts): solo las 7 monedas, tasas positivas de hasta 10 dígitos enteros y hasta 5,000 proyectos por escritura.
+- **Listado de proyectos** (`getProjects`), que piden el formulario de perfiles y el de bloques, en [projects.ts](lib/db/projects.ts), [project-actions.ts](lib/db/project-actions.ts) y [project-list-mapping.ts](lib/db/project-list-mapping.ts):
+  - paginación, orden, búsqueda (nombre, código y desarrolladora) y los filtros rápidos de dominio, región GAM/Interior y país, con las mismas relaciones que poblaba Strapi;
+  - los filtros avanzados responden "todavía no están migrados", y el de fase "no está disponible en la base nueva" (los proyectos no tienen ese campo; la UI hoy no lo manda).
+- **Orden compartido** en [list-query.ts](lib/db/list-query.ts): los vacíos de `code` y `department` quedan donde los ponía el MySQL de Strapi (primeros en ascendente, últimos en descendente).
+- **Verificación**: `npm test` 143/143 (antes 116) y `tsc` con los mismos 38 errores previos, ninguno en archivos tocados. Lectura de humo en sesión de solo lectura contra `msp_app` (2 perfiles, 1,137 proyectos, filtros y orden) y prueba de punta a punta autorizada con 8 casos, sin datos de prueba al final.
+
+## Auditoría de las escrituras en la base nueva (v1.32.0)
+
+_2026-10-28_
+
+Paso 4 de la §14.8 de `docs/migration/README.md`. **Producción no cambia**: solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+
+- **`audit_log` en cada escritura de catálogos** ([catalogs.ts](lib/db/catalogs.ts)):
+  - crear, editar y borrar corren en una transacción que también escribe la fila de auditoría; si una de las dos falla, no se guarda ninguna;
+  - la fila lleva el usuario de la sesión (`requireRole` en [catalog-actions.ts](lib/db/catalog-actions.ts)), la tabla, el `id`, el `publicId` (`documentId` de Strapi) y las filas antes y después en JSON;
+  - editar o borrar un elemento que no existe da "El elemento del catálogo no existe.", como antes.
+- **Reglas puras** en [audit-entry.ts](lib/db/audit-entry.ts), con pruebas; la escritura, en [audit.ts](lib/db/audit.ts).
+- **Migración `20261028170000_audit_log_public_id`** ([prisma/migrations](prisma/migrations/20261028170000_audit_log_public_id/migration.sql)): agrega la columna `public_id` (admite `NULL`) y un índice `(entity, public_id)`. No toca filas.
+- **Con `msp_app` todavía como copia de Strapi** (decisión 17): la próxima carga del ETL borra lo creado en la app, pero las filas de `audit_log` quedan.
+- **Verificación**: `npm test` 116/116 y `tsc` con los mismos 38 errores previos, ninguno en archivos tocados. Migración aplicada en `msp_app` y prueba de punta a punta 15/15 (crear, editar y borrar, más los casos de error), sin datos de prueba al final.
+
+## Límite de intentos de login, validación con Zod y errores genéricos en la base nueva (v1.31.0)
+
+_2026-10-28_
+
+Paso 3 de la §14.8 de `docs/migration/README.md` ("endurecer"). **Producción no cambia**: todo esto solo actúa con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
+
+- **Límite de intentos de login**:
+  - Reglas puras en [lib/auth/login-throttle.ts](lib/auth/login-throttle.ts), con pruebas; contadores en [lib/db/login-throttle.ts](lib/db/login-throttle.ts); uso en [auth-actions.ts](lib/db/auth-actions.ts).
+  - Por cuenta: 5 intentos en 15 minutos y luego 15 minutos de bloqueo. Por IP: 20 en 15 minutos.
+  - Cada intento suma antes de comprobar la clave, en un solo `INSERT … ON CONFLICT`, así que una ráfaga en paralelo no pasa del límite. Pasado el límite se rechaza sin llegar a bcrypt, exista o no la cuenta.
+  - El login correcto borra el contador de la cuenta y le resta uno al de la IP.
+  - No usa el `rateLimit` de Better Auth: ese solo aplica a su ruta HTTP, que no está montada.
+- **Migración `20261028153000_login_attempt`** ([prisma/migrations](prisma/migrations/20261028153000_login_attempt/migration.sql)): solo agrega la tabla `login_attempt`. El ETL no la carga ni la borra.
+- **Validación con Zod** de la entrada de las Server Actions:
+  - Login ([auth-schemas.ts](lib/db/auth-schemas.ts)): identificador de hasta 255 caracteres y clave de hasta 256. Una entrada inválida da el mismo mensaje que una clave mala.
+  - Catálogos ([catalog-schemas.ts](lib/db/catalog-schemas.ts), con ayuda de [input.ts](lib/db/input.ts)):
+    - endpoint, id, parámetros de lista y cuerpo, con tipos y largos;
+    - las claves desconocidas se descartan;
+    - `null` vacía el campo (antes se habría guardado el texto `"null"`);
+    - los errores llegan como detalles en español (`name: máximo 255 caracteres`).
+- **`/api/exchange-rates`** ([route.ts](app/api/exchange-rates/route.ts)): responde 401 solo sin sesión. Si la base no responde, responde 503 y deja el detalle en el log; antes daba un falso 401.
+- **Incluye el commit `25871a7` (28 oct)**, que salió sin entrada:
+  - Errores genéricos hacia el navegador: `PublicError` en [action-result.ts](lib/db/action-result.ts). El detalle de Prisma o `pg` queda en el log del servidor, y `P2037`/`53300` dan "La base de datos está ocupada…".
+  - Pool que cierra las conexiones inactivas a los 5 s, con `attachDatabasePool` de `@vercel/functions` 3.10.4 ([client.ts](lib/db/client.ts), [connection.ts](lib/db/connection.ts)).
+- **Verificación**: `npm test` 110/110 y `tsc` con los mismos 38 errores previos, ninguno en archivos nuevos.
+
 ## Actualización de seguridad: Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1)
 
 _2026-10-27_

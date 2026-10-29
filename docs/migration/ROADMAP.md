@@ -181,7 +181,8 @@ Una variable `NEXT_PUBLIC_DATA_BACKEND=strapi|prisma` elige la implementación *
 3. [x] **Fachada** `lib/api/client.ts` con la implementación `strapi`; los imports de la UI pasaron de `strapiClient` a `dataClient` (21 oct, v1.28.2, rama `feat/data-facade`). El contrato es el tipo `DataClient` (31 métodos) y el backend lo elige `NEXT_PUBLIC_DATA_BACKEND` (tiene que ser `NEXT_PUBLIC_` porque la UI lo lee en el navegador). Fuera de `lib/api/` nadie importa `strapiClient`; los tipos `Strapi*` y los helpers puros siguen saliendo de `strapi.ts` hasta el paso 2.
 4. [ ] Implementación `prisma`, módulo por módulo. Orden (decisión 11 del README): catálogos → auth → perfiles → proyectos → bloques → unidades → sync → tipo de cambio.
    - [x] Catálogos (21 oct, v1.29.0): `lib/db/catalogs.ts` + `lib/db/catalog-actions.ts`, y `lib/api/prisma-client.ts` en la fachada. Las Server Actions solo responden con el backend `prisma`, en `next dev` o en un despliegue de staging con `MSP_STAGING_DEPLOY=true` (desde el 22 oct; `README.md` §14.2.1); desde el 22 oct por la tarde además piden sesión y rol (subpaso siguiente). Se corre con `pnpm dev:staging`, que lee solo el `.env` único de la raíz (sin credenciales de Strapi ni n8n desde el 22 oct).
-   - [ ] Auth (hashes bcrypt reutilizados: decisiones 12 y 13). **Sesión y autorización hechas el 22 oct, sin commit** (`README.md` §14.9): Better Auth en vez de Auth.js (la decisión 12 se reemplazó), sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`. La guarda por entorno se mantiene. Falta probarlo en el navegador y lo de cuenta (`forgotPassword`, `resetPassword`, `updateMe`, `changePassword`).
+   - [ ] Auth (hashes bcrypt reutilizados: decisiones 12 y 13). **Sesión y autorización hechas el 22 oct, commit `75541cb`** (`README.md` §14.9): Better Auth en vez de Auth.js (la decisión 12 se reemplazó), sesión en `msp_app.session`, login con correo o usuario, matriz de roles de Strapi en cada Server Action, `proxy.ts`. La guarda por entorno se mantiene. Errores genéricos (28 oct, `25871a7`) y límite de intentos más Zod (28 oct, v1.31.0, `7bef959`; migración aplicada y prueba de punta a punta 13/13; `README.md` §14.13). `audit_log` en las escrituras de catálogos con `publicId` (28 oct, v1.32.0, sin commit; migración aplicada y prueba de punta a punta 15/15; `README.md` §14.14). Falta probarlo en el navegador y lo de cuenta (`forgotPassword`, `resetPassword`, `updateMe`, `changePassword`).
+   - [x] Perfiles de tipo de cambio (28 oct, v1.33.0, sin commit): `lib/db/exchange-rate-profiles.ts` + `exchange-rate-profile-actions.ts`, con monedas, vínculos de proyectos y auditoría por proyecto en la misma transacción. Junto con él, `getProjects` básico (`lib/db/projects.ts`: búsqueda, orden, paginación y filtros rápidos). Prueba de punta a punta 8/8; falta el navegador (`README.md` §14.16).
 5. [ ] Por cada módulo, recorrer su lista **"debe seguir funcionando"** en staging con `NEXT_PUBLIC_DATA_BACKEND=prisma`.
 6. [ ] Linter funcionando (`eslint` instalado) y `tsc --noEmit` limpio en los archivos nuevos; quitar `ignoreBuildErrors`.
 
@@ -192,6 +193,8 @@ Después del corte (fase 8) se borra la implementación `strapi` y, ya sin presi
 ### Fase 6 — Workers (reemplazo de n8n)
 
 Un servicio en Railway (`workers/`) con BullMQ + Redis. La app solo **encola**.
+
+Ficha de cada workflow, orden de trabajo, estado y reglas de coordinación con el agente de módulos: [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md).
 
 | Workflow n8n hoy | Reemplazo | Notas |
 |---|---|---|
@@ -316,6 +319,7 @@ A revisar con negocio:
 - **Archivos:** `exchange-rate-profiles-table.tsx`, `exchange-rate-profile-form.tsx`.
 - **Métodos:** `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile`, `getProjects` (para vincular).
 - **Lo que Strapi hace hoy y hay que construir:** componente `currencies` con 7 subcomponentes por moneda → tabla `exchange_rate_profile_currency`. Desaparecen `sanitizeCurrenciesComponentForWrite` y el anidado; se conservan `localCurrencyUnitsPerOneUsd` y `normalizeProjectCurrenciesFromExchangeProfile` (pasan a `lib/domain`).
+- **Hecho (28 oct, v1.33.0):** los 5 métodos y `getProjects` en `lib/db/`. La UI no cambió: la implementación `prisma` devuelve el mismo objeto `currencies` y acepta el mismo cuerpo (`projects` como arreglo o `{ connect, disconnect }`), así que `sanitizeCurrenciesComponentForWrite` sigue solo en el lado `strapi`. Decidido con el usuario: **borrar un perfil con proyectos se impide** ("está en uso"; Strapi lo permitía), y cada proyecto vinculado o desvinculado deja su fila `update` en `audit_log`. Ver `README.md` §14.16.
 - **Debe seguir funcionando:**
   - [ ] CRUD y clonar perfil.
   - [ ] Tasas de compra y venta con 8 decimales por moneda (GTQ, MXN, PAB, BZD, CRC, NIO, HNL).
@@ -327,6 +331,7 @@ A revisar con negocio:
 - **Pantallas:** `projects` (lista), `new`, `view/[documentId]`, `edit/[documentId]`, `clone/[id]`.
 - **Archivos:** `projects-table.tsx`, `advanced-filters.tsx`, `project-form.tsx` y sus 7 pestañas en `components/projects/form-tabs/` (`general-info`, `location`, `amenities`, `services`, `financing`, `banks`, `currencies`).
 - **Métodos:** `getProjects` (filtros avanzados, búsqueda, orden, paginación), `getProjectById` (lo usan también bloques y la hoja), `createProject`, `updateProject`, más catálogos.
+- **Hecho en parte (28 oct, v1.33.0):** `getProjects` con búsqueda, orden, paginación y filtros rápidos (dominio, región, país) en `lib/db/projects.ts`. Faltan los filtros avanzados (hoy responden "todavía no están migrados"), `getProjectById`, `createProject` y `updateProject`. El filtro de fase (`availability`) no tiene campo ni en Strapi ni en `msp_app` y responde con un error; la UI no lo manda.
 - **Lo que Strapi hace hoy y hay que construir:** la traducción de filtros a query-string de Strapi → un constructor de `where` de Prisma con los mismos filtros; `populate` profundo (país, desarrollador, NSE, amenidades, servicios, perfil) → `include` explícito; relaciones muchos-a-muchos (amenidades, servicios) por `documentId` → tablas puente con FK.
 - **Debe seguir funcionando:**
   - [ ] Lista con todos los filtros avanzados actuales, búsqueda, orden y paginación.
@@ -395,6 +400,7 @@ A revisar con negocio:
 - **Archivos:** `components/exchange-rate-sidebar.tsx`, `lib/exchange-rates.ts`, `app/api/exchange-rates/route.ts` (GET con caché en memoria; DELETE al cerrar sesión).
 - **Hoy:** webhook de n8n (`EXCHANGE_RATES_WEBHOOK_URL`) que sirve un histórico guardado en S3, raspado de Banguat cada 6 h.
 - **Reemplazo:** worker programado → tabla `exchange_rate`; la ruta lee la tabla (la caché en memoria y el DELETE dejan de ser necesarios).
+- **Estado (29 oct, v1.34.0, sin commit):** la tabla tiene los 7,274 días cargados desde el SOAP de Banguat (`etl`: `npm run rates:load`), con paridad 7,274 de 7,274 contra el GET de n8n (`npm run rates:parity`), y la ruta la lee con el backend `prisma` (probada con sesión en `pnpm dev:staging`: 200 desde la tabla, 401 sin sesión). v1.35.0: ruta `POST /api/cron/exchange-rates` (últimos 15 días, protegida con `CRON_SECRET`, 404 fuera de staging), pensada para un cron diario de GitHub Actions. Probada a mano en el Vercel de staging (200, 29 oct). Falta el workflow de GitHub y el histórico paginado (va con los endpoints del Copilot). Detalle en [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md), workflow 7.
 - **Debe seguir funcionando:**
   - [ ] Tasa del día (compra y venta) e histórico paginado.
   - [ ] Si Banguat no responde, se sigue mostrando el último dato conocido.

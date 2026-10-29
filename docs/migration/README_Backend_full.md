@@ -23,22 +23,22 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 ## 3. Endurecer
 
-- [ ] Errores genéricos hacia el navegador. Hoy `actionFailure` (`lib/db/action-result.ts`) devuelve `error.message` tal cual; el detalle debe quedar solo en el log del servidor.
+- [x] Errores genéricos hacia el navegador (28 oct, `25871a7`): `actionFailure` (`lib/db/action-result.ts`) solo deja pasar el mensaje de un `PublicError` (sesión, permiso, `CatalogError`); el resto queda en el log del servidor. Si no hay conexiones libres, "La base de datos está ocupada…". Ver `README.md` §14.12.
 - [x] Login en tiempo constante (22 oct): Better Auth calcula un hash bcrypt de costo 10 (el mismo de los hashes de Strapi) cuando la cuenta no existe, por correo y por usuario. Excepción menor: un usuario de menos de 3 o más de 30 caracteres se rechaza antes, sin hash.
-- [ ] Límite de intentos de login. Hoy no hay. Sin Redis, iría en `msp_app` (migración nueva).
-- [ ] Validación de entrada con Zod en `lib/db/`. `zod` está instalado pero no se usa ahí; los catálogos aceptan solo campos conocidos (`toCatalogWriteData`), sin límite de largo.
+- [x] Límite de intentos de login (28 oct, v1.31.0, sin commit): 5 por cuenta y 20 por IP en 15 minutos, bloqueo de 15 minutos, contadores en la tabla nueva `msp_app.login_attempt` (`lib/auth/login-throttle.ts`, `lib/db/login-throttle.ts`). Migración `20261028153000_login_attempt` aplicada el 28 oct y prueba de punta a punta contra `msp_app` 13/13. Falta probarlo en el navegador. Ver `README.md` §14.13.
+- [x] Validación de entrada con Zod en `lib/db/` (28 oct, v1.31.0, sin commit): `auth-schemas.ts` (login) y `catalog-schemas.ts` (endpoint, id, parámetros y cuerpo, con largos máximos); `input.ts` arma los detalles en español.
 
 ## 4. Auditoría
 
-- [ ] Escribir en `audit_log` en cada escritura, en la misma transacción, con el usuario de la sesión. La tabla existe desde la migración `init`; ningún código escribe en ella.
-- [ ] Guardar el `publicId` además del `entityId` numérico, para poder reaplicar cambios en Strapi (reversa manual, decisión 14). Implica una migración nueva, aplicada solo en `msp_app` con `npm run app:deploy` desde `etl/` y con confirmación del usuario.
+- [x] Escribir en `audit_log` en cada escritura, en la misma transacción, con el usuario de la sesión (28 oct, v1.32.0, sin commit): catálogos, con `writeAudit` de `lib/db/audit.ts`. Decidido hacerlo con `msp_app` todavía como espejo (decisión 17). Prueba de punta a punta contra `msp_app` 15/15; falta el navegador. Ver `README.md` §14.14.
+- [x] Guardar el `publicId` además del `entityId` numérico, para poder reaplicar cambios en Strapi (reversa manual, decisión 14) (28 oct, v1.32.0). Migración `20261028170000_audit_log_public_id` aplicada el 28 oct.
 
 ## 5. Calidad y operación
 
 - [ ] Bajar la línea base de 38 errores de `npx tsc --noEmit` y quitar `typescript.ignoreBuildErrors` de `next.config.mjs`.
 - [ ] Linter que funcione (`pnpm lint` falla: `eslint` no está instalado).
-- [ ] Revisar el pool de conexiones: cada instancia de Vercel abre su propio pool de 2 (`lib/db/connection.ts`).
-- [ ] Escribir cuándo `msp_app` deja de ser espejo de Strapi. Hoy el ETL borra lo que se crea en la app, salvo las cuentas `app-…`. Debe quedar decidido antes de activar `audit_log`.
+- [ ] Revisar el pool de conexiones: cada instancia de Vercel abre su propio pool de 2 (`lib/db/connection.ts`). *En la app, hecho el 28 oct (`25871a7`):* las conexiones inactivas se cierran a los 5 s y `attachDatabasePool` (`@vercel/functions`) las suelta antes de congelar la función. **Falta** (una persona): liberar el rol saturado en Railway, desplegar el staging y decidir `idle_session_timeout` / rol propio. Ver `README.md` §14.12.
+- [ ] Escribir cuándo `msp_app` deja de ser espejo de Strapi. Hoy el ETL borra lo que se crea en la app, salvo las cuentas `app-…`. *El 28 oct el usuario decidió activar `audit_log` antes de esto (decisión 17); el corte sigue sin fecha y debe quedar decidido, con los respaldos (decisión 16), antes de que la app se use en serio.*
 
 ## 6. Fuera del código (lo hace una persona, no el agente)
 
@@ -51,15 +51,15 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 - [x] Qué puede hacer cada rol: la matriz de Strapi (punto 2; 22 oct).
 - [x] Sesión guardada en la base (Better Auth, `msp_app.session`; 22 oct).
 - [x] Duración de la sesión: 7 días renovados con el uso; no se cierra al cerrar el navegador (22 oct).
-- [ ] Límite de intentos de login: cuántos y por cuánto tiempo.
+- [x] Límite de intentos de login: 5 por cuenta y 20 por IP en 15 minutos, bloqueo de 15 minutos, guardado en `msp_app` (valores del plan del 28 oct, aceptados por el usuario).
 - [ ] Si recuperar contraseña por correo entra ahora (necesita proveedor de correo: Resend o SES).
 
 ## 8. Después del pulido: módulos sin migrar
 
-En `lib/api/prisma-client.ts`, 22 métodos fallan con "todavía no está migrado". Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
+En `lib/api/prisma-client.ts`, 16 métodos fallan con "todavía no está migrado" (eran 22 hasta la v1.33.0). Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
 
 - [ ] Cuenta (4): `forgotPassword`, `resetPassword`, `updateMe`, `changePassword`.
-- [ ] Perfiles de tipo de cambio (5): `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile`.
-- [ ] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`.
+- [x] Perfiles de tipo de cambio (5): `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile` (28 oct, v1.33.0, sin commit; prueba de punta a punta 8/8; falta el navegador). Ver `README.md` §14.16.
+- [ ] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`. *`getProjects` hecho el 28 oct (v1.33.0) con búsqueda, orden, paginación y filtros rápidos; los filtros avanzados y el de fase responden con un error claro.*
 - [ ] Bloques (5): `getBlocks`, `getBlocksLite`, `getBlockById`, `createBlock`, `updateBlock`.
 - [ ] Unidades (4): `getUnitsAllPages`, `updateUnit`, `updateUnitBatch`, `createUnit`.

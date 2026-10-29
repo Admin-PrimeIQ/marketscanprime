@@ -789,6 +789,19 @@ model Verification {
   @@map("verification")
 }
 
+/// Intentos de login por cuenta (`acct:<identificador>`) o por IP (`ip:<dirección>`), en una ventana
+/// fija. Lo escribe `loginAction` (`lib/db/login-throttle.ts`); el ETL no la carga ni la borra.
+model LoginAttempt {
+  key         String    @id
+  failCount   Int       @default(0) @map("fail_count")
+  windowStart DateTime  @map("window_start") @db.Timestamptz(6)
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedAt])
+  @@map("login_attempt")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Operación: sincronización con el warehouse, tipo de cambio, auditoría
 // ─────────────────────────────────────────────────────────────────────────────
@@ -876,12 +889,16 @@ model ExchangeRate {
   @@map("exchange_rate")
 }
 
-/// Quién cambió qué. `entity` = nombre de tabla; `before`/`after` = filas en JSON.
+/// Quién cambió qué. `entity` = nombre de tabla; `before`/`after` = filas en JSON. `publicId` es el
+/// `documentId` de Strapi de la fila: con él se reaplica un cambio en Strapi (reversa manual,
+/// decisión 14), porque `entityId` solo vale dentro de `msp_app`. Lo escribe `lib/db/audit.ts` en la
+/// misma transacción que el cambio; el ETL no la carga ni la borra.
 model AuditLog {
   id        BigInt      @id @default(autoincrement())
   userId    Int?        @map("user_id")
   entity    String
   entityId  Int         @map("entity_id")
+  publicId  String?     @map("public_id")
   action    AuditAction
   before    Json?
   after     Json?
@@ -890,6 +907,7 @@ model AuditLog {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([entity, entityId])
+  @@index([entity, publicId])
   @@index([userId])
   @@index([createdAt])
   @@map("audit_log")
