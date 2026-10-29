@@ -10,6 +10,7 @@ Creado el 28 oct 2026. Fuentes: [`docs/manual-del-sistema.md`](../manual-del-sis
 
 1. Cumplir la sección **«0. Lectura obligatoria»** de [`README.md`](README.md): la skill [`proteger-produccion`](../../.agents/skills/proteger-produccion/SKILL.md), su [inventario](../../.agents/skills/proteger-produccion/inventario-produccion.md), [`ROADMAP.md`](ROADMAP.md) y el README completo. Este documento no la reemplaza.
 2. Responder en español. Antes de explorar código, `graphify query "<pregunta>"`; después de modificarlo, `graphify update .`.
+3. **Para retomar el trabajo**, leer en este orden: el bloque «Traspaso» al inicio de la §7 (dónde quedó todo y qué sigue), la entrada más reciente de la bitácora (§8), la §6 (lo que hay que preguntarle al usuario) y la §9 (cómo correr cosas en esta máquina sin tropezar).
 
 **Todo n8n es producción.** Mientras dure la migración, los 9 workflows siguen corriendo igual y nadie debe notar que existimos. Reglas que aplican en especial a este trabajo:
 
@@ -41,7 +42,7 @@ Si una tarea no cae claramente en ninguna fila, preguntarle al usuario antes de 
 
 Los dos agentes trabajan en el mismo repo y la misma base `msp_app`. Lo que se comparte, y cómo no pisarse:
 
-- **Ramas.** Cada agente en su propia rama, que sale de la rama vigente de la migración (hoy `feat/data-facade`, que el usuario fusiona a `main` con PR: [#9](https://github.com/Admin-PrimeIQ/marketscanprime/pull/9) y [#10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10) el 29 oct). Ningún agente hace commit, `git push` ni merge: el usuario hace los commits. Un merge a `main` despliega `admin.primeiqlatam.com`: el código de la migración tiene que seguir apagado ahí (backend `strapi`, guardas de `lib/db/guard.ts`).
+- **Ramas.** Cada agente en su propia rama, que sale de `main` (el usuario fusionó ahí `feat/data-facade` con los PR [#9](https://github.com/Admin-PrimeIQ/marketscanprime/pull/9), [#10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10) y [#11](https://github.com/Admin-PrimeIQ/marketscanprime/pull/11) el 29 oct). La rama de este agente es **`jc_migrate_workflowsn`**. Ningún agente hace commit, `git push` ni merge: el usuario hace los commits. Un merge a `main` despliega `admin.primeiqlatam.com`: el código de la migración tiene que seguir apagado ahí (backend `strapi`, guardas de `lib/db/guard.ts`).
 - **`prisma/schema.prisma` y migraciones (lo más delicado).** Las migraciones se generan con `migrate diff --from-config-datasource`, que compara **la base real** contra **tu** `schema.prisma`. Si el otro agente ya aplicó una migración que tu rama todavía no tiene, tu diff incluirá un `DROP` de sus tablas o columnas. Por eso:
   1. antes de generar una migración, traer a tu rama el `schema.prisma` y las carpetas de `prisma/migrations/` del otro agente (pedírselo al usuario si no están commiteadas);
   2. revisar línea por línea que el SQL **solo** traiga lo tuyo: ningún `DROP`, y nada que mencione `dbo_stage` ni `dbo`;
@@ -200,6 +201,8 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 |---|---|---|
 | Modelos `SyncRun` (`sync_run`), `SyncRunBlock` (`sync_run_block`) y enums `SyncRunStatus`, `SyncOperation`, `SyncBlockMode`, `SyncBlockOperation` | `prisma/schema.prisma` | Tablas creadas en `msp_app` (migración `init`), vacías. **Falta** el índice único parcial «una sola corrida activa» (Prisma no lo modela; agregarlo a mano en una migración, README §10). |
 | Modelo `ExchangeRate` (`exchange_rate`) | `prisma/schema.prisma` | Único `(date, currency)`. Cargada con el histórico (7,274 días desde el 30/11/2006) y actualizada a diario por el cron (workflow 7). |
+| Tipo de cambio (workflow 7) | Reglas y cliente SOAP en `lib/domain/exchange-rates/`; servicio `lib/db/exchange-rate-sync.ts`; rutas `app/api/exchange-rates/route.ts` y `app/api/cron/exchange-rates/route.ts`; `lib/cron-secret.ts`; carga y paridad en `etl/src/exchange-rates/` (`npm run rates:load`, `npm run rates:parity`); cron `.github/workflows/exchange-rates.yml` | En `main`. Corre a diario en staging; falta la semana en sombra (§7 paso 1). |
+| Contadores del bloque (workflow 6) | `lib/domain/blocks/counters.ts` (cálculo puro), `lib/db/block-counter-mapping.ts` (puente con Prisma), `lib/db/block-counters.ts` (`lockBlockForUpdate`, `recalculateBlockCounters`), `lib/domain/units/concurrency.ts` (`findStaleUnits`); paridad en `etl/src/block-counters/` (`npm run counters:parity`). Cada archivo con su `.test.ts` | Commits del usuario `12155da` y `7a34015`, en `origin/jc_migrate_workflowsn`, sin fusionar a `main`. Probado contra `msp_app` (§8, 29 oct). Nadie lo llama todavía: lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8). |
 | Conexión de solo lectura al warehouse MySQL | `etl/src/warehouse/connection.ts`, `ping.ts` (`npm run warehouse:ping`), lista de tablas en `etl/src/db/warehouse-tables.ts` | Escrita, nunca probada: falta `DATABASE_HOST_WAREHOUSE` (README §13.3). |
 | Conexión al Postgres de staging (`dbo_stage` en solo lectura) | `etl/src/stage/connection.ts`, `ping.ts`, `describe.ts` | Funciona. **Falta** el cliente de escritura para la copia sombra: conexión aparte con lista cerrada de las 11 tablas, y que cualquier escritura fuera de ella (en especial `sec_*`) falle en el código (README §8 punto 3). |
 | Estructura del warehouse en Postgres | README §11.3 y §11.4 | Las 11 tablas del push existen vacías en `dbo_stage` y `dbo` del servidor de staging. |
@@ -225,13 +228,14 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 
 | Pregunta | Bloquea |
 |---|---|
-| **Identidad de filas en el warehouse:** cómo se asignan `legacyId` / `cod_proyecto` a bloques y unidades nuevos. Revisar primero cómo inserta el Sync Block Worker en `housing_units` (si manda `id` explícito, que choca con `IDENTITY ALWAYS`, y si devuelve el id a Strapi). | Push (workflow 4) |
+| **Host del warehouse en el `.env`:** ¿ya agregó el usuario `DATABASE_HOST_WAREHOUSE` (y, si el usuario de Strapi no sirve ahí, `DATABASE_USER_WAREHOUSE` / `DATABASE_PASSWORD_WAREHOUSE`)? Es información, no permiso: `warehouse:ping` solo lee. El agente no lee el `.env` ni busca nombres de variables en él (la revisión automática lo bloquea); hay que preguntar. | `npm run warehouse:ping` (§7 paso 3) |
+| **Identidad de filas en el warehouse:** cómo se asignan `legacyId` / `cod_proyecto` a bloques y unidades nuevos. Hoy un bloque se une a su fila de `housing_universe` por `cod_proyecto` ↔ `legacyId`, y los nacidos en la app (sin `legacyId`) por `documentId` (`CLAUDE.md`, «Sibling repo»). Revisar primero cómo inserta el Sync Block Worker en `housing_units` (si manda `id` explícito, que choca con `IDENTITY ALWAYS`, y si devuelve el id a Strapi). | Push (workflow 4) |
 | **El pull:** eliminarlo o reemplazarlo por un importador con vista previa. | Workflow 5 |
 | **Quién lee cada `dbo`** y si otros proyectos escriben en las tablas de Market Scan. | Corte del push |
 | **Red:** ¿Railway llega al RDS MySQL? (IP fija o túnel). | Workers que lean el warehouse |
 | **Infraestructura de workers:** proyecto o servicio de Railway, y Redis propio. No existen. Los crea una persona; nombres que no se confundan con producción (p. ej. `marketscan-next`, `msp-*`). | Servicio de workers |
 | **Respaldos del push:** S3 propio o tabla con retención. | Workflow 4 en producción |
-| **Acceso a `n8n-manager`:** clonarlo en esta máquina (solo lectura) y exportar Block Edit Queue y Chat Sessions API, que no están en el repo. | Workflows 4, 6, 8 y 9 |
+| **Acceso a `n8n-manager`:** clonarlo en esta máquina (solo lectura). Chat Sessions API no está en ese repo: pedirle al usuario que lo exporte desde n8n, como hizo con Block Edit Queue el 29 oct (lo busca por nombre en la lista de workflows y usa *Download*). Un JSON exportado puede traer tokens de producción: leerlo, no copiar el token y no guardarlo en el repo. | Workflows 4, 8 y 9 |
 | **Regla de Interior** (README §13.2): no cambia el push (copia valores), pero sí la paridad si alguien recalcula unidades. | Paridad del push |
 
 ---
@@ -240,7 +244,17 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 
 Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha en la §8.
 
-> **Estado al 29 oct, 15:30:** el paso 1 está construido y solo espera la semana en sombra. El paso 2 (contadores) está construido y espera a que el agente de módulos lo llame desde `saveUnitChanges`. **El siguiente paso de este agente es el 3, acceso al warehouse**, que necesita respuestas del usuario (§6): host del MySQL (`DATABASE_HOST_WAREHOUSE`), red desde Railway e identidad de filas.
+> **Traspaso al 29 oct, 15:20 (UTC-6).** Para el agente que continúe esta conversación.
+>
+> **Git.** Rama `jc_migrate_workflowsn`, al día con `origin` en `fa2271e` (commit del usuario, ~15:20, con el resultado de la prueba en `CHANGELOG.md` y `README.md` §6), **sin fusionar a `main`**. El código de los contadores (v1.36.0) está en `12155da` y `7a34015`. Sin commit queda solo este archivo, con este traspaso y la §9. El commit lo hace el usuario.
+>
+> **Dónde quedó cada paso:**
+> - Paso 1, tipo de cambio: construido y en `main`; corre a diario. Falta la semana en sombra (30 oct–5 nov): `npm run rates:parity` en `etl/` cada día después de las 7:17. El 30 oct, revisar además la primera corrida programada del workflow de GitHub.
+> - Paso 2, contadores: construido, con paridad y probado contra `msp_app` en una transacción revertida (§8). **Este agente no tiene nada más que hacer ahí**: lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8, con el orden bloquear → `findStaleUnits` → escribir unidades → `recalculateBlockCounters`). Queda una decisión del usuario para el corte: recalcular de una vez los ~580 bloques del warehouse o no.
+> - **Siguiente para este agente: paso 3, acceso al warehouse.** No necesita permiso (es solo lectura); necesita que el usuario confirme que agregó `DATABASE_HOST_WAREHOUSE` al `.env` (§6). Con eso: `npm run warehouse:ping` desde `etl/` (receta y qué hacer según el resultado en `README.md` §13.3). Si muestra permisos de escritura, detenerse y avisar; si faltan permisos, el `GRANT SELECT` lo corre un administrador, no el agente.
+> - Pasos 4 y 5 dependen del 3 y de la identidad de filas (§6). La red desde Railway (§6) solo hace falta cuando exista el worker.
+>
+> **Lo último que pidió el usuario** fue este traspaso. Antes había preguntado para qué hacía falta su permiso: solo para escribir (en `msp_app` o en cualquier sistema); el paso 3 pide datos, no autorización.
 
 1. [ ] **Tipo de cambio** (workflow 7), sin workers. **Construido; falta solo la semana en sombra.**
    - v1.34.0 (29 oct): reglas puras, carga del histórico desde el SOAP de Banguat (7,274 días en `msp_app.exchange_rate`), paridad 7,274 de 7,274 contra el `GET` de n8n y ruta `/api/exchange-rates` leyendo la tabla en modo `prisma` (probada con sesión en `pnpm dev:staging`: 200 desde la tabla y barra lateral correcta).
@@ -251,7 +265,7 @@ Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha 
 2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Construido el 29 oct (v1.36.0); falta que el agente de módulos lo llame.** Detalle en la ficha del workflow 6 (§4).
    - Hecho: `computeBlockCounters` (`lib/domain/blocks/counters.ts`, copia exacta de n8n), `lockBlockForUpdate` y `recalculateBlockCounters` (`lib/db/block-counters.ts`), el bloqueo optimista de unidades (`findStaleUnits` en `lib/domain/units/concurrency.ts`) y la paridad de solo lectura (`npm run counters:parity` en `etl/`).
    - Para cerrar la casilla: `saveUnitChanges` los usa (`ROADMAP.md` §4.8), y el usuario decide en el corte si se recalculan de una vez los ~580 bloques del warehouse. Apagar el workflow 6 en n8n lo hace una persona en el corte.
-   - Probado contra `msp_app` el 29 oct con autorización del usuario, en una transacción revertida (bitácora del 29 oct, 15:30–15:45).
+   - Probado contra `msp_app` el 29 oct con autorización del usuario, en una transacción revertida (bitácora del 29 oct, 15:10–15:20).
 3. [ ] **Acceso al warehouse:** `npm run warehouse:ping` en verde (README §13.3) y respuesta a la identidad de filas (§6).
 4. [ ] **Mapeador del push** (workflow 4): `lib/domain/warehouse/`, puro, con prueba de paridad celda por celda contra el `dbo_stage` de MySQL.
 5. [ ] **Cliente de escritura de la copia sombra** con lista cerrada de las 11 tablas, y worker `warehouse-push` sobre BullMQ.
@@ -268,8 +282,9 @@ Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 
 Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6), qué se hizo, qué se verificó, migraciones aplicadas en `msp_app`, commits del usuario y qué quedó pendiente o por preguntar.
 
-### 29 oct 2026, 15:30–15:45
+### 29 oct 2026, 15:10–15:20
 
+- El usuario hizo el commit `7a34015` (15:10, código de los contadores y documentos de la v1.36.0) y lo subió a `origin/jc_migrate_workflowsn`. No está fusionado a `main`.
 - Prueba de `recalculateBlockCounters` contra `msp_app`, **autorizada por el usuario**, con un script temporal (ya borrado) que corrió todo en una transacción y la revirtió al final. Actor: el usuario de pruebas (`engteam`, id 137).
 - Bloques: `ciudad-buenaventura-fase-1` (id 3374, contadores al día) y `lotificacion-caserio-navidad` (id 3383, 13 guardadas contra 14 unidades).
 - Resultado, 6 de 6:
@@ -281,10 +296,12 @@ Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6
   - Después del `ROLLBACK`, los dos bloques (incluido `updatedAt`) y el conteo de `audit_log` quedaron iguales.
 - La secuencia del id de `audit_log` avanzó (Postgres no la revierte): es un hueco inofensivo en la numeración.
 - Una corrida intermedia falló dentro de la transacción por un error del script (comprobaba el bloque libre con un bloque que la propia transacción tenía tomado). Se revirtió sola, y la corrida final lo confirmó al inicio: el bloque 3383 seguía con 13.
-- Sin migraciones. Sin cambios de código.
-- Pendiente: lo mismo que la entrada anterior, salvo esta prueba.
+- Sin migraciones. Sin cambios de código. Resultado anotado en `CHANGELOG.md`, `README.md` §6 y la §7 de este archivo; el usuario los subió en `fa2271e`.
+- El usuario preguntó para qué se necesitaba su permiso: solo para escribir. El paso 3 necesita datos (§6), no autorización.
+- Se reescribió el traspaso (§7), se actualizaron la §2 (ramas), la §5 (piezas de los workflows 6 y 7) y la §6 (host del warehouse, exportar Chat Sessions API), y se agregó la §9 para que otro agente pueda continuar. Sin commit.
+- Pendiente: el commit de este archivo (usuario), el paso 3 en cuanto el usuario confirme el host del warehouse, y la semana en sombra del tipo de cambio.
 
-### 29 oct 2026, 14:30–15:30
+### 29 oct 2026, 14:30–15:10
 
 - Rama `jc_migrate_workflowsn` (con `dce934a` y `main` ya fusionados por el usuario). El usuario exportó Block Edit Queue desde n8n; el JSON quedó fuera del repo porque trae el token de Strapi de producción (se le avisó).
 - Decisiones del usuario: copiar la fórmula de n8n tal cual (las correcciones se deciden con el reporte); recalcular en la transacción del guardado y pasar a BullMQ solo si la medición lo pide (más de 500 ms o cuando exista el servicio de workers); **bloqueo optimista** de unidades: rechazar el cambio de una unidad editada por otra persona desde que se cargó la hoja y avisar.
@@ -336,3 +353,29 @@ Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6
 - Se creó este documento a partir del manual, el `ROADMAP.md` y el código. No se tocó ningún workflow, base ni servicio.
 - Comprobado en el repo: `sync_run`, `sync_run_block` y `exchange_rate` existen en `prisma/schema.prisma`; las rutas de sync responden 503 con el backend `prisma`; `n8n-manager` no está clonado en esta máquina.
 - Siguiente: preguntarle al usuario por las decisiones de la §6 y empezar por el paso 1 de la §7.
+
+---
+
+## 9. Cómo trabajar en esta máquina
+
+Lo aprendido en las sesiones del 28 y 29 oct (Windows, PowerShell 5, Node 24). Las reglas de la §0 siguen mandando.
+
+**Pruebas y tipos**
+- Desde la raíz, `npm test` (módulos puros con `node --test`); desde `etl/`, su propio `npm test`. Al 29 oct: 191 en la raíz y 64 en `etl`.
+- `npx tsc --noEmit` tiene 38 errores de base; filtrar la salida a los archivos tocados.
+- En PowerShell, pasar la salida de `npm test` por `Select-String` no muestra nada: redirigirla a un archivo en `$env:TEMP` y leer el final.
+- Un archivo nuevo de `lib/domain/` o de `lib/db/` con pruebas también va en el script `test` de `package.json`, que lista los patrones a mano.
+
+**Scripts contra `msp_app`**
+- Correrlos desde la raíz con el `tsx` del ETL: `.\etl\node_modules\.bin\tsx.cmd scripts/<archivo>.mts`, cargando el `.env` dentro del script con `process.loadEnvFile(".env")`.
+- `lib/db/client.ts` importa `server-only` y falla fuera de Next. Armar el cliente aparte: `new PrismaClient({ adapter: new PrismaPg(new pg.Pool({ ...appPoolConfig(), max: 1 }), { schema: APP_SCHEMA }) })`, con `PrismaClient` de `lib/db/generated/client.ts` y `appPoolConfig`, `APP_SCHEMA` de `lib/db/connection.ts`. Pool chico: el Postgres de Railway corta con «too many connections».
+- Solo lectura por defecto: abrir la conexión con `-c default_transaction_read_only=on`, como `etl/src/block-counters/index.ts`.
+- **Cualquier escritura en `msp_app` necesita autorización del usuario.** Para probar código que escribe sin dejar rastro, correrlo dentro de `prisma.$transaction(async (tx) => { …; throw ROLLBACK })`, atrapar ese error afuera y comprobar después de la transacción que todo quedó igual. Las secuencias de Postgres avanzan igual (huecos inofensivos en los ids). Ojo: lo que la transacción ya bloqueó con `FOR UPDATE` no sirve como «fila libre» en una prueba de bloqueo.
+- El usuario de pruebas se busca por el correo de `DEV_LOGIN_EMAIL` sin imprimirlo; su `username` es `engteam` (id 137), no `app-engteam`.
+- Borrar los scripts temporales al terminar; no se suben.
+
+**Archivos y `.env`**
+- No leer ni imprimir valores del `.env`, ni buscar nombres de variables en él: preguntarle al usuario si una variable existe.
+- `Set-Content -Encoding utf8` de PowerShell 5 agrega BOM. Para editar, usar las herramientas de edición; si hace falta PowerShell, `[System.IO.File]::WriteAllText($ruta, $texto, [System.Text.UTF8Encoding]::new($false))`.
+- `next dev` crea un `AGENTS.md` en la raíz al arrancar: borrarlo.
+- Los JSON exportados de n8n quedan fuera del repo (traen tokens de producción).
