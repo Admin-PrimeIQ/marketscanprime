@@ -25,7 +25,7 @@ pnpm start            # next start
 
 Type checking: `npx tsc --noEmit`. Note `next.config.mjs` sets `typescript.ignoreBuildErrors: true`, so **a green build does not mean the types are clean**. The baseline is noisy — filter output to files you touched.
 
-Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine and block context in `lib/domain/units/`, plus `lib/*.test.ts`, `lib/copilot/`, `lib/db/` (catalog mapping and guard) and `components/units/`. The ETL in `etl/` has its own `npm test`.
+Tests: `npm test` runs the pure modules with `node --test` (no dependencies needed): the formula engine, block context and unit concurrency check in `lib/domain/units/`, the block counters in `lib/domain/blocks/`, plus `lib/*.test.ts`, `lib/copilot/`, `lib/db/` (catalog mapping and guard) and `components/units/`. The ETL in `etl/` has its own `npm test`.
 
 ## Environment
 

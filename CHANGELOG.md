@@ -6,6 +6,18 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Contadores del bloque sin n8n y bloqueo optimista de unidades (v1.36.0)
+
+_2026-10-29_
+
+Paso 2 de la §7 de [`docs/migration/N8N_WORKFLOWS.md`](docs/migration/N8N_WORKFLOWS.md): reemplazo del workflow de n8n "Block Edit Queue", que recalculaba los contadores del bloque después de cada guardado de la hoja. **Producción no cambia**: nada de esto se llama todavía; lo usará `saveUnitChanges` cuando se migre el módulo de unidades (`ROADMAP.md` §4.8).
+
+- **Cálculo** [lib/domain/blocks/counters.ts](lib/domain/blocks/counters.ts): `computeBlockCounters`, copia exacta del nodo "Compute counters" (decisión del usuario: las reglas raras se conservan). Sus pruebas incluyen el código de n8n tal cual y exigen el mismo resultado en 2,000 bloques al azar.
+- **Transacción** [lib/db/block-counters.ts](lib/db/block-counters.ts): `lockBlockForUpdate` (`SELECT … FOR UPDATE` del bloque) y `recalculateBlockCounters(tx, blockId, actor)`, que lee las unidades, calcula y escribe las 10 columnas con su fila en `audit_log` solo si cambiaron. Puente puro con Prisma en [lib/db/block-counter-mapping.ts](lib/db/block-counter-mapping.ts). Sin cola ni Redis: se pasa a BullMQ solo si el recálculo supera 500 ms o cuando exista el servicio de workers (decisión del usuario).
+- **Bloqueo optimista** [lib/domain/units/concurrency.ts](lib/domain/units/concurrency.ts): `findStaleUnits` compara, en milisegundos, el `updatedAt` con el que la hoja cargó cada unidad contra el actual; una unidad que otra persona cambió o borró no se sobrescribe (decisión del usuario).
+- **Paridad** `npm run counters:parity` en `etl/` ([etl/src/block-counters/](etl/src/block-counters/)), solo lectura sobre `msp_app`: 1,102 de 1,688 bloques iguales; en los nacidos en el backoffice, 199 de 204. Los distintos son bloques que n8n nunca recalculó (casi todos vienen del warehouse). Detalle en la ficha del workflow 6.
+- **Verificación**: `npm test` 191/191 (antes 169), `etl` 64/64, `tsc` sin errores en archivos tocados. `recalculateBlockCounters` aún no se probó contra la base (escribe; requiere autorización).
+
 ## Ruta del cron del tipo de cambio para Vercel de staging (v1.35.0)
 
 _2026-10-29_

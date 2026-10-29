@@ -142,15 +142,30 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 
 ### Grupo B: contadores de bloque (1 workflow)
 
-#### 6. Block Edit Queue · sin ID (no exportado)
+#### 6. Block Edit Queue (webhook + Redis debounce) · `VXpCCQ78qLYcR4r9`
 
-- **Hoy:** webhook público `POST /webhook/block-counter-update` con `{ blockId, skipSync? }`. Encola en Redis (`blockqueue:<blockId>`), espera 10 s y solo el pedido más reciente sigue; lee todas las unidades del bloque en Strapi, calcula y hace `PUT` del bloque.
-- **Calcula:** `availableUnits`, `availableM2`, `totalUnits`, `totalM2`, `averagePricePerM2USD`, `averageInstallmentUSD`, `averageIncomeUSD`, `assignedParking`, `averagePriceUSD`, `averageSizeM2` (manual, líneas 7018–7077). En `msp_app` son columnas de `block` (`total_units`, `available_m2`, `average_price_per_m2_usd`, …).
-- **Lo llaman:** la hoja de unidades después de guardar y `scripts/sync-database` después de un push de unidades.
-- **Ojo:** el workflow **no está exportado** en `n8n-manager`, así que no hay fuente de las fórmulas exactas (qué cuenta como disponible, qué tamaño promedia, cómo trata los nulos). Hay que reconstruirlas y probarlas contra los valores que ya tienen los bloques. Pedirle al usuario el JSON exportado desde n8n (lo exporta una persona; exportar es lectura) antes de adivinar.
-- **Reemplazo:** función pura `computeBlockCounters(unidades)` en `lib/domain/` con pruebas, que el agente de módulos llama dentro de la transacción del guardado de unidades. Ya no hace falta cola ni debounce. Si resultara lento, job de BullMQ con `jobId = blockId` y `delay`.
-- **Paridad sin tocar producción:** `msp_app` tiene los bloques y las unidades copiados de Strapi por el ETL. Calcular para todos los bloques y comparar contra las columnas guardadas, en sesión de solo lectura. Las diferencias muestran bloques que n8n no recalculó o reglas mal reconstruidas.
-- **Hecho cuando:** la función coincide con lo guardado en los bloques recalculados recientemente y el usuario aprueba las diferencias restantes.
+- **Fuente:** el usuario lo exportó desde n8n el 29 oct (no está en `n8n-manager`). El JSON **no se guarda en el repo**: trae escrito en dos nodos el token de la API de Strapi de producción. Rotarlo lo decide quien administra producción.
+- **Hoy:** webhook público `POST /webhook/block-counter-update` con `{ blockId, skipSync? }`.
+  1. Si `skipSync` es `true`, salta directo al cálculo.
+  2. Si no, pone el aviso arriba de una lista en Redis (`blockqueue:<blockId>`), espera 10 s y relee: si su aviso ya no está arriba, responde `skipped` (un aviso más nuevo hará el cálculo). La lista nunca se limpia ni vence.
+  3. Lee de Strapi todas las unidades del bloque (de 100 en 100, por `documentId` o por `id` numérico).
+  4. Calcula (nodo "Compute counters") y hace `PUT /api/blocks/<blockId>` con el resultado.
+  5. Si el `PUT` falla, también responde `skipped`: un error no se distingue de un aviso descartado.
+  - Tiene un "Schedule Trigger" suelto, sin conexiones: no corre.
+- **Reglas del cálculo** (copiadas tal cual en `lib/domain/blocks/counters.ts`):
+  - cuenta todas las unidades, disponibles o no; disponible = `availability` `Available` (o `available`);
+  - tamaño de la unidad = `unitSizeM2`, y si es 0 o falta, `totalSizeM2`;
+  - `totalM2` y `availableM2` suman ese tamaño; `averageSizeM2` = `totalM2 / totalUnits`, incluidas las de 0 m²;
+  - `averagePriceUSD`, `averagePricePerM2USD`, `averageInstallmentUSD` y `averageIncomeUSD` promedian solo valores > 0; sin ninguno, `null`;
+  - `assignedParking` = suma de `parkingSpaces`;
+  - lo que no es número cuenta como 0; m² y promedios con `Math.round(x * 100) / 100`.
+- **Lo llaman:** la hoja de unidades después de guardar (con el `documentId`) y `scripts/sync-database` después de un push de unidades. El ejemplo guardado en el JSON trae `blockId: "1310"` enviado con axios: el CLI manda el `id` numérico, y en Strapi v5 ese `PUT` probablemente falla (sin confirmar; no se llama a Strapi ni a n8n para comprobarlo). La paridad lo respalda: casi todos los bloques del warehouse nunca se recalcularon.
+- **Reemplazo (hecho el 29 oct, v1.36.0):**
+  - `computeBlockCounters` en [`lib/domain/blocks/counters.ts`](../../lib/domain/blocks/counters.ts), pura. Sus pruebas incluyen el código del nodo de n8n copiado tal cual y exigen el mismo resultado en 2,000 bloques al azar.
+  - `lockBlockForUpdate` y `recalculateBlockCounters(tx, blockId, actor)` en [`lib/db/block-counters.ts`](../../lib/db/block-counters.ts): bloquean la fila del bloque, leen sus unidades, calculan y escriben las 10 columnas con su fila en `audit_log`, en la transacción de quien llama. Si nada cambió, no escriben.
+  - **Decisión del usuario (29 oct):** recalcular en la misma transacción del guardado, sin cola. Pasar a BullMQ (`jobId = blockId` con retraso, que junta los guardados del mismo bloque) solo si el recálculo pasa de 500 ms o cuando exista el servicio de workers. Medido el 29 oct en `msp_app`: unidades por bloque mediana 78, p95 474, máximo 4,467; en el más grande, ~300 ms leyendo desde una PC fuera de Railway y ~5 ms calculando.
+- **Paridad** (`npm run counters:parity` en `etl/`, solo lectura, 29 oct): de 1,688 bloques, 1,102 iguales. Nacidos en el backoffice: 199 de 204 iguales; los 5 restantes se explican sin tocar la fórmula (2 sin unidades, 2 con una unidad borrada después del último cálculo, 1 nunca calculado). Del warehouse: 903 de 1,484; de los 573 distintos, 482 tienen `total_units` vacío (n8n nunca los escribió y sus promedios vienen del warehouse), 71 tienen promedios del warehouse y 20 un total desactualizado.
+- **Hecho cuando:** la función coincide con lo guardado donde n8n sí recalculó (cumplido, ver paridad) y el agente de módulos la llama dentro de `saveUnitChanges`. **Pendiente de decidir en el corte:** recalcular de una vez los ~580 bloques del warehouse o dejar que se actualicen al guardar; lo primero cambia los promedios que el push copia al warehouse.
 
 ### Grupo C: tipo de cambio (1 workflow)
 
@@ -225,7 +240,7 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 
 Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha en la §8.
 
-> **Estado al 29 oct, 14:00:** el paso 1 está construido, su cron ya está en `main` y corre a diario contra staging; solo espera la semana en sombra, que no requiere código. **El siguiente workflow a migrar es el 6, Block Edit Queue (paso 2).** El siguiente agente empieza por ahí, no por el tipo de cambio.
+> **Estado al 29 oct, 15:30:** el paso 1 está construido y solo espera la semana en sombra. El paso 2 (contadores) está construido y espera a que el agente de módulos lo llame desde `saveUnitChanges`. **El siguiente paso de este agente es el 3, acceso al warehouse**, que necesita respuestas del usuario (§6): host del MySQL (`DATABASE_HOST_WAREHOUSE`), red desde Railway e identidad de filas.
 
 1. [ ] **Tipo de cambio** (workflow 7), sin workers. **Construido; falta solo la semana en sombra.**
    - v1.34.0 (29 oct): reglas puras, carga del histórico desde el SOAP de Banguat (7,274 días en `msp_app.exchange_rate`), paridad 7,274 de 7,274 contra el `GET` de n8n y ruta `/api/exchange-rates` leyendo la tabla en modo `prisma` (probada con sesión en `pnpm dev:staging`: 200 desde la tabla y barra lateral correcta).
@@ -233,12 +248,10 @@ Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha 
    - 29 oct: workflow de GitHub [`.github/workflows/exchange-rates.yml`](../../.github/workflows/exchange-rates.yml) en `main` (PR #10), diario a las 7:17 de Guatemala; corrida manual desde GitHub con 200 en Vercel.
    - Para cerrar la casilla: semana en sombra (`npm run rates:parity` en `etl/` cada día, del 30 oct al 5 nov) sin diferencias, la lista de `ROADMAP.md` §4.10 y la casilla correspondiente marcada allí. Apagar el workflow 7 en n8n lo hace una persona en el corte.
    - Fuera de este paso: el histórico paginado que consulta el Copilot (paso 8).
-2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Siguiente.** Ver la ficha del workflow 6 en la §4.
-   - **Bloqueo previo, preguntarle al usuario:** el JSON exportado de Block Edit Queue (no está en `n8n-manager`; exportarlo desde n8n lo hace una persona y es solo lectura). Sin él no se adivinan las fórmulas (qué cuenta como disponible, qué tamaño se promedia, cómo se tratan los nulos y las unidades sin precio).
-   - **Lo que hay hoy en el repo:** nada del cálculo. La hoja llama al webhook con `notifyBlockCounterUpdate()` en `components/units/datasheet-units-table.tsx` (líneas 240–243, llamadas en 2909 y 3103); con el backend `prisma` la URL queda vacía (`productionN8nDefault`) y no se llama. `scripts/sync-database` también lo llama después de un push de unidades.
-   - **Entregables:** función pura `computeBlockCounters(unidades)` en `lib/domain/blocks/counters.ts` (sin React ni alias `@/`, imports relativos `.ts`, igual que `lib/domain/units/`) con pruebas `node --test`; un script de paridad de solo lectura en `etl/` que calcule todos los bloques de `msp_app` y compare con sus columnas guardadas (`total_units`, `available_units`, `total_m2`, `available_m2`, `average_price_per_m2_usd`, …), con reporte en `etl/reports/`.
-   - **Coordinación:** el agente de módulos llama la función dentro de `saveUnitChanges` (`ROADMAP.md` §4.8; esa acción aún no existe al 29 oct). Avisarle por la bitácora cuando la función y sus pruebas estén listas.
-   - **No requiere** workers, Redis ni el warehouse.
+2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Construido el 29 oct (v1.36.0); falta que el agente de módulos lo llame.** Detalle en la ficha del workflow 6 (§4).
+   - Hecho: `computeBlockCounters` (`lib/domain/blocks/counters.ts`, copia exacta de n8n), `lockBlockForUpdate` y `recalculateBlockCounters` (`lib/db/block-counters.ts`), el bloqueo optimista de unidades (`findStaleUnits` en `lib/domain/units/concurrency.ts`) y la paridad de solo lectura (`npm run counters:parity` en `etl/`).
+   - Para cerrar la casilla: `saveUnitChanges` los usa (`ROADMAP.md` §4.8), y el usuario decide en el corte si se recalculan de una vez los ~580 bloques del warehouse. Apagar el workflow 6 en n8n lo hace una persona en el corte.
+   - `recalculateBlockCounters` no tiene prueba contra la base todavía: escribe, así que necesita autorización del usuario (en una transacción que se revierta al final).
 3. [ ] **Acceso al warehouse:** `npm run warehouse:ping` en verde (README §13.3) y respuesta a la identidad de filas (§6).
 4. [ ] **Mapeador del push** (workflow 4): `lib/domain/warehouse/`, puro, con prueba de paridad celda por celda contra el `dbo_stage` de MySQL.
 5. [ ] **Cliente de escritura de la copia sombra** con lista cerrada de las 11 tablas, y worker `warehouse-push` sobre BullMQ.
@@ -254,6 +267,15 @@ Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 ## 8. Bitácora
 
 Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6), qué se hizo, qué se verificó, migraciones aplicadas en `msp_app`, commits del usuario y qué quedó pendiente o por preguntar.
+
+### 29 oct 2026, 14:30–15:30
+
+- Rama `jc_migrate_workflowsn` (con `dce934a` y `main` ya fusionados por el usuario). El usuario exportó Block Edit Queue desde n8n; el JSON quedó fuera del repo porque trae el token de Strapi de producción (se le avisó).
+- Decisiones del usuario: copiar la fórmula de n8n tal cual (las correcciones se deciden con el reporte); recalcular en la transacción del guardado y pasar a BullMQ solo si la medición lo pide (más de 500 ms o cuando exista el servicio de workers); **bloqueo optimista** de unidades: rechazar el cambio de una unidad editada por otra persona desde que se cargó la hoja y avisar.
+- Hecho: `lib/domain/blocks/counters.ts` (commit del usuario `12155da`), `etl/src/block-counters/` (`npm run counters:parity`), `lib/db/block-counter-mapping.ts`, `lib/db/block-counters.ts` y `lib/domain/units/concurrency.ts`, con pruebas. v1.36.0, propuesta.
+- Verificado: `npm test` 191/191 (antes 169), `etl` 64/64, `tsc` con los 38 errores previos y ninguno en archivos nuevos. Paridad en solo lectura: 1,102 de 1,688 bloques iguales; los distintos son bloques que n8n nunca recalculó (ficha del workflow 6). Medición en solo lectura: el bloque más grande (4,467 unidades) se lee en ~300 ms desde una PC y se calcula en ~5 ms.
+- Sin escrituras en `msp_app` ni migraciones.
+- Pendiente: prueba de `recalculateBlockCounters` contra la base (escribe; pedir autorización), la llamada desde `saveUnitChanges` (agente de módulos) y, en el corte, decidir el recálculo masivo de los bloques del warehouse. Siguiente paso de este agente: el 3 (acceso al warehouse).
 
 ### 29 oct 2026, 12:15–14:00
 
