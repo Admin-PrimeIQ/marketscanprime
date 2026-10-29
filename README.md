@@ -265,5 +265,3 @@ Vercel will detect the push from `Admin-PrimeIQ` and trigger the deployment auto
 | SSH key | `~/.ssh/id_primeiq` |
 | Remote URL | `git@github-primeiq:Admin-PrimeIQ/market-scan-back-office.git` |
 
-
-#test

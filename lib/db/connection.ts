@@ -63,7 +63,9 @@ function appSsl(env: Env): ConnectionOptions {
   const fromEnv = env.DATABASE_CA_APP?.trim()
   let ca = fromEnv ? normalizeCaPem(fromEnv) : undefined
   if (!ca) {
-    const file = resolve(process.cwd(), env.DATABASE_CA_FILE_APP?.trim() || DEFAULT_CA_FILE)
+    // El .pem llega al bundle por `outputFileTracingIncludes` (next.config.mjs); sin el ignore,
+    // Turbopack rastrearía el proyecto entero.
+    const file = resolve(/*turbopackIgnore: true*/ process.cwd(), env.DATABASE_CA_FILE_APP?.trim() || DEFAULT_CA_FILE)
     if (!existsSync(file)) {
       const where = env.VERCEL_ENV ? ` (entorno de Vercel: ${env.VERCEL_ENV})` : ""
       throw new Error(

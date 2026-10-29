@@ -46,25 +46,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  let locale: 'es' | 'en' = defaultLocale;
-  let messages = messagesEs; // Por defecto español
-  
-  try {
-    const cookieStore = await cookies();
-    locale = (cookieStore.get('locale')?.value || defaultLocale) as 'es' | 'en';
-    
-    // Usar mensajes estáticos según el locale
-    if (locale === 'en') {
-      messages = messagesEn;
-    } else {
-      messages = messagesEs;
-    }
-  } catch (error) {
-    // Si hay error, usar valores por defecto
-    console.error('Error loading i18n:', error);
-    locale = defaultLocale;
-    messages = messagesEs;
-  }
+  // Sin try/catch: al prerenderizar, `cookies()` lanza el error con el que Next marca la ruta como
+  // dinámica, y atraparlo rompe esa detección.
+  const cookieStore = await cookies();
+  const locale: 'es' | 'en' = cookieStore.get('locale')?.value === 'en' ? 'en' : defaultLocale;
+  const messages = locale === 'en' ? messagesEn : messagesEs;
 
   return (
     <html lang={locale} suppressHydrationWarning>
