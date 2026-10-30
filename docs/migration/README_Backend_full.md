@@ -56,10 +56,10 @@ Hecho el 22 oct 2026 con **Better Auth 1.7.12** en vez de Auth.js (decisión 12,
 
 ## 8. Después del pulido: módulos sin migrar
 
-En `lib/api/prisma-client.ts`, 13 métodos fallan con "todavía no está migrado" (eran 22 hasta la v1.33.0 y 16 hasta la v1.37.0). Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
+En `lib/api/prisma-client.ts`, 9 métodos fallan con "todavía no está migrado" (eran 22 hasta la v1.33.0, 16 hasta la v1.37.0 y 13 hasta la v1.38.0). Receta para migrar un módulo: §14.5 de `README.md` (ya con `requireRole` en cada acción); lista "debe seguir funcionando" de cada uno: `ROADMAP.md` §4.
 
 - [ ] Cuenta (4): `forgotPassword`, `resetPassword`, `updateMe`, `changePassword`.
 - [x] Perfiles de tipo de cambio (5): `getExchangeRateProfiles`, `getExchangeRateProfileById`, `createExchangeRateProfile`, `updateExchangeRateProfile`, `deleteExchangeRateProfile` (28 oct, v1.33.0, commit `16e15f5`, fusionado a `main`; prueba de punta a punta 8/8; probado en el navegador por el usuario el 29 oct). Ver `README.md` §14.16.
-- [x] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`. *`getProjects` básico el 28 oct (v1.33.0); el resto y los filtros avanzados el 29 oct (v1.37.0, rama `jc_migrate_projects`, sin commit; prueba de punta a punta revertida 6/6; falta el navegador). El filtro de fase sigue con error. Ver `README.md` §14.18.*
-- [ ] Bloques (5): `getBlocks`, `getBlocksLite`, `getBlockById`, `createBlock`, `updateBlock`.
+- [x] Proyectos (4): `getProjects`, `getProjectById`, `createProject`, `updateProject`. *`getProjects` básico el 28 oct (v1.33.0); el resto y los filtros avanzados el 29 oct (v1.37.0, rama `jc_migrate_projects`, commit del usuario `18e710d`; prueba de punta a punta revertida 6/6; falta el navegador). El filtro de fase sigue con error. Ver `README.md` §14.18.*
+- [ ] Bloques (5): `getBlocks`, `getBlocksLite`, `getBlockById`, `createBlock`, `updateBlock`. *4 de 5 el 30 oct (v1.38.0 propuesta, rama local `jc_migrate_blocks`, sin commit; código generado en el servidor; prueba de punta a punta revertida 9/9; falta el navegador). `getBlocksLite` (de `/sync`) sigue sin migrar. Ver `README.md` §14.20.*
 - [ ] Unidades (4): `getUnitsAllPages`, `updateUnit`, `updateUnitBatch`, `createUnit`.

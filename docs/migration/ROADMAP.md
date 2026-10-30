@@ -332,7 +332,7 @@ A revisar con negocio:
 - **Archivos:** `projects-table.tsx`, `advanced-filters.tsx`, `project-form.tsx` y sus 7 pestañas en `components/projects/form-tabs/` (`general-info`, `location`, `amenities`, `services`, `financing`, `banks`, `currencies`).
 - **Métodos:** `getProjects` (filtros avanzados, búsqueda, orden, paginación), `getProjectById` (lo usan también bloques y la hoja), `createProject`, `updateProject`, más catálogos.
 - **Hecho en parte (28 oct, v1.33.0):** `getProjects` con búsqueda, orden, paginación y filtros rápidos (dominio, región, país) en `lib/db/projects.ts`. El filtro de fase (`availability`) no tiene campo ni en Strapi ni en `msp_app` y responde con un error; la UI no lo manda.
-- **Hecho (29 oct, v1.37.0, rama `jc_migrate_projects`, sin commit):**
+- **Hecho (29 oct, v1.37.0, rama `jc_migrate_projects`, commit del usuario `18e710d` del 30 oct):**
   - Filtros avanzados en `lib/db/project-filters.ts`, con la semántica corregida que decidió el usuario («distinto» incluye vacíos, «entre» con OR es una sola condición, fechas por día completo).
   - `getProjectById` con NSE, tipo de seguridad y perfil con monedas (también en `project.currencies`).
   - `createProject` y `updateProject`, con referencias validadas, amenidades y servicios en su orden y una fila de `audit_log` por proyecto. `code` puede repetirse, como en Strapi.
@@ -356,6 +356,12 @@ A revisar con negocio:
 - **Lo que Strapi hace hoy y hay que construir:**
   - Código único (campo `uid`, sin índice único en MySQL) → índice único en Postgres + función de generación (slug + sufijo) dentro de la transacción. Desaparecen la ruta y las credenciales de admin.
   - Financiamiento: 4 tablas encadenadas con el banco en el `field` → `block_bank_rate`.
+- **Hecho (30 oct, v1.38.0 propuesta, rama local `jc_migrate_blocks`, sin commit):**
+  - `getBlocks` en `lib/db/blocks.ts` y `lib/db/block-list-mapping.ts`: búsqueda, filtros de proyectos, región, país (por `documentId` o ISO) y dominio, el filtro avanzado `project.department` (con `lib/db/project-filters.ts`) y orden también por proyecto, departamento y categoría.
+  - `getBlockById` con proyecto y país, categoría, enfoque, estado y el componente de financiamiento. Un banco está presente si tiene fila en `block_bank_rate`, y su tasa puede ir vacía; el `0 = no trabaja` de abajo y del comentario de `prisma/schema.prisma` no es lo que carga la ETL.
+  - `createBlock` y `updateBlock` con referencias validadas antes de la transacción, financiamiento reemplazado entero (`null` lo borra) y una fila de `audit_log` por bloque. El **código lo genera el servidor** (`lib/db/block-code.ts`: slug del nombre y primer sufijo libre, `-1`, `-2`…; se conserva si el nombre no cambia; reintento ante `P2002`). En modo `prisma` el formulario ya no llama a `generate-code`; la ruta sigue para el backend `strapi`.
+  - `getBlocksLite` sigue sin migrar (es de `/sync`, del agente de workflows). Los contadores se guardan como llegan; el recálculo tras editar unidades queda para §4.8.
+  - Probado con lectura de humo y una prueba de punta a punta revertida (9/9); falta el navegador. Ver `README.md` §14.20.
 - **Debe seguir funcionando:**
   - [ ] Lista con filtros por país, región (GAM/Interior por `quarter`) y dominio (vivienda, oficinas, industrial).
   - [ ] Crear, editar y clonar; el código se genera solo y nunca se repite.
