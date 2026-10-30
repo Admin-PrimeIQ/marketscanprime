@@ -1,6 +1,7 @@
 import type { StrapiBlock, StrapiBlocksResponse } from "@/lib/api/strapi"
 import { writeAudit, type AuditActor } from "./audit"
 import { codeSourceName, EMPTY_BLOCK_CODE, nextFreeCode, slugifyBlockCode } from "./block-code"
+import { lockBlockForUpdate } from "./block-counters"
 import {
   BlockError,
   blockError,
@@ -12,7 +13,10 @@ import {
 import {
   BLOCK_NOT_FOUND,
   BLOCK_RELATIONS,
+  domainChangeProblem,
+  DUPLICATE_LEGACY_ID,
   isUniqueViolation,
+  legacyIdToCheck,
   MISSING_REFERENCES,
   toBlockAuditRow,
   toBlockError,
@@ -117,6 +121,16 @@ async function generateCode(db: PrismaClient | Prisma.TransactionClient, name: s
   )
 }
 
+/** Rechaza un `legacyId` nuevo o cambiado que ya tenga otro bloque (`legacyIdToCheck`). */
+async function assertLegacyIdFree(tx: Prisma.TransactionClient, legacyId: string | null, ownId?: number): Promise<void> {
+  if (legacyId === null) return
+  const other = await tx.block.findFirst({
+    where: { legacyId, ...(ownId !== undefined ? { NOT: { id: ownId } } : {}) },
+    select: { code: true, name: true },
+  })
+  if (other) throw new BlockError(DUPLICATE_LEGACY_ID, [`legacyId: ${legacyId} (${other.code ?? other.name ?? "sin nombre"})`])
+}
+
 const financingTerms = (financing: FinancingWrite) => financing.terms as Prisma.BlockFinancingCreateWithoutBlockInput
 
 /** Al editar: el componente se reemplaza entero (términos y bancos) o, con `null`, se borra. */
@@ -139,7 +153,8 @@ function financingUpdate(financing: FinancingWrite | null | undefined, hadFinanc
  * Los métodos de bloques de `DataClient`, sobre `msp_app`. Cada escritura deja en `audit_log`, en la
  * misma transacción y a nombre de `actor`, la fila del bloque con su financiamiento y sus bancos. El
  * código lo genera el servidor (`block-code.ts`); si choca con otro guardado simultáneo, se reintenta.
- * Los contadores y promedios se guardan como llegan: se recalculan al guardar unidades.
+ * Los contadores y promedios no se escriben aquí: los calcula `recalculateBlockCounters`
+ * (block-counters.ts) al guardar unidades.
  */
 export function createBlockRepository(prisma: PrismaClient, actor: AuditActor) {
   async function readDetail(id: number): Promise<StrapiBlock> {
@@ -191,6 +206,7 @@ export function createBlockRepository(prisma: PrismaClient, actor: AuditActor) {
           const code = await generateCode(prisma, name)
           markGenerated(true)
           return prisma.$transaction(async (tx) => {
+            await assertLegacyIdFree(tx, legacyIdToCheck(write.scalars.legacyId))
             const created = await tx.block.create({
               data: {
                 ...write.scalars,
@@ -223,8 +239,19 @@ export function createBlockRepository(prisma: PrismaClient, actor: AuditActor) {
         const foreignKeys = await resolveReferences(prisma, write)
         const blockId = await withCodeRetry((markGenerated) =>
           prisma.$transaction(async (tx) => {
-            const before = await tx.block.findUnique({ where, include: AUDIT_INCLUDE })
-            if (!before) throw new BlockError(BLOCK_NOT_FOUND)
+            const target = await tx.block.findUnique({ where, select: { id: true } })
+            if (!target) throw new BlockError(BLOCK_NOT_FOUND)
+            // Primero el bloque, como `saveUnitChanges`: un guardado de unidades del mismo bloque espera.
+            await lockBlockForUpdate(tx, target.id)
+            const before = await tx.block.findUniqueOrThrow({ where: { id: target.id }, include: AUDIT_INCLUDE })
+
+            const domain = write.scalars.domain
+            if (domain !== undefined && domain !== before.domain) {
+              const problem = domainChangeProblem(before.domain, domain, await tx.unit.count({ where: { blockId: before.id } }))
+              if (problem) throw new BlockError(problem)
+            }
+            await assertLegacyIdFree(tx, legacyIdToCheck(write.scalars.legacyId, before.legacyId), before.id)
+
             const sourceName = codeSourceName(write.scalars.name, before)
             const code = sourceName === null ? undefined : await generateCode(tx, sourceName, before.id)
             markGenerated(code !== undefined)

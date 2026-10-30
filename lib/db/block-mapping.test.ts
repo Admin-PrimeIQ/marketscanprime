@@ -1,12 +1,16 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { BLOCK_COUNTER_FIELDS } from "../domain/blocks/counters.ts"
 import { BlockError, type BlockListRow } from "./block-list-mapping.ts"
 import {
   BLOCK_NOT_FOUND,
+  DOMAIN_LOCKED,
+  domainChangeProblem,
   DUPLICATE_BLOCK_CODE,
   fromFinancingRows,
   INVALID_BLOCK,
   isUniqueViolation,
+  legacyIdToCheck,
   MISSING_REFERENCES,
   toBlockAuditRow,
   toBlockError,
@@ -14,6 +18,7 @@ import {
   toFinancingWrite,
   toStrapiBlockDetail,
   type BlockAuditSource,
+  type BlockRequest,
   type FinancingRow,
 } from "./block-mapping.ts"
 
@@ -206,8 +211,6 @@ test("toBlockWriteData traduce nombres, fechas y vacíos; undefined no cambia", 
       collectionDate: new Date("2026-03-15T00:00:00.000Z"),
       startDate: null,
       year: 2026,
-      totalUnits: 40,
-      averagePriceUsd: 150000.5,
       additionalParkingPriceUsd: null,
     },
     relations: { project: "proj-3", blockCategory: null, blockFocus: 4 },
@@ -215,6 +218,30 @@ test("toBlockWriteData traduce nombres, fechas y vacíos; undefined no cambia", 
   })
   assert.throws(() => toBlockWriteData({ name: "" }, "update"), BlockError)
   assert.throws(() => toBlockWriteData({ project: null }, "update"), BlockError)
+})
+
+test("toBlockWriteData ignora los contadores: solo los escribe recalculateBlockCounters", () => {
+  const counters = Object.fromEntries(BLOCK_COUNTER_FIELDS.map((field) => [field, 7])) as BlockRequest
+  assert.deepEqual(toBlockWriteData(counters, "update"), { scalars: {}, relations: {} })
+  const create = toBlockWriteData({ ...counters, name: "Torre", project: 3, domain: "housing" }, "create")
+  assert.deepEqual(create.scalars, { name: "Torre", domain: "housing" })
+})
+
+test("domainChangeProblem: el tipo de inmueble solo cambia si el bloque no tiene unidades", () => {
+  assert.equal(domainChangeProblem("housing", undefined, 10), null)
+  assert.equal(domainChangeProblem("housing", "housing", 10), null)
+  assert.equal(domainChangeProblem("housing", "office", 0), null)
+  assert.equal(domainChangeProblem("housing", "office", 1), DOMAIN_LOCKED)
+})
+
+test("legacyIdToCheck: se revisa al crear o al cambiar; vacío o igual no se revisa", () => {
+  assert.equal(legacyIdToCheck(undefined), null)
+  assert.equal(legacyIdToCheck(null), null)
+  assert.equal(legacyIdToCheck("1234"), "1234")
+  assert.equal(legacyIdToCheck("1234", null), "1234")
+  assert.equal(legacyIdToCheck("1234", "1234"), null)
+  assert.equal(legacyIdToCheck("5678", "1234"), "5678")
+  assert.equal(legacyIdToCheck(null, "1234"), null)
 })
 
 test("toBlockAuditRow: decimales en texto, fechas YYYY-MM-DD, ids, términos y bancos ordenados", () => {

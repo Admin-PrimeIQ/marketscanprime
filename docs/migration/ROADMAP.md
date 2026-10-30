@@ -356,7 +356,7 @@ A revisar con negocio:
 - **Lo que Strapi hace hoy y hay que construir:**
   - Código único (campo `uid`, sin índice único en MySQL) → índice único en Postgres + función de generación (slug + sufijo) dentro de la transacción. Desaparecen la ruta y las credenciales de admin.
   - Financiamiento: 4 tablas encadenadas con el banco en el `field` → `block_bank_rate`.
-- **Hecho (30 oct, v1.38.0 propuesta, rama local `jc_migrate_blocks`, sin commit):**
+- **Hecho (30 oct, v1.38.0, rama `jc_migrate_blocks`, commit del usuario `652f3ad`, subido):**
   - `getBlocks` en `lib/db/blocks.ts` y `lib/db/block-list-mapping.ts`: búsqueda, filtros de proyectos, región, país (por `documentId` o ISO) y dominio, el filtro avanzado `project.department` (con `lib/db/project-filters.ts`) y orden también por proyecto, departamento y categoría.
   - `getBlockById` con proyecto y país, categoría, enfoque, estado y el componente de financiamiento. Un banco está presente si tiene fila en `block_bank_rate`, y su tasa puede ir vacía; el `0 = no trabaja` de abajo y del comentario de `prisma/schema.prisma` no es lo que carga la ETL.
   - `createBlock` y `updateBlock` con referencias validadas antes de la transacción, financiamiento reemplazado entero (`null` lo borra) y una fila de `audit_log` por bloque. El **código lo genera el servidor** (`lib/db/block-code.ts`: slug del nombre y primer sufijo libre, `-1`, `-2`…; se conserva si el nombre no cambia; reintento ante `P2002`). En modo `prisma` el formulario ya no llama a `generate-code`; la ruta sigue para el backend `strapi`.

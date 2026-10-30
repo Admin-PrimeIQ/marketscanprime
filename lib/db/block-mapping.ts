@@ -18,6 +18,8 @@ export const BLOCK_NOT_FOUND = "El bloque no existe."
 export const MISSING_REFERENCES = "Hay referencias que no existen en la base nueva"
 export const INVALID_BLOCK = "Datos del bloque inválidos"
 export const DUPLICATE_BLOCK_CODE = "Ya existe un bloque con ese código; intenta guardar de nuevo."
+export const DOMAIN_LOCKED = "No se puede cambiar el tipo de inmueble de un bloque que ya tiene unidades."
+export const DUPLICATE_LEGACY_ID = "Ya existe otro bloque con ese ID legacy."
 
 export type BlockRef = string | number
 export type Quarter = "T1" | "T2" | "T3" | "T4" | "S1" | "S2"
@@ -117,6 +119,11 @@ export interface BlockRequest {
   market?: Market | "" | null
   blockUsage?: BlockUsage | "" | null
   commercializationMonths?: number | null
+  /**
+   * Contadores del bloque: el formulario los manda, pero no se escriben. Solo los escribe
+   * `recalculateBlockCounters` (block-counters.ts) al guardar unidades; aceptarlos aquí dejaría que
+   * un formulario abierto antes los regrese a valores viejos.
+   */
   totalUnits?: number | null
   totalM2?: number | null
   availableUnits?: number | null
@@ -126,9 +133,9 @@ export interface BlockRequest {
   averagePricePerM2USD?: number | null
   averageInstallmentUSD?: number | null
   averageIncomeUSD?: number | null
+  assignedParking?: number | null
   additionalParkingPriceUSD?: number | null
   visitorParking?: number | null
-  assignedParking?: number | null
   totalProjectParking?: number | null
   parkingForSale?: number | null
   project?: BlockRef | null
@@ -153,18 +160,8 @@ export interface BlockScalarData {
   market?: Market | null
   blockUsage?: BlockUsage | null
   commercializationMonths?: number | null
-  totalUnits?: number | null
-  totalM2?: number | null
-  availableUnits?: number | null
-  availableM2?: number | null
-  averagePriceUsd?: number | null
-  averageSizeM2?: number | null
-  averagePricePerM2Usd?: number | null
-  averageInstallmentUsd?: number | null
-  averageIncomeUsd?: number | null
   additionalParkingPriceUsd?: number | null
   visitorParking?: number | null
-  assignedParking?: number | null
   totalProjectParking?: number | null
   parkingForSale?: number | null
 }
@@ -186,25 +183,9 @@ export interface BlockWriteData {
 const TEXT_FIELDS = ["legacyId", "phase", "tower", "sector"] as const
 const ENUM_FIELDS = ["quarter", "market", "blockUsage"] as const
 const DATE_FIELDS = ["collectionDate", "startDate", "deliveryDate"] as const
-/** Mismo nombre en el cuerpo y en la columna. */
-const VALUE_FIELDS = [
-  "year",
-  "commercializationMonths",
-  "totalUnits",
-  "totalM2",
-  "availableUnits",
-  "availableM2",
-  "averageSizeM2",
-  "visitorParking",
-  "assignedParking",
-  "totalProjectParking",
-  "parkingForSale",
-] as const
+/** Mismo nombre en el cuerpo y en la columna. Sin contadores: ver `BlockRequest`. */
+const VALUE_FIELDS = ["year", "commercializationMonths", "visitorParking", "totalProjectParking", "parkingForSale"] as const
 const RENAMED_FIELDS = {
-  averagePriceUSD: "averagePriceUsd",
-  averagePricePerM2USD: "averagePricePerM2Usd",
-  averageInstallmentUSD: "averageInstallmentUsd",
-  averageIncomeUSD: "averageIncomeUsd",
   additionalParkingPriceUSD: "additionalParkingPriceUsd",
 } as const
 
@@ -295,6 +276,26 @@ export function toBlockWriteData(request: BlockRequest, mode: "create" | "update
   if (request.financing === null) write.financing = null
   else if (request.financing !== undefined) write.financing = toFinancingWrite(request.financing)
   return write
+}
+
+/**
+ * El tipo de inmueble decide las tablas del warehouse a las que va el bloque en el push y la tabla
+ * hija de sus unidades (`unit_housing` / `unit_office` / `unit_industrial`): con unidades no cambia.
+ */
+export function domainChangeProblem(current: string, requested: BlockDomain | undefined, unitCount: number): string | null {
+  if (requested === undefined || requested === current || unitCount === 0) return null
+  return DOMAIN_LOCKED
+}
+
+/**
+ * `legacyId` que hay que buscar repetido antes de guardar, o `null` si no hace falta. El push une el
+ * bloque con su fila de `housing_universe` por ese valor y salta los repetidos, así que uno nuevo o
+ * cambiado no puede chocar con otro bloque. Los repetidos que ya existen no se revisan mientras el
+ * valor no cambie, para no bloquear otras ediciones. `stored` es `undefined` al crear.
+ */
+export function legacyIdToCheck(requested: string | null | undefined, stored?: string | null): string | null {
+  if (requested === undefined || requested === null) return null
+  return requested === stored ? null : requested
 }
 
 const decimalText = (value: DecimalLike | null) => (value === null ? null : value.toString())

@@ -6,6 +6,18 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Bloques sobre Prisma sin choques con los workflows: contadores, tipo de inmueble y `legacyId` (v1.38.1)
+
+_2026-10-30_
+
+Cierra, en el backend `prisma`, los huecos de bloques que chocaban con los reemplazos de los workflows de n8n (`docs/migration/N8N_WORKFLOWS.md`, bitácora del 30 oct). **Producción no cambia**: con el backend `strapi` nada de esto se usa. Sin migraciones ni escrituras en `msp_app`.
+
+- **Contadores** [lib/db/block-mapping.ts](lib/db/block-mapping.ts): `toBlockWriteData` ya no escribe los 10 contadores y promedios (`totalUnits`, `availableUnits`, `totalM2`, `availableM2`, `averageSizeM2`, `assignedParking` y los cuatro promedios en USD). Solo los escribe `recalculateBlockCounters` ([lib/db/block-counters.ts](lib/db/block-counters.ts)) al guardar unidades. Antes, un formulario de bloque abierto antes de un guardado de unidades los regresaba a valores viejos, y clonar un bloque copiaba los del original. [lib/db/block-schemas.ts](lib/db/block-schemas.ts) los sigue aceptando (el formulario los manda y el esquema es estricto). En el formulario ya estaban deshabilitados.
+- **Bloqueo** [lib/db/blocks.ts](lib/db/blocks.ts): `update` toma la fila del bloque con `lockBlockForUpdate` antes de leer el `before`, el mismo orden que seguirá `saveUnitChanges`.
+- **Tipo de inmueble**: `update` rechaza cambiar `domain` si el bloque tiene unidades (`domainChangeProblem`). El dominio decide las tablas del warehouse del push y la tabla hija de las unidades.
+- **`legacyId`**: `create` y `update` rechazan un `legacyId` nuevo o cambiado que ya tenga otro bloque (`legacyIdToCheck`). El push une el bloque con el warehouse por ese valor y salta los repetidos. Sin índice único: dos altas simultáneas con el mismo valor podrían pasar (riesgo bajo, aceptado). Lectura de solo lectura en `msp_app` el 30 oct: 0 valores repetidos entre los 1,688 bloques.
+- **Verificación**: `npm test` 235/235 (3 pruebas nuevas), `tsc` sin errores nuevos (38 previos).
+
 ## Bloques sobre Prisma: listado, detalle con financiamiento, alta y edición (v1.38.0)
 
 _2026-10-30_
