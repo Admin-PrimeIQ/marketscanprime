@@ -6,6 +6,21 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Bloques sobre Prisma: listado, detalle con financiamiento, alta y edición (v1.38.0)
+
+_2026-10-30_
+
+Módulo de bloques de la implementación `prisma` de `dataClient` (`docs/migration/README.md` §14.20). **Producción no cambia**: con el backend `strapi` (el de `admin.primeiqlatam.com`) el formulario sigue pidiendo el código a `/api/blocks/generate-code` como antes, y las Server Actions siguen detrás de la guarda de `lib/db/guard.ts`. Sin migraciones. `getBlocksLite` (de `/sync`, del agente de workflows) sigue sin migrar.
+
+- **Código del bloque** [lib/db/block-code.ts](lib/db/block-code.ts) (puro, con pruebas): en modo `prisma` lo genera el servidor al guardar, sin credenciales de Strapi. Es el slug del nombre (el mismo `slugify` del formulario) y, si ya existe, el primer sufijo libre (`-1`, `-2`, …). Al editar se conserva si el nombre no cambió; si cambió, o si el bloque no tenía código, se genera otro sin contar el propio bloque. Si otro guardado simultáneo toma el mismo código (`P2002`), se reintenta hasta 3 veces.
+- **Listado** [lib/db/block-list-mapping.ts](lib/db/block-list-mapping.ts) (puro, con pruebas): búsqueda en nombre, código, fase, torre y sector; filtros de proyectos, región GAM/Interior, país por `documentId` o ISO y tipo de inmueble; el filtro avanzado `project.department` con la semántica de proyectos («distinto de» y «no contiene» incluyen los vacíos), y orden también por `project.name`, `project.department` y `blockCategory.name`. El `filters` libre responde con error. [lib/db/project-filters.ts](lib/db/project-filters.ts) acepta ahora una tabla de campos propia y campos de una relación.
+- **Detalle y escritura** [lib/db/block-mapping.ts](lib/db/block-mapping.ts) (puro, con pruebas): el financiamiento vuelve como el componente `financing.financing` (nueve términos y un espacio por banco con fila en `block_bank_rate`, con la tasa vacía como `null`). Al guardar, el componente se reemplaza entero, `null` lo borra junto con los bancos y `undefined` no lo toca. Los contadores y promedios se guardan como llegan (se recalculan al guardar unidades). Al crear son obligatorios `name`, `project` y `domain`.
+- **Repositorio** [lib/db/blocks.ts](lib/db/blocks.ts): las referencias se resuelven en paralelo antes de abrir la transacción; dentro van solo el `before` mínimo, el código si hace falta, la escritura (con financiamiento y bancos anidados) y `audit_log`. El detalle se lee después del commit. La fila de auditoría lleva términos y bancos.
+- **Entrada** [lib/db/block-schemas.ts](lib/db/block-schemas.ts): `blockRequestSchema` estricto, **sin `code`**. Admite los enumerados de `msp_app`, `numeric(10, 2)`, enteros ≥ 0, fechas `YYYY-MM-DD` reales y los 18 bancos; descarta los `id` del componente que devolvía Strapi.
+- **Acciones** [lib/db/block-actions.ts](lib/db/block-actions.ts), conectadas en [lib/api/prisma-client.ts](lib/api/prisma-client.ts) (`getBlocks`, `getBlockById`, `createBlock`, `updateBlock`); quedan 9 `notMigrated`.
+- **Formulario** [components/blocks/block-form.tsx](components/blocks/block-form.tsx): en modo `prisma` no llama a `generate-code` ni manda `code`, y el error muestra también los `details` de la base nueva.
+- **Verificación**: `npm test` 232/232, `tsc` sin errores nuevos (38 previos). Lectura de humo de solo lectura contra `msp_app`: cada par de filtros opuestos suma los 1,688 bloques; los 11 órdenes de la tabla, detalle con financiamiento, oficina sin financiamiento e id inexistente. Prueba de punta a punta con autorización, dentro de una transacción revertida: crear con 3 bancos, sufijo `-1`, editar sin renombrar, renombrar, borrar financiamiento, referencia inexistente, clonar, `audit_log` y listado, 9/9; `msp_app` quedó igual.
+
 ## Proyectos sobre Prisma: detalle, alta, edición y filtros avanzados (v1.37.0)
 
 _2026-10-29_

@@ -2,6 +2,8 @@ import type { StrapiAuthResponse, StrapiUser } from "./strapi"
 import type { DataClient } from "./client"
 import type { ActionResult } from "@/lib/db/action-result"
 import { getMeAction, loginAction, logoutAction } from "@/lib/db/auth-actions"
+import type { BlockRequest } from "@/lib/db/block-mapping"
+import { createBlockAction, getBlockAction, listBlocksAction, updateBlockAction } from "@/lib/db/block-actions"
 import {
   createCatalogItemAction,
   deleteCatalogItemAction,
@@ -24,6 +26,9 @@ import { createProjectAction, getProjectAction, listProjectsAction, updateProjec
  * - Catálogos y perfiles de tipo de cambio: reales, contra `msp_app` vía Server Actions, con permiso por rol.
  * - Proyectos: listado (búsqueda, orden, filtros rápidos y avanzados), detalle, alta y edición; el
  *   filtro de fase responde con un error claro.
+ * - Bloques: listado (búsqueda, orden, filtros rápidos y `project.department`), detalle con
+ *   financiamiento, alta y edición; el código lo genera el servidor. `getBlocksLite` (de `/sync`)
+ *   sigue sin migrar.
  * - Sesión: Better Auth (`lib/auth/server.ts`) con cookie httpOnly; nunca llama a Strapi. El
  *   navegador no ve la cookie: `getMe` la valida en el servidor.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
@@ -89,20 +94,20 @@ export const prismaDataClient: DataClient = {
     return unwrap(await updateProjectAction(id, data))
   },
 
-  async getBlocks() {
-    notMigrated("getBlocks")
+  async getBlocks(params) {
+    return unwrap(await listBlocksAction(params))
   },
   async getBlocksLite() {
     notMigrated("getBlocksLite")
   },
-  async getBlockById() {
-    notMigrated("getBlockById")
+  async getBlockById(id) {
+    return unwrap(await getBlockAction(id))
   },
-  async createBlock() {
-    notMigrated("createBlock")
+  async createBlock(data) {
+    return unwrap(await createBlockAction(data as BlockRequest))
   },
-  async updateBlock() {
-    notMigrated("updateBlock")
+  async updateBlock(id, data) {
+    return unwrap(await updateBlockAction(id, data as BlockRequest))
   },
 
   async getUnitsAllPages() {

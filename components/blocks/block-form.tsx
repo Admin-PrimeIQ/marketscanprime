@@ -44,6 +44,7 @@ import {
   localCurrencyUnitsPerOneUsd,
 } from "@/lib/api/strapi"
 import { dataClient } from "@/lib/api/client"
+import { resolveDataBackend } from "@/lib/api/data-backend"
 import { toast } from "@/hooks/use-toast"
 import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
@@ -485,10 +486,13 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       const generatedName = buildBlockName(selectedProject?.name ?? '', formData)
 
       // Determinar el code a enviar:
+      // - Base nueva (prisma) → no se manda: lo genera el servidor al guardar (lib/db/block-code.ts)
       // - Edit sin cambio de nombre → conservar el code existente (puede tener correlativo de migración)
       // - Edit con cambio de nombre, o create → pedir a Strapi el UID disponible con correlativo correcto
-      let resolvedCode: string
-      if (mode === 'edit' && generatedName === (initialData?.name || '')) {
+      let resolvedCode: string | undefined
+      if (resolveDataBackend() === 'prisma') {
+        resolvedCode = undefined
+      } else if (mode === 'edit' && generatedName === (initialData?.name || '')) {
         resolvedCode = initialData?.code || slugify(generatedName)
       } else {
         const res = await fetch('/api/blocks/generate-code', {
@@ -505,7 +509,7 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
       const dataToSend: any = {
         ...formDataWithoutNameAndCode,
         name: generatedName,
-        code: resolvedCode,
+        ...(resolvedCode !== undefined ? { code: resolvedCode } : {}),
         year: Number(formData.year),
         quarter: formData.quarter as 'T1' | 'T2' | 'T3' | 'T4' | 'S1' | 'S2',
         // Transformar relaciones a documentId directo
@@ -589,8 +593,10 @@ export function BlockForm({ mode = "create", initialData }: BlockFormProps) {
               errorMessage = `${errorMessage}: ${strapiErrorData.message}`
             }
           } else if (error.message && error.message !== errorMessage) {
-            // Si el mensaje del error es diferente al genérico, usarlo
-            errorMessage = `${errorMessage}: ${error.message}`
+            // Si el mensaje del error es diferente al genérico, usarlo (con los `details` de la base nueva, si hay)
+            const details = (error as { details?: unknown }).details
+            const detailText = Array.isArray(details) && details.length > 0 ? ` (${details.join(', ')})` : ''
+            errorMessage = `${errorMessage}: ${error.message}${detailText}`
           }
         }
       } catch (parseError) {

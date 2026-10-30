@@ -124,7 +124,7 @@ export interface ProjectListRow {
 }
 
 /** Copia las claves con valor: Strapi devolvía `null`, pero los tipos `StrapiProject` las declaran opcionales. */
-function withoutNulls<T extends Record<string, unknown>>(value: T): Partial<{ [K in keyof T]: NonNullable<T[K]> }> {
+export function withoutNulls<T extends Record<string, unknown>>(value: T): Partial<{ [K in keyof T]: NonNullable<T[K]> }> {
   const out: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) {
     if (item !== null && item !== undefined) out[key] = item

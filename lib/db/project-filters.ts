@@ -56,13 +56,19 @@ const DATE_OPERATORS: ReadonlySet<string> = new Set([
   "isNotNull",
 ])
 
-type FieldSpec =
-  | { kind: "text"; nullable: boolean }
+/**
+ * `relation` + `column`: texto de una relación obligatoria (`project.department` en bloques); la
+ * condición va dentro de `{ [relation]: { is: … } }`.
+ */
+export type FieldSpec =
+  | { kind: "text"; nullable: boolean; relation?: string; column?: string }
   | { kind: "toOne"; foreignKey: string }
   | { kind: "toMany"; target: string }
   | { kind: "date" }
 
-const FIELDS: Record<string, FieldSpec> = {
+export type AdvancedFilterFields = Readonly<Record<string, FieldSpec>>
+
+const FIELDS: AdvancedFilterFields = {
   code: { kind: "text", nullable: true },
   name: { kind: "text", nullable: false },
   department: { kind: "text", nullable: true },
@@ -186,15 +192,17 @@ function allowedOperators(spec: FieldSpec): ReadonlySet<string> {
   return RELATION_OPERATORS
 }
 
-function condition(filter: AdvancedFilter): Where {
-  const spec = FIELDS[filter.field]
+function condition(filter: AdvancedFilter, fields: AdvancedFilterFields): Where {
+  const spec = Object.hasOwn(fields, filter.field) ? fields[filter.field] : undefined
   if (!spec) throw new InvalidFilter(`el campo "${filter.field}" no se puede filtrar`)
   if (!allowedOperators(spec).has(filter.operator)) {
     throw new InvalidFilter(`el operador "${filter.operator}" no aplica a "${filter.field}"`)
   }
   switch (spec.kind) {
-    case "text":
-      return textCondition(filter.field, spec.nullable, filter)
+    case "text": {
+      const where = textCondition(spec.column ?? filter.field, spec.nullable, filter)
+      return spec.relation ? { [spec.relation]: { is: where } } : where
+    }
     case "toOne":
       return toOneCondition(filter.field, spec.foreignKey, filter)
     case "toMany":
@@ -206,19 +214,21 @@ function condition(filter: AdvancedFilter): Where {
 
 /**
  * `where` de los filtros avanzados combinados con `logic`, o `null` si no hay ninguno. Junta todos
- * los problemas y los lanza en un solo error de `toError`, uno por filtro.
+ * los problemas y los lanza en un solo error de `toError`, uno por filtro. `fields` son los campos
+ * permitidos; por omisión, los de proyectos.
  */
 export function buildAdvancedFiltersWhere(
   filters: ReadonlyArray<AdvancedFilter> | undefined,
   logic: "AND" | "OR" = "AND",
   toError: (details: string[]) => Error,
+  fields: AdvancedFilterFields = FIELDS,
 ): Where | null {
   if (!filters || filters.length === 0) return null
   const conditions: Where[] = []
   const problems: string[] = []
   filters.forEach((filter, index) => {
     try {
-      conditions.push(condition(filter))
+      conditions.push(condition(filter, fields))
     } catch (error) {
       if (!(error instanceof InvalidFilter)) throw error
       problems.push(`advancedFilters.${index}: ${error.message}`)
