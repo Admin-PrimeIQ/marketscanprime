@@ -19,6 +19,7 @@ import {
   updateExchangeRateProfileAction,
 } from "@/lib/db/exchange-rate-profile-actions"
 import { createProjectAction, getProjectAction, listProjectsAction, updateProjectAction } from "@/lib/db/project-actions"
+import { createUnitAction, listUnitsAction, updateUnitAction } from "@/lib/db/unit-actions"
 
 /**
  * Implementación `prisma` de `dataClient` (`NEXT_PUBLIC_DATA_BACKEND=prisma`).
@@ -29,6 +30,9 @@ import { createProjectAction, getProjectAction, listProjectsAction, updateProjec
  * - Bloques: listado (búsqueda, orden, filtros rápidos y `project.department`), detalle con
  *   financiamiento, alta y edición; el código lo genera el servidor. `getBlocksLite` (de `/sync`)
  *   sigue sin migrar.
+ * - Unidades: la lectura de la hoja (`getUnitsAllPages`), en páginas de 1,000 pedidas en paralelo,
+ *   y el guardado (`updateUnit`, `updateUnitBatch`, `createUnit`): cada llamada es una transacción
+ *   que recalcula los contadores del bloque; el código repetido lo resuelve el servidor con sufijo.
  * - Sesión: Better Auth (`lib/auth/server.ts`) con cookie httpOnly; nunca llama a Strapi. El
  *   navegador no ve la cookie: `getMe` la valida en el servidor.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
@@ -42,6 +46,9 @@ import { createProjectAction, getProjectAction, listProjectsAction, updateProjec
  * (la sesión real viaja en la cookie).
  */
 const COOKIE_SESSION = "cookie-session"
+
+/** Cada respuesta de una Server Action debe quedar bajo el límite de 4.5 MB de las funciones de Vercel. */
+const UNITS_PAGE_SIZE = 1000
 
 function notMigrated(method: string): never {
   throw new Error(`"${method}" todavía no está migrado a la base nueva (NEXT_PUBLIC_DATA_BACKEND=prisma).`)
@@ -110,17 +117,27 @@ export const prismaDataClient: DataClient = {
     return unwrap(await updateBlockAction(id, data as BlockRequest))
   },
 
-  async getUnitsAllPages() {
-    notMigrated("getUnitsAllPages")
+  async getUnitsAllPages(params) {
+    const blockDocumentId = params?.blockDocumentId ?? ""
+    const search = params?.search
+    const listPage = async (page: number) =>
+      unwrap(await listUnitsAction({ blockDocumentId, page, pageSize: UNITS_PAGE_SIZE, ...(search ? { search } : {}) }))
+
+    const first = await listPage(1)
+    const { pageCount, total } = first.meta.pagination
+    const rest = await Promise.all(Array.from({ length: pageCount - 1 }, (_, index) => listPage(index + 2)))
+    const data = [...first.data, ...rest.flatMap((response) => response.data)]
+    return { data, meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total } } }
   },
-  async updateUnit() {
-    notMigrated("updateUnit")
+  // El bloque que pasa la hoja no hace falta: el servidor lo toma de la unidad.
+  async updateUnit(documentId, field, value) {
+    return unwrap(await updateUnitAction(documentId, [{ field, value }]))
   },
-  async updateUnitBatch() {
-    notMigrated("updateUnitBatch")
+  async updateUnitBatch(documentId, updates) {
+    return unwrap(await updateUnitAction(documentId, updates))
   },
-  async createUnit() {
-    notMigrated("createUnit")
+  async createUnit(data) {
+    return unwrap(await createUnitAction(data))
   },
 
   async getExchangeRateProfiles(params) {

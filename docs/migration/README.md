@@ -22,11 +22,11 @@ Reglas que aplican siempre:
 
 Documento de traspaso para que otra persona o agente de IA continúe el trabajo sin releer las conversaciones originales (15 al 22 oct y 27–28 oct 2026). Resume el sistema actual, lo que se decidió, lo que ya está hecho y lo que falta.
 
-**Foco actual (30 oct, 11:56): BLOQUES ya está migrado (v1.38.0, rama `jc_migrate_blocks`, commit del usuario `652f3ad`, subido; §14.20). Falta que el usuario lo pruebe en el navegador. Dónde quedó la conversación, qué preguntar primero y qué sigue: §14.21. Proyectos (v1.37.0, `18e710d`) también está subido, en `origin/jc_migrate_projects`; ninguna de las dos ramas está fusionada a `main`.** Todo lo anterior tiene commit y está fusionado a `main` (PR #9 y #10, 29 oct): perfiles de tipo de cambio y `getProjects` básico (v1.33.0, §14.16) y, del **otro agente** (el de workflows de n8n), el tipo de cambio de Banguat (v1.34.0 y v1.35.0, [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md)). Hay **dos agentes** trabajando en paralelo: este README (§14) es del agente de **módulos**; el de **workflows** escribe en `N8N_WORKFLOWS.md` (reparto en su §1 y reglas de coordinación en su §2). Lista con casillas: [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15, 16 y 17 (§3).
+**Foco actual (30 oct, 15:50): UNIDADES: la hoja lee y guarda en `msp_app` con el backend `prisma` (v1.39.0 y v1.40.0, rama `jc_migrate_blocks`, sin commit; §14.22). Falta el commit del usuario, probar la hoja en el navegador y medir el guardado en el staging de Vercel. Dónde quedó la conversación, qué preguntar primero y qué sigue: §14.23.** Bloques está migrado (v1.38.0, `652f3ad`, §14.20) y sus choques con los workflows se cerraron (v1.38.1, `c0ee770`, §14.22), los dos subidos. Proyectos (v1.37.0, `18e710d`) también está subido, en `origin/jc_migrate_projects`; ninguna de las dos ramas está fusionada a `main`.** Todo lo anterior tiene commit y está fusionado a `main` (PR #9 y #10, 29 oct): perfiles de tipo de cambio y `getProjects` básico (v1.33.0, §14.16) y, del **otro agente** (el de workflows de n8n), el tipo de cambio de Banguat (v1.34.0 y v1.35.0, [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md)). Hay **dos agentes** trabajando en paralelo: este README (§14) es del agente de **módulos**; el de **workflows** escribe en `N8N_WORKFLOWS.md` (reparto en su §1 y reglas de coordinación en su §2). Lista con casillas: [`README_Backend_full.md`](README_Backend_full.md). Decisiones que lo enmarcan: 14, 15, 16 y 17 (§3).
 
-**Lo más reciente (30 oct, 11:56): §14.21** (traspaso: estado de las ramas, el análisis «senior dev» con sus riesgos y las partes de este README que ya no son ciertas, pendientes y siguiente módulo). Antes, **§14.20** (30 oct, mediodía: bloques sobre Prisma: listado, detalle con financiamiento, alta y edición, con el código generado en el servidor; v1.38.0). Antes, **§14.19** (30 oct, 9:30; traspaso: estado de la rama, lo que mostró la prueba del usuario en el navegador, pendientes y siguiente módulo). Antes, **§14.18** (29 oct, tarde: proyectos sobre Prisma: detalle, alta, edición y filtros avanzados, v1.37.0). Antes, **§14.17** (29 oct, 14:00; traspaso para el agente de módulos: estado tras la fusión a `main`, siguiente módulo y coordinación con el agente de workflows). Antes, **§14.16** (28 oct, perfiles de tipo de cambio y `getProjects` básico, v1.33.0, commit `16e15f5`; prueba de punta a punta 8/8; probado en el navegador por el usuario el 29 oct). Antes, **§14.15** (traspaso de las 11:47) **y §14.14** (`audit_log` en las escrituras de catálogos, v1.32.0, sin commit; migración `audit_log_public_id` aplicada y prueba de punta a punta 15/15; falta el navegador). Antes, **§14.13** (límite de intentos de login y Zod, v1.31.0, commit `7bef959`; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
+**Lo más reciente (30 oct, 15:50): §14.23** (traspaso: estado de git, lo que ya no es cierto en secciones anteriores, pendientes y qué preguntar primero). Antes, **§14.22** (30 oct, tarde: choques entre bloques y workflows, v1.38.1; unidades sobre Prisma, lectura v1.39.0 y guardado v1.40.0, con las decisiones del usuario y las dos pruebas revertidas). Antes, **§14.21** (30 oct, 11:56; traspaso: estado de las ramas, el análisis «senior dev» con sus riesgos y las partes de este README que ya no son ciertas, pendientes y siguiente módulo). Antes, **§14.20** (30 oct, mediodía: bloques sobre Prisma: listado, detalle con financiamiento, alta y edición, con el código generado en el servidor; v1.38.0). Antes, **§14.19** (30 oct, 9:30; traspaso: estado de la rama, lo que mostró la prueba del usuario en el navegador, pendientes y siguiente módulo). Antes, **§14.18** (29 oct, tarde: proyectos sobre Prisma: detalle, alta, edición y filtros avanzados, v1.37.0). Antes, **§14.17** (29 oct, 14:00; traspaso para el agente de módulos: estado tras la fusión a `main`, siguiente módulo y coordinación con el agente de workflows). Antes, **§14.16** (28 oct, perfiles de tipo de cambio y `getProjects` básico, v1.33.0, commit `16e15f5`; prueba de punta a punta 8/8; probado en el navegador por el usuario el 29 oct). Antes, **§14.15** (traspaso de las 11:47) **y §14.14** (`audit_log` en las escrituras de catálogos, v1.32.0, sin commit; migración `audit_log_public_id` aplicada y prueba de punta a punta 15/15; falta el navegador). Antes, **§14.13** (límite de intentos de login y Zod, v1.31.0, commit `7bef959`; migración `login_attempt` aplicada y prueba de punta a punta 13/13; falta el navegador). Antes, **§14.12 (28 oct, 9:10):** El error **`too many connections for role "j_stage_admin"`** sigue abierto: el rol está saturado por conexiones que **no** salen de la PC del usuario (sospechoso principal: el staging de Vercel). En código ya se hizo lo que toca a la app (errores genéricos al navegador, pool que suelta conexiones inactivas y `attachDatabasePool` para Vercel), con commit `25871a7` del usuario, subido. Falta lo que hace **una persona** en Railway y en Vercel (§14.12). Antes, 27 oct: actualización de seguridad a Next.js 16.4.3, React 19.2.9 y Node 24.22.1 (v1.30.1, `d154426`, §14.11).
 
-**Para retomar rápido:** lee la sección 0, luego la **§14.21** (30 oct, 11:56: dónde quedó la conversación, qué preguntar primero y qué partes de este README están desactualizadas), la **§14.20** (bloques: qué se hizo, cómo probarlo y el patrón rápido de guardado), la **§14.19** (30 oct, 9:30: dónde quedó la conversación y qué preguntar primero), la **§14.18** (cómo se hizo proyectos, el patrón más reciente), la **§14.17** (29 oct, 14:00: dónde seguir migrando y coordinación con el otro agente), la §1 y la §2 de [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md) (reparto y coordinación con el otro agente), la **§14.16** (cómo se hizo el último módulo, para copiar el patrón) y la **§14.15** (28 oct, 11:47: dónde quedó la conversación, qué preguntar primero, cómo seguir y las trampas del entorno), la **§14.14** y la **§14.13** (lo hecho el 28 oct: `audit_log`, límite de intentos y Zod), la §14.8 (plan del pulido y su estado), la §14.5 (receta para migrar un módulo), la **§14.12** (28 oct, 9:10: el error de conexiones y lo que tiene que hacer una persona en Railway y Vercel), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
+**Para retomar rápido:** lee la sección 0, luego la **§14.23** (30 oct, 15:50: dónde quedó la conversación y qué preguntar primero), la **§14.22** (unidades: qué se hizo, decisiones y cómo se probó), la **§14.21** (30 oct, 11:56: dónde quedó la conversación, qué preguntar primero y qué partes de este README están desactualizadas), la **§14.20** (bloques: qué se hizo, cómo probarlo y el patrón rápido de guardado), la **§14.19** (30 oct, 9:30: dónde quedó la conversación y qué preguntar primero), la **§14.18** (cómo se hizo proyectos, el patrón más reciente), la **§14.17** (29 oct, 14:00: dónde seguir migrando y coordinación con el otro agente), la §1 y la §2 de [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md) (reparto y coordinación con el otro agente), la **§14.16** (cómo se hizo el último módulo, para copiar el patrón) y la **§14.15** (28 oct, 11:47: dónde quedó la conversación, qué preguntar primero, cómo seguir y las trampas del entorno), la **§14.14** y la **§14.13** (lo hecho el 28 oct: `audit_log`, límite de intentos y Zod), la §14.8 (plan del pulido y su estado), la §14.5 (receta para migrar un módulo), la **§14.12** (28 oct, 9:10: el error de conexiones y lo que tiene que hacer una persona en Railway y Vercel), la **§14.11** (27–28 oct: actualización de seguridad y la primera parte del error de conexiones), la **§14.10** (dónde quedó la conversación del 22 oct a las 14:41: pruebas de penetración, qué está protegido y qué no, siguiente paso), la §14.9 (cómo se hizo la sesión con Better Auth y sus trampas), la §13 (la duda de Interior y lo ofrecido sin respuesta, de antes) y la §14 (Fase 5: la app sobre `msp_app`, con cómo correrla, desplegarla en Vercel y seguir). Lo último que se hizo (22 oct: staging en Vercel, `.env` único, certificado, cuenta `app-engteam`) y lo que quedó pendiente está en la **§14.7**. Después la §6 (estado), la §12 (el ETL Strapi → `msp_app`), la §11 (el Postgres de staging) y la §8 (próximos pasos). Para confirmar que el estado sigue igual: los chequeos de solo lectura de la §6.1 desde `etl/`, y `npm test` desde la raíz.
 
 ---
 
@@ -1745,3 +1745,122 @@ El análisis las encontró y el usuario no pidió corregirlas. Al leerlas, **man
 - Él cambia de modo Plan a Agent; no usar `SwitchMode` por cuenta propia.
 - No poner en los documentos cifras que no salgan de una salida comprobada. En la §14.20 se quitaron desgloses que no se podían verificar.
 - Levanta la app con `pnpm run dev`; lo recomendado sigue siendo `pnpm dev:staging` (§14.19).
+
+### 14.22 Bitácora del 30 oct (tarde): choques con los workflows y unidades sobre Prisma (v1.38.1, v1.39.0, v1.40.0)
+
+Esta conversación empezó como la del agente de **workflows** (análisis de [`N8N_WORKFLOWS.md`](N8N_WORKFLOWS.md)). A pedido del usuario siguió con el módulo de **unidades**, que en el reparto es del agente de módulos. Todo se hizo en `jc_migrate_blocks`. La bitácora corta está en la §8 de `N8N_WORKFLOWS.md`; el detalle de cada versión, en `CHANGELOG.md`.
+
+#### v1.38.1: choques entre bloques y los workflows (12:00–12:40, commit del usuario `c0ee770`)
+
+El usuario pidió revisar si lo ya migrado chocaba con los reemplazos de los workflows. Se arregló en el código de bloques, validando en el servidor y sin migraciones:
+
+- `toBlockWriteData` ya no escribe los 10 contadores y promedios del bloque; solo los escribe `recalculateBlockCounters`. El esquema los sigue aceptando porque el formulario los manda.
+- `update` de bloques toma la fila con `lockBlockForUpdate` antes de leer el `before`.
+- No se puede cambiar `domain` si el bloque tiene unidades (`domainChangeProblem`).
+- Se rechaza un `legacyId` nuevo o cambiado que ya tenga otro bloque (`legacyIdToCheck`). Sin índice único (riesgo bajo, aceptado).
+
+#### v1.39.0: la hoja lee unidades de `msp_app` (14:50–15:10, sin commit)
+
+Decisiones del usuario: páginas de 1,000 pedidas en paralelo (límite de 4.5 MB de las funciones de Vercel) y un aviso fijo mientras el guardado no estuviera migrado (ese aviso se quitó en la v1.40.0).
+
+- `lib/db/unit-mapping.ts` (puro, con pruebas): la fila de `unit` con su tabla hija (`unit_housing`, `unit_office`, `unit_industrial`) vuelve como `StrapiUnit` con la zona dinámica `unitType`. Traduce los nombres de miembros de enumerados de Prisma a los valores guardados (`Not_Available` → `"Not Available"`, `Micro_1` → `"Micro 1"`). Conserva los milisegundos de `createdAt`/`updatedAt`.
+- `lib/db/unit-schemas.ts`, `lib/db/units.ts` (`list`), `lib/db/unit-actions.ts` (`listUnitsAction`, permiso `read`) y `getUnitsAllPages` en `lib/api/prisma-client.ts`.
+- `datasheet-units-table.tsx` no cambió para leer.
+- Verificado en una sesión de solo lectura sobre el bloque con más unidades de cada tipo (4,467 vivienda, 153 oficina, 205 industrial): total, `documentId` únicos, orden, componente y enumerados coinciden.
+
+#### v1.40.0: la hoja guarda en `msp_app` (15:10–15:45, sin commit)
+
+Plan: [`docs/superpowers/plans/2026-10-30-unidades-guardado-prisma.md`](../superpowers/plans/2026-10-30-unidades-guardado-prisma.md). Decisiones del usuario (eligió la recomendada en todas):
+
+- **Arquitectura:** `updateUnit`, `updateUnitBatch` y `createUnit` del backend `prisma` llaman a Server Actions; la hoja casi no cambia y `strapi.ts` no se tocó. Cada llamada es una transacción.
+- **Concurrencia:** gana la última escritura, campo por campo (como en Strapi). `findStaleUnits` queda para cuando la hoja mande un solo lote por Guardar.
+- **Código repetido:** el servidor usa el primer sufijo libre (`-1`, `-2`, …), la regla del UID de Strapi (`nextFreeCode` de `lib/db/block-code.ts`). Sin `code` en el alta, sale del nombre. Ya no se llama a `/api/units/generate-code`.
+- **Tipo de unidad:** sale de `block.domain`. Un componente de otro tipo se rechaza; una unidad sin fila hija la recibe al escribir un campo de la zona dinámica.
+- **Fila que falla:** Guardar sigue deteniéndose en la primera, como hoy.
+- **Contadores en cada celda:** se dejan en la transacción y se mide en el staging de Vercel. Si una celda pasa de 500 ms, se mueven al botón Guardar o a una cola.
+
+Qué se hizo:
+
+- `lib/db/unit-write-mapping.ts` (puro, 13 pruebas): nombres de Strapi a columnas, enumerados de la UI a miembros de Prisma, rutas `unitType[0].campo` y la heredada `type[0].campo`, descarte de los campos solo de cliente (misma regla que `strapi.ts`) y errores con detalle.
+- `lib/db/unit-schemas.ts`: `parseUnitId`, `parseUnitUpdates` (1–300 cambios) y `parseUnitCreate` (bloque obligatorio).
+- `lib/db/units.ts`: `update` y `create`. Dentro de la transacción:
+  1. bloquea el bloque (`lockBlockForUpdate`);
+  2. lee el `before`;
+  3. resuelve los catálogos en serie, porque `pg` no admite consultas simultáneas en la conexión de la transacción;
+  4. resuelve el código;
+  5. escribe la unidad con la fila hija;
+  6. llama a `recalculateBlockCounters` y escribe `audit_log`.
+
+  Un lote sin campos guardables no escribe nada. Ante un choque de código simultáneo (`P2002`), reintenta hasta 3 veces.
+- `lib/db/unit-actions.ts`: `updateUnitAction` (permiso `update`) y `createUnitAction` (permiso `create`).
+- `components/units/datasheet-units-table.tsx` (`handleSave`): si el lote traía `code` y el servidor devolvió otro, la celda muestra el que quedó y la hoja se recarga.
+- Se quitaron el aviso de la página y sus textos: `app/(main)/units/list/[id]/page.tsx` y `messages/*.json` volvieron a como estaban en `c0ee770`.
+
+Verificado:
+
+- `npm test` 258/258; `npx tsc --noEmit` con los 38 errores de siempre, ninguno en archivos tocados (corrido de nuevo a las 15:45, después del último cambio).
+- Datos en solo lectura que apoyaron las decisiones: ninguna unidad tiene un tipo distinto al de su bloque; 107,850 unidades de vivienda no tienen componente; 2,268 códigos son `base-N` con `base` existente.
+- **Dos pruebas en `msp_app`, autorizadas por el usuario,** cada una en transacciones que se revirtieron siempre (scripts temporales ya borrados). La segunda usó el repositorio real:
+  - lote en vivienda;
+  - código repetido (`-1`);
+  - fila hija creada;
+  - alta en oficinas con código repetido y `"Micro 1"`;
+  - industrial por `type[0]`;
+  - guardado sin cambios (0 filas de auditoría);
+  - los 5 errores esperados.
+
+  Después del rollback todo quedó igual; solo avanzaron las secuencias de id de `unit` y `audit_log`.
+- **Tiempo desde una PC:** 3.6–4.8 s por guardado, casi todo red. No sirve para decidir; falta medir en Vercel.
+- Prisma 7.10 imprime un `DeprecationWarning` de `pg` («client.query() when the client is already executing»). `--trace-deprecation` lo ubica en su intérprete de consultas (los `include` se cargan en paralelo dentro de la transacción), no en este código. Hoy no cambia el resultado.
+
+### 14.23 Dónde quedó la conversación (30 oct, 15:50): traspaso
+
+#### Estado (comprobado con git a las 15:47)
+
+- **Rama:** `jc_migrate_blocks`, al día con `origin/jc_migrate_blocks` en `c0ee770` (v1.38.1). Encima de `origin/main` (`c9158cb`): `18e710d` (proyectos), `652f3ad` (bloques), `c0ee770` (choques con workflows). Ninguno fusionado a `main`.
+- **Sin commit** (lo hace el usuario): v1.39.0 y v1.40.0 juntas.
+  - Modificados: `CHANGELOG.md`, `components/units/datasheet-units-table.tsx`, `docs/migration/N8N_WORKFLOWS.md`, `docs/migration/README.md` (este traspaso), `lib/api/client.ts`, `lib/api/prisma-client.ts`, `package.json` (1.40.0).
+  - Nuevos: `lib/db/unit-actions.ts`, `unit-mapping.ts` y su prueba, `unit-schemas.ts`, `unit-write-mapping.ts` y su prueba, `units.ts`, y los planes `docs/superpowers/plans/2026-10-30-unidades-lectura-prisma.md` y `…-guardado-prisma.md`.
+  - `ROADMAP.md` y `README_Backend_full.md` **no** se actualizaron con unidades: preguntarle al usuario antes de tocarlos.
+- **`msp_app`:** sin migraciones y sin datos nuevos (las dos pruebas se revirtieron). No hay registro de que el usuario haya abierto la hoja en el navegador con el backend `prisma`.
+- **Modo `prisma`:** quedan **5 `notMigrated`**: `getBlocksLite` (de `/sync`, no tocar) y cuenta (`forgotPassword`, `resetPassword`, `updateMe`, `changePassword`).
+- `graphify update .` corrido.
+
+#### Lo que ya no es cierto en secciones anteriores
+
+Manda esta sección. Además de la lista de la §14.21:
+
+- §14.20 y §14.21 dicen «9 `notMigrated`» y «la hoja todavía no está migrada»: hoy son 5 y la hoja lee y guarda.
+- §14.21 («Si sigue unidades») dice que `/api/units/generate-code` hace falta en modo `prisma`: ya no se usa ahí.
+- La fila de unidades de la §6 y el `ROADMAP.md` §4.8 no reflejan la v1.39.0 ni la v1.40.0.
+
+#### Pendiente
+
+1. **Del usuario:**
+   - el commit de la v1.39.0 y la v1.40.0;
+   - probar la hoja en `pnpm dev:staging`: abrir un bloque de cada tipo, editar celdas, Guardar, crear una unidad y repetir un código. El login escribe en `msp_app.session` y guardar escribe unidades: lo hace él o lo autoriza;
+   - medir en el staging de Vercel cuánto tarda guardar una celda. Si pasa de 500 ms, mover los contadores al botón Guardar o a una cola (su decisión del 30 oct).
+2. **Unidades, siguiente parte:**
+   - `findStaleUnits` (`lib/domain/units/concurrency.ts`, del agente de workflows; no reescribirlo) cuando la hoja mande un lote por Guardar;
+   - que Guardar siga con las demás filas si una falla (`ROADMAP.md` §4.8);
+   - el `DeprecationWarning` de Prisma, si molesta: sacar los `include` de la transacción y leer la unidad después del commit, como en bloques.
+3. **Sigue abierto de la §14.21:** el análisis «senior dev» (qué despliega `main`, la credencial `j_stage_admin`, fecha de corte, patrón rápido en proyectos y perfiles, pruebas repetibles), la regla de Interior y la limpieza de este README.
+4. **Del lado de workflows** (traspaso en `N8N_WORKFLOWS.md` §7): la segunda corrida diaria del cron del tipo de cambio, el orden del runbook del workflow 7 frente al paso 8, los campos del contrato del workflow 1 y el host del warehouse del paso 3.
+
+#### Lo primero al retomar: preguntarle al usuario
+
+1. Si ya hizo el commit (comprobar con `git status` y `git log`) y si probó la hoja; qué vio y cuánto tardó en Vercel.
+2. Si actualiza `ROADMAP.md` §4.8, `README_Backend_full.md` y la fila de unidades de la §6.
+3. Qué sigue, en un cuestionario: `findStaleUnits` y seguir con las demás filas, pasar proyectos y perfiles al patrón rápido, cuenta (necesita proveedor de correo) o limpiar este README.
+
+#### Reglas que siguen vigentes en esta conversación
+
+Además de la sección 0, la §14.15, la §14.19 y la §14.21 («Cómo trabaja el usuario»):
+
+- No leer ni imprimir valores del `.env`, ni buscar nombres de variables en él: preguntarle al usuario.
+- Cada escritura en `msp_app` necesita su autorización, incluso en una transacción revertida y el login de `pnpm dev:staging`.
+- No cambiar de rama, ni `stash`, `checkout` o `reset`, sin el usuario. El agente no hace commit, push, PR ni merge.
+- No tocar `getBlocksLite`, `lib/db/block-counters.ts` ni `lib/domain/units/concurrency.ts` sin preguntar.
+- Los JSON exportados de n8n traen tokens de producción: nunca copiarlos al repo.
+- Scripts temporales contra la base: en PowerShell, desde la raíz con `.\etl\node_modules\.bin\tsx.cmd`, `process.loadEnvFile(".env")`, salida a `$env:TEMP`, y borrarlos al terminar.
+- `node --test` corre TypeScript sin compilar: nada de propiedades en parámetros del constructor y, en módulos puros, imports relativos con `.ts`.
