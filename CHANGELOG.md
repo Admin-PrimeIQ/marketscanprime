@@ -6,6 +6,95 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Unidades sobre Prisma, parte 2: la hoja guarda en la base nueva (v1.40.0)
+
+_2026-10-30_
+
+Con `NEXT_PUBLIC_DATA_BACKEND=prisma`, la hoja `/units/list/[id]` guarda en `msp_app`: la edición celda por celda (`updateUnit`), el botón Guardar (`updateUnitBatch`) y las unidades nuevas (`createUnit`). **Producción no cambia**: con el backend `strapi` la hoja hace lo mismo que antes y `strapi.ts` no se tocó. Sin migraciones. Plan y decisiones: [docs/superpowers/plans/2026-10-30-unidades-guardado-prisma.md](docs/superpowers/plans/2026-10-30-unidades-guardado-prisma.md).
+
+- **Cada guardado es una transacción** [lib/db/units.ts](lib/db/units.ts):
+  - bloquea el bloque (`lockBlockForUpdate`);
+  - escribe solo los campos recibidos (gana la última escritura, campo por campo, como en Strapi);
+  - crea o actualiza la fila hija del tipo del bloque;
+  - recalcula los contadores del bloque (`recalculateBlockCounters`; reemplaza el webhook de n8n "Block Edit Queue");
+  - deja la unidad en `audit_log` a nombre del usuario de la sesión.
+
+  Un lote sin campos guardables (solo precios en otra moneda, por ejemplo) no escribe nada.
+- **Código de la unidad**: si el pedido ya es de otra unidad, el servidor usa el primer sufijo libre (`-1`, `-2`, …), la regla del UID de Strapi; si dos guardados chocan a la vez, reintenta. Sin `code` en el alta, sale del nombre. Ya no se llama a `/api/units/generate-code`, que entra a Strapi como administrador.
+- **Mapeo** [lib/db/unit-write-mapping.ts](lib/db/unit-write-mapping.ts) (puro, con pruebas):
+  - nombres de Strapi a columnas de Prisma, y los enumerados de la UI al nombre del miembro (`"Not Available"` → `Not_Available`, `"Micro 1"` → `Micro_1`);
+  - la zona dinámica completa o por ruta (`unitType[0].campo`, también la heredada `type[0].campo`);
+  - se descartan los campos que solo existen en el cliente (la misma regla que `strapi.ts`);
+  - un campo desconocido, un valor inválido o un componente de otro tipo que el del bloque se rechazan con detalle;
+  - un `unitType` vacío no borra el componente.
+- **Entrada y acciones** [lib/db/unit-schemas.ts](lib/db/unit-schemas.ts), [lib/db/unit-actions.ts](lib/db/unit-actions.ts): `updateUnitAction` exige `update` y `createUnitAction` exige `create`; el alta exige el bloque. Un lote admite hasta 300 cambios.
+- **Fachada** [lib/api/prisma-client.ts](lib/api/prisma-client.ts): `updateUnit`, `updateUnitBatch` y `createUnit` llaman a las acciones. Quedan 5 `notMigrated`.
+- **Hoja** [components/units/datasheet-units-table.tsx](components/units/datasheet-units-table.tsx): después de Guardar, si el lote traía `code` y el servidor devolvió otro, la celda muestra el que quedó. Con Strapi el código devuelto es el enviado, así que no cambia nada.
+- **Aviso**: se quitó el aviso fijo de "guardar no migrado" de [app/(main)/units/list/[id]/page.tsx](app/(main)/units/list/[id]/page.tsx) y sus textos de `messages/es.json` y `messages/en.json`.
+- **Verificación**:
+  - `npm test` 258/258 (13 pruebas nuevas) y `tsc` sin errores nuevos (38 previos).
+  - Dos pruebas en `msp_app` autorizadas por el usuario, cada una dentro de transacciones que se revirtieron siempre. Después del rollback, conteos de unidades, filas hijas y `audit_log`, valores y `updatedAt` quedaron iguales. Con el repositorio real, sobre el bloque con más unidades de cada tipo:
+    - vivienda (4,467 unidades): lote con disponibilidad, precio y recámaras, más campos de cliente descartados; dos filas de auditoría (unidad y contadores);
+    - código de otra unidad del mismo bloque: quedó con `-1`;
+    - unidad de vivienda sin componente: se creó su fila hija;
+    - alta en oficinas (153 unidades) con código repetido, estacionamiento y `"Micro 1"`: quedó con `-1` y la respuesta trae todo;
+    - industrial (205 unidades) por la ruta `type[0]`;
+    - errores con detalle para componente de otro tipo, campo desconocido, catálogo inexistente, unidad inexistente y cambio de bloque.
+  - Desde una PC fuera de Railway, cada guardado tardó entre 3.6 y 4.8 s, casi todo de ida y vuelta de red. **Falta medir en el staging de Vercel**: si allá una celda pasa de 500 ms, los contadores pasan al botón Guardar o a una cola.
+  - Prisma 7.10 avisa en consola que lanza consultas simultáneas sobre la conexión de una transacción (`DeprecationWarning` de `pg`, por los `include`). Sale de su intérprete, no de este código, y no cambia el resultado.
+- **Pendiente**: la revisión de versiones (`findStaleUnits`) cuando la hoja mande un lote por Guardar, y que Guardar siga con las demás filas si una falla (ROADMAP §4.8).
+
+---
+
+## Unidades sobre Prisma, parte 1: la hoja lee de la base nueva (v1.39.0)
+
+_2026-10-30_
+
+Con `NEXT_PUBLIC_DATA_BACKEND=prisma`, la hoja `/units/list/[id]` abre las unidades del bloque desde `msp_app`. Llegan con la misma forma que en Strapi, así que [components/units/datasheet-units-table.tsx](components/units/datasheet-units-table.tsx) no cambia. **Producción no cambia**: con el backend `strapi` nada de esto se usa. Sin migraciones ni escrituras en `msp_app`. Guardar y crear unidades siguen sin migrar (parte 2).
+
+- **Mapeo** [lib/db/unit-mapping.ts](lib/db/unit-mapping.ts) (puro, con pruebas):
+  - La fila de `unit` con su tabla hija vuelve como `StrapiUnit`, con la zona dinámica `unitType`:
+    - `unit_housing` vuelve como `unit-types.housing`;
+    - `unit_office` vuelve como `unit-types.offices`;
+    - `unit_industrial` vuelve como `unit-types.industrial`.
+
+    Una unidad sin tipo trae `[]`.
+  - Las relaciones también vienen: el bloque con su proyecto y los tres catálogos.
+  - `createdAt` y `updatedAt` conservan los milisegundos, que necesita el control de concurrencia de la parte 2.
+  - Se traducen dos enumerados, porque el cliente de Prisma devuelve el nombre del miembro y no el valor guardado:
+    - `Not_Available` vuelve como `"Not Available"`;
+    - `Micro_1`…`Large_5` vuelven como `"Micro 1"`…`"Large 5"`.
+  - El componente industrial incluye `qualityClassification`.
+- **Entrada** [lib/db/unit-schemas.ts](lib/db/unit-schemas.ts): el bloque es obligatorio, sea `documentId` o id numérico. Un `pageSize` mayor que 1,000 o una clave desconocida se rechazan.
+- **Repositorio y acción** [lib/db/units.ts](lib/db/units.ts) y [lib/db/unit-actions.ts](lib/db/unit-actions.ts):
+  - `listUnitsAction` exige el permiso `read`.
+  - El orden es el de Strapi: `createdAt` ascendente y luego `id`.
+  - La búsqueda opcional es por `code`.
+- **Fachada** [lib/api/prisma-client.ts](lib/api/prisma-client.ts): `getUnitsAllPages` pide páginas de 1,000 en paralelo, para que cada respuesta quede bajo el límite de 4.5 MB de las funciones de Vercel, y devuelve el sobre de una sola página de Strapi. Quedan 8 `notMigrated`.
+- **Aviso** [app/(main)/units/list/[id]/page.tsx](app/(main)/units/list/[id]/page.tsx): solo en modo `prisma`, un aviso fijo dice que guardar unidades todavía no está migrado. El texto está en `messages/es.json` y `messages/en.json`.
+- **Verificación**:
+  - `npm test` 245/245 (10 pruebas nuevas) y `tsc` sin errores nuevos (38 previos).
+  - Lectura con el repositorio real contra `msp_app`, en una sesión de solo lectura (`transaction_read_only = on`), sobre el bloque con más unidades de cada tipo: 4,467 de vivienda, 153 de oficinas y 205 industriales. En los tres coinciden:
+    - el total con un `count` directo;
+    - los `documentId`, sin repetidos;
+    - el orden;
+    - el componente según el tipo;
+    - el bloque con su proyecto en todas las unidades;
+    - las clasificaciones y los rangos de oficina dentro de los valores de la hoja.
+  - La página más pesada midió 1.23 MB. Desde una PC fuera de Railway, con una conexión, cada página de 1,000 tardó unos 2 s; el bloque más grande, 10.2 s en serie. En la app las páginas van en paralelo (2 conexiones).
+
+## Bloques sobre Prisma sin choques con los workflows: contadores, tipo de inmueble y `legacyId` (v1.38.1)
+
+_2026-10-30_
+
+Cierra, en el backend `prisma`, los huecos de bloques que chocaban con los reemplazos de los workflows de n8n (`docs/migration/N8N_WORKFLOWS.md`, bitácora del 30 oct). **Producción no cambia**: con el backend `strapi` nada de esto se usa. Sin migraciones ni escrituras en `msp_app`.
+
+- **Contadores** [lib/db/block-mapping.ts](lib/db/block-mapping.ts): `toBlockWriteData` ya no escribe los 10 contadores y promedios (`totalUnits`, `availableUnits`, `totalM2`, `availableM2`, `averageSizeM2`, `assignedParking` y los cuatro promedios en USD). Solo los escribe `recalculateBlockCounters` ([lib/db/block-counters.ts](lib/db/block-counters.ts)) al guardar unidades. Antes, un formulario de bloque abierto antes de un guardado de unidades los regresaba a valores viejos, y clonar un bloque copiaba los del original. [lib/db/block-schemas.ts](lib/db/block-schemas.ts) los sigue aceptando (el formulario los manda y el esquema es estricto). En el formulario ya estaban deshabilitados.
+- **Bloqueo** [lib/db/blocks.ts](lib/db/blocks.ts): `update` toma la fila del bloque con `lockBlockForUpdate` antes de leer el `before`, el mismo orden que seguirá `saveUnitChanges`.
+- **Tipo de inmueble**: `update` rechaza cambiar `domain` si el bloque tiene unidades (`domainChangeProblem`). El dominio decide las tablas del warehouse del push y la tabla hija de las unidades.
+- **`legacyId`**: `create` y `update` rechazan un `legacyId` nuevo o cambiado que ya tenga otro bloque (`legacyIdToCheck`). El push une el bloque con el warehouse por ese valor y salta los repetidos. Sin índice único: dos altas simultáneas con el mismo valor podrían pasar (riesgo bajo, aceptado). Lectura de solo lectura en `msp_app` el 30 oct: 0 valores repetidos entre los 1,688 bloques.
+- **Verificación**: `npm test` 235/235 (3 pruebas nuevas), `tsc` sin errores nuevos (38 previos).
+
 ## Bloques sobre Prisma: listado, detalle con financiamiento, alta y edición (v1.38.0)
 
 _2026-10-30_

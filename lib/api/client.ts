@@ -7,7 +7,8 @@
  * app a la vez con `NEXT_PUBLIC_DATA_BACKEND`; mezclarlos por módulo dejaría dos fuentes de verdad.
  *
  * La implementación `prisma` (`lib/api/prisma-client.ts`) se completa módulo por módulo
- * (ver `docs/migration/ROADMAP.md`, fase 5); hoy cubre catálogos, perfiles de tipo de cambio y proyectos.
+ * (ver `docs/migration/ROADMAP.md`, fase 5); hoy cubre catálogos, perfiles de tipo de cambio, proyectos,
+ * bloques y la hoja de unidades (lectura y guardado).
  */
 
 import { resolveDataBackend, type DataBackend } from "./data-backend"

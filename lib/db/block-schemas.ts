@@ -115,6 +115,8 @@ export const blockRequestSchema = z
     market: emptyOr([...MARKETS]),
     blockUsage: emptyOr([...BLOCK_USAGES]),
     commercializationMonths: count,
+    // Contadores: el formulario los manda y se aceptan para no romper `.strict()`, pero
+    // `toBlockWriteData` no los escribe (los calcula `recalculateBlockCounters`).
     totalUnits: count,
     totalM2: amount,
     availableUnits: count,

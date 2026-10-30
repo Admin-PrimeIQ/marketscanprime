@@ -2879,9 +2879,19 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
         })
         try {
           let codeAttempts = 0
+          let codeChangedByServer = false
           while (true) {
             try {
-              await dataClient.updateUnitBatch(unitId, updates, blockDocumentId)
+              const savedUnit = await dataClient.updateUnitBatch(unitId, updates, blockDocumentId)
+              // Con el backend prisma el servidor resuelve el código repetido con sufijo (-1, -2, …).
+              if (
+                updates.some((u) => u.field === "code") &&
+                savedUnit?.code &&
+                savedUnit.code !== (unit as { code?: unknown }).code
+              ) {
+                ;(unit as { code?: unknown }).code = savedUnit.code
+                codeChangedByServer = true
+              }
               break
             } catch (writeErr) {
               if (isUnitCodeConflict(writeErr) && codeAttempts < 5) {
@@ -2904,7 +2914,7 @@ export function DatasheetUnitsTable({ units, blockId, blockName, blockCollection
               throw writeErr
             }
           }
-          if (codeAttempts > 0) setRefreshKey((k) => k + 1) // redibujar la celda code con el correlativo
+          if (codeAttempts > 0 || codeChangedByServer) setRefreshKey((k) => k + 1) // redibujar la celda code con el correlativo
           const blockIdForWebhook = blockId
           if (blockIdForWebhook) void notifyBlockCounterUpdate(String(blockIdForWebhook))
         } catch (err) {
