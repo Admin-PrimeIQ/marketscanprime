@@ -331,7 +331,13 @@ A revisar con negocio:
 - **Pantallas:** `projects` (lista), `new`, `view/[documentId]`, `edit/[documentId]`, `clone/[id]`.
 - **Archivos:** `projects-table.tsx`, `advanced-filters.tsx`, `project-form.tsx` y sus 7 pestañas en `components/projects/form-tabs/` (`general-info`, `location`, `amenities`, `services`, `financing`, `banks`, `currencies`).
 - **Métodos:** `getProjects` (filtros avanzados, búsqueda, orden, paginación), `getProjectById` (lo usan también bloques y la hoja), `createProject`, `updateProject`, más catálogos.
-- **Hecho en parte (28 oct, v1.33.0):** `getProjects` con búsqueda, orden, paginación y filtros rápidos (dominio, región, país) en `lib/db/projects.ts`. Faltan los filtros avanzados (hoy responden "todavía no están migrados"), `getProjectById`, `createProject` y `updateProject`. El filtro de fase (`availability`) no tiene campo ni en Strapi ni en `msp_app` y responde con un error; la UI no lo manda.
+- **Hecho en parte (28 oct, v1.33.0):** `getProjects` con búsqueda, orden, paginación y filtros rápidos (dominio, región, país) en `lib/db/projects.ts`. El filtro de fase (`availability`) no tiene campo ni en Strapi ni en `msp_app` y responde con un error; la UI no lo manda.
+- **Hecho (29 oct, v1.37.0, rama `jc_migrate_projects`, sin commit):**
+  - Filtros avanzados en `lib/db/project-filters.ts`, con la semántica corregida que decidió el usuario («distinto» incluye vacíos, «entre» con OR es una sola condición, fechas por día completo).
+  - `getProjectById` con NSE, tipo de seguridad y perfil con monedas (también en `project.currencies`).
+  - `createProject` y `updateProject`, con referencias validadas, amenidades y servicios en su orden y una fila de `audit_log` por proyecto. `code` puede repetirse, como en Strapi.
+  - La pestaña `banks-tab.tsx` existe pero el formulario no la usa (no manda bancos). El financiamiento del proyecto son `fha`, `muvi`, `fractionalDownPayment`, `downPaymentPercentage` y NSE.
+  - Probado con lectura de humo y una prueba de punta a punta revertida (6/6); falta el navegador. Ver `README.md` §14.18.
 - **Lo que Strapi hace hoy y hay que construir:** la traducción de filtros a query-string de Strapi → un constructor de `where` de Prisma con los mismos filtros; `populate` profundo (país, desarrollador, NSE, amenidades, servicios, perfil) → `include` explícito; relaciones muchos-a-muchos (amenidades, servicios) por `documentId` → tablas puente con FK.
 - **Debe seguir funcionando:**
   - [ ] Lista con todos los filtros avanzados actuales, búsqueda, orden y paginación.

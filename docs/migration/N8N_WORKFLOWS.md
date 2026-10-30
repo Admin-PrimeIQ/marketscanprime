@@ -2,7 +2,7 @@
 
 Documento de trabajo para el agente (o la persona) que **migra los workflows de n8n** a un servicio propio. Otro agente migra en paralelo **los módulos del sitio web** (proyectos, bloques, unidades, perfiles, cuenta) siguiendo [`README.md`](README.md) §14. Este documento dice qué hace hoy cada workflow, con qué sistemas habla, qué lo reemplaza, quién es dueño de cada pieza y cómo coordinarse con el otro agente.
 
-Creado el 28 oct 2026. Fuentes: [`docs/manual-del-sistema.md`](../manual-del-sistema.md) (sección «Integraciones (n8n)», líneas 1760–1955; contratos de cada webhook, líneas 6612–7458; diagramas de secuencia, 7458–7800), [`ROADMAP.md`](ROADMAP.md) (fase 6 y §4.9–4.11) y el inventario de producción de la skill `proteger-produccion`.
+Creado el 28 oct 2026; última actualización: 30 oct 2026, 9:45 (UTC-6). Fuentes: [`docs/manual-del-sistema.md`](../manual-del-sistema.md) (sección «Integraciones (n8n)», líneas 1760–1955; contratos de cada webhook, líneas 6612–7458; diagramas de secuencia, 7458–7800), [`ROADMAP.md`](ROADMAP.md) (fase 6 y §4.9–4.11) y el inventario de producción de la skill `proteger-produccion`.
 
 ---
 
@@ -42,12 +42,15 @@ Si una tarea no cae claramente en ninguna fila, preguntarle al usuario antes de 
 
 Los dos agentes trabajan en el mismo repo y la misma base `msp_app`. Lo que se comparte, y cómo no pisarse:
 
-- **Ramas.** Cada agente en su propia rama, que sale de `main` (el usuario fusionó ahí `feat/data-facade` con los PR [#9](https://github.com/Admin-PrimeIQ/marketscanprime/pull/9), [#10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10) y [#11](https://github.com/Admin-PrimeIQ/marketscanprime/pull/11) el 29 oct). La rama de este agente es **`jc_migrate_workflowsn`**. Ningún agente hace commit, `git push` ni merge: el usuario hace los commits. Un merge a `main` despliega `admin.primeiqlatam.com`: el código de la migración tiene que seguir apagado ahí (backend `strapi`, guardas de `lib/db/guard.ts`).
+- **Ramas.** Cada agente en su propia rama, que sale de `main`. Ningún agente hace commit, `git push` ni merge: el usuario hace los commits. Un merge a `main` despliega `admin.primeiqlatam.com`: el código de la migración tiene que seguir apagado ahí (backend `strapi`, guardas de `lib/db/guard.ts`).
+  - Historia: `feat/data-facade` entró a `main` con los PR [#9](https://github.com/Admin-PrimeIQ/marketscanprime/pull/9), [#10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10) y [#11](https://github.com/Admin-PrimeIQ/marketscanprime/pull/11); la rama de este agente, **`jc_migrate_workflowsn`**, entró con el [PR #12](https://github.com/Admin-PrimeIQ/marketscanprime/pull/12) (`c9158cb`, 29 oct 15:27): contadores v1.36.0 y el arreglo del build (`57a31b8`). Esa rama no tiene nada pendiente.
+  - **La carpeta de trabajo es una sola para los dos agentes.** Al 30 oct está en `jc_migrate_projects` (agente de módulos) con muchos cambios suyos sin commit. Antes de tocar nada: `git branch --show-current` y `git status --short`. **No** cambiar de rama, ni hacer `stash`, `checkout` o `reset` mientras haya cambios ajenos: se los llevaría o los perdería. Este documento solo lo edita este agente, así que se puede editar en cualquier rama; el usuario decide en qué rama lo commitea. Para **código** nuevo de workflows, pedirle al usuario la rama (una nueva desde `main`, o `jc_migrate_workflowsn` puesta al día con `main`) y que él haga el cambio de rama.
 - **`prisma/schema.prisma` y migraciones (lo más delicado).** Las migraciones se generan con `migrate diff --from-config-datasource`, que compara **la base real** contra **tu** `schema.prisma`. Si el otro agente ya aplicó una migración que tu rama todavía no tiene, tu diff incluirá un `DROP` de sus tablas o columnas. Por eso:
   1. antes de generar una migración, traer a tu rama el `schema.prisma` y las carpetas de `prisma/migrations/` del otro agente (pedírselo al usuario si no están commiteadas);
   2. revisar línea por línea que el SQL **solo** traiga lo tuyo: ningún `DROP`, y nada que mencione `dbo_stage` ni `dbo`;
   3. aplicar con `npm run app:deploy` desde `etl/`, solo con confirmación del usuario, y avisar en la bitácora (§8) qué migración quedó aplicada.
   Los modelos `SyncRun`, `SyncRunBlock` y `ExchangeRate` ya existen (§5): extenderlos es tarea de este agente; los demás modelos, del otro.
+  **Índices que Prisma no modela.** El índice único parcial «una sola corrida activa» (§5) se escribe a mano en SQL: Prisma 7.10 no puede declararlo en `schema.prisma` (el paquete instalado no trae el preview `partialIndexes`). Por eso, cada `migrate diff` posterior lo verá como sobrante y propondrá un `DROP INDEX`. Quitar esa línea a mano en cada migración y avisarlo en la bitácora (§8) y al otro agente.
 - **`lib/domain/`.** Reglas puras compartidas (fórmulas, varas, contexto del bloque). Si el mapeador del warehouse o los contadores necesitan cambiar una regla existente, no se cambia en silencio: afecta a la hoja de unidades. Agregar archivos nuevos (p. ej. `lib/domain/warehouse/`, `lib/domain/blocks/counters.ts`) no choca.
 - **Versión y `CHANGELOG.md`.** Ambos agentes suben la versión de `package.json` y escriben en `CHANGELOG.md`, así que chocan seguido. Al juntar ramas, el usuario decide el número final; cada entrada nombra los archivos que toca.
 - **Documentos.** Este agente escribe su avance en **este** archivo (§7 y §8) y marca las casillas de la fase 4 y la fase 6 en `ROADMAP.md`. El README principal (§14) es del agente de módulos; aquí solo se agrega una línea en su §6 o §8 cuando algo de los workflows cambie el estado general.
@@ -115,6 +118,7 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 - **Lo llama:** `lib/sync/runs-api.ts` desde las 6 rutas de `app/api/sync/` (validan el bearer de Strapi; 5 exigen super-admin).
 - **Contrato:** manual, líneas 6614–7016 (`writeback`, `runs`, `runs/{runId}`, `release`, `snapshots`, `snapshot`, `sql/projects`). Estados: `resolving`, `running`, `completed`, `completed_with_skips`, `failed`, `aborted`.
 - **Reemplazo:** las mismas 6 rutas, ahora sobre `msp_app.sync_run` / `sync_run_block` con `requireRole` (sin `X-Sync-Key` público). `sql-projects` lee el warehouse directo con Prisma. Las rutas deben devolver la misma forma que hoy para que `components/sync/*` no cambie. Hoy, con el backend `prisma`, responden 503 (`lib/sync/prisma-unavailable.ts`).
+- **Permisos:** no hace falta uno nuevo. `lib/auth/permissions.ts` ya tiene `superAdmin` (solo `super_administrator`) para las rutas que hoy usan `isStrapiSuperAdmin`, y `read` para ver una corrida (`runs/[runId]`, que hoy solo valida el bearer). Revisar ruta por ruta qué método exige qué, porque `runs` mezcla los dos.
 - **Hecho cuando:** la lista «debe seguir funcionando» de `ROADMAP.md` §4.9 pasa en staging.
 
 #### 2. [Prime IQ] Sync Resolve Targets · `bpLA8t0B6vr7Qq7f`
@@ -126,12 +130,13 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 
 - **Hoy:** cron cada 20 s. Toma la corrida activa más antigua, reinicia bloques trabados más de 35 min, reintenta la resolución (máximo 5), aborta si más del 20 % falla la protección de vaciado y reparte hasta 20 pendientes de la fase más baja.
 - **Reemplazo:** **desaparece**. BullMQ reparte, reintenta y limita concurrencia; los trabados se cubren con `stalledInterval`. Conservar las dos reglas de negocio: la protección de vaciado (abortar si más del 20 % falla) y el orden por fase.
+- **Ojo (revisión del 29 oct):** BullMQ no trae ninguna de esas dos reglas. Trabaja con jobs sueltos, así que abortar la corrida entera y esperar a que termine una fase antes de la siguiente necesitan un coordinador propio en cualquier caso. Alternativa sin Redis: `msp_app.sync_run_block` ya es una cola; los workers toman bloques con `SELECT … FOR UPDATE SKIP LOCKED` y el coordinador es una consulta sobre la misma tabla. Para ~1,700 bloques por corrida, Postgres alcanza. Eso quitaría de la §6 el Redis propio y parte de la infraestructura de workers. **Es decisión del usuario** (§6); no construir la cola antes de que la tome.
 
 #### 4. [Prime IQ] Sync Block Worker (push) · `yBuM3XVk36DwRgbs`
 
 - **Hoy:** reclama el bloque en Supabase, lee bloque (con financiamiento) y unidades de Strapi, respalda en S3 las filas actuales del warehouse y, en una transacción, escribe universo, unidades (borra e inserta), amenidades, servicios y `banking_info`. Guarda el resultado en S3.
 - **Mapeo:** README §5 y `FORMULAS.md` (varas × 1.4342 / 1.1976, `_qtz` con la tasa de compra del perfil, textos recortados a 50/20, «Si»/«No», período `2026 - 2T`). Los factores de varas del warehouse **difieren a propósito** de los de la hoja: no unificarlos.
-- **Reemplazo:** mapeador puro (propuesta: `lib/domain/warehouse/`) + worker `warehouse-push` que escribe en la copia sombra (`dbo_stage` del Postgres de staging). El SQL cambia por las diferencias de Postgres: `id` `IDENTITY ALWAYS`, columnas con eñe entre comillas dobles, amenidades `boolean`, industrial con `char(64)` y `real` (README §11.4).
+- **Reemplazo:** mapeador puro (propuesta: `lib/domain/warehouse/`) + worker `warehouse-push` que escribe en la copia sombra (`dbo_stage` del Postgres de staging). El SQL cambia por las diferencias de Postgres: `id` `IDENTITY ALWAYS`, columnas con eñe entre comillas dobles, amenidades `boolean`, industrial con `char(64)` y `real` (README §11.4). `IDENTITY ALWAYS` no es un bloqueo técnico: Postgres acepta ids explícitos con `INSERT … OVERRIDING SYSTEM VALUE`. Lo que hay que decidir es quién asigna el id (§6, identidad de filas).
 - **Hecho cuando:** la prueba de paridad pasa celda por celda contra lo que n8n dejó en el `dbo_stage` de MySQL, para todos los bloques de un dominio, y el push sombra corre una semana junto a n8n sin diferencias (`ROADMAP.md` fase 4).
 - **Bloqueado por:** acceso de lectura al warehouse MySQL (`npm run warehouse:ping` nunca corrió con éxito, README §13.3) y la identidad de filas (§6).
 
@@ -161,11 +166,13 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
   - `assignedParking` = suma de `parkingSpaces`;
   - lo que no es número cuenta como 0; m² y promedios con `Math.round(x * 100) / 100`.
 - **Lo llaman:** la hoja de unidades después de guardar (con el `documentId`) y `scripts/sync-database` después de un push de unidades. El ejemplo guardado en el JSON trae `blockId: "1310"` enviado con axios: el CLI manda el `id` numérico, y en Strapi v5 ese `PUT` probablemente falla (sin confirmar; no se llama a Strapi ni a n8n para comprobarlo). La paridad lo respalda: casi todos los bloques del warehouse nunca se recalcularon.
-- **Reemplazo (hecho el 29 oct, v1.36.0):**
+- **Reemplazo (hecho el 29 oct, v1.36.0; en `main` desde el [PR #12](https://github.com/Admin-PrimeIQ/marketscanprime/pull/12)):**
   - `computeBlockCounters` en [`lib/domain/blocks/counters.ts`](../../lib/domain/blocks/counters.ts), pura. Sus pruebas incluyen el código del nodo de n8n copiado tal cual y exigen el mismo resultado en 2,000 bloques al azar.
   - `lockBlockForUpdate` y `recalculateBlockCounters(tx, blockId, actor)` en [`lib/db/block-counters.ts`](../../lib/db/block-counters.ts): bloquean la fila del bloque, leen sus unidades, calculan y escriben las 10 columnas con su fila en `audit_log`, en la transacción de quien llama. Si nada cambió, no escriben.
   - **Decisión del usuario (29 oct):** recalcular en la misma transacción del guardado, sin cola. Pasar a BullMQ (`jobId = blockId` con retraso, que junta los guardados del mismo bloque) solo si el recálculo pasa de 500 ms o cuando exista el servicio de workers. Medido el 29 oct en `msp_app`: unidades por bloque mediana 78, p95 474, máximo 4,467; en el más grande, ~300 ms leyendo desde una PC fuera de Railway y ~5 ms calculando.
 - **Paridad** (`npm run counters:parity` en `etl/`, solo lectura, 29 oct): de 1,688 bloques, 1,102 iguales. Nacidos en el backoffice: 199 de 204 iguales; los 5 restantes se explican sin tocar la fórmula (2 sin unidades, 2 con una unidad borrada después del último cálculo, 1 nunca calculado). Del warehouse: 903 de 1,484; de los 573 distintos, 482 tienen `total_units` vacío (n8n nunca los escribió y sus promedios vienen del warehouse), 71 tienen promedios del warehouse y 20 un total desactualizado.
+- **No basta con la hoja.** Cualquier otra ruta que escriba unidades de un bloque deja los contadores viejos si no recalcula: borrar unidades, clonar un bloque, importar. n8n tenía el mismo hueco, porque solo lo llamaba la hoja. Esas rutas deben seguir el mismo orden que `saveUnitChanges` (primero `lockBlockForUpdate`, después las unidades, al final `recalculateBlockCounters`) para no crear deadlocks. Pasárselo al agente de módulos por medio del usuario, para `ROADMAP.md` §4.8.
+- **`scripts/sync-database`** también llama a `block-counter-update`. Si el workflow 6 se apaga en n8n antes que Strapi, esa llamada empieza a fallar: va en el runbook del corte (§7 paso 9).
 - **Hecho cuando:** la función coincide con lo guardado donde n8n sí recalculó (cumplido, ver paridad) y el agente de módulos la llama dentro de `saveUnitChanges`. **Pendiente de decidir en el corte:** recalcular de una vez los ~580 bloques del warehouse o dejar que se actualicen al guardar; lo primero cambia los promedios que el push copia al warehouse.
 
 ### Grupo C: tipo de cambio (1 workflow)
@@ -178,6 +185,9 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 - **Fuente nueva:** el servicio SOAP oficial de Banguat (`https://www.banguat.gob.gt/variables/ws/TipoCambio.asmx`, operación `TipoCambioRango`), sin credenciales. Da los 7,274 días en una sola respuesta. Para el dólar devuelve compra = venta = la referencia de n8n, salvo el 30/11/2006 y el 01/12/2006, donde difieren: ahí n8n guarda `buy`/`sell` con `referenceRate` en null, y el reemplazo hace lo mismo.
 - **Reemplazo:** reglas puras en `lib/domain/exchange-rates/`, carga y paridad en `etl/src/exchange-rates/` (`npm run rates:load`, `npm run rates:parity`), y la ruta lee `msp_app.exchange_rate` con el backend `prisma` manteniendo la forma de respuesta. Tarea periódica (decisión del usuario, 29 oct): **una vez al día, 7:17 de Guatemala**. La hace la ruta `POST /api/cron/exchange-rates` del Vercel de staging (últimos 15 días, `Authorization: Bearer <CRON_SECRET>`; 404 fuera de staging), disparada por el workflow de GitHub Actions [`.github/workflows/exchange-rates.yml`](../../.github/workflows/exchange-rates.yml) (`17 13 * * *` UTC y `workflow_dispatch`; secretos de repositorio `MSP_STAGING_URL`, `MSP_CRON_SECRET`, `MSP_VERCEL_BYPASS`). No se usan los Cron Jobs de Vercel porque `vercel.json` también se aplicaría al proyecto de producción. **En `main` desde el 29 oct ([PR #10](https://github.com/Admin-PrimeIQ/marketscanprime/pull/10)) y corrido a mano desde GitHub ese día: 200 en Vercel.** Para correrlo fuera de horario: Actions → «Tipo de cambio (Banguat)» → *Run workflow*, o `npm run rates:load -- --from DD/MM/AAAA` en `etl/`.
 - **Hecho cuando:** una semana en sombra con los mismos valores que el `GET` de n8n, y la lista de `ROADMAP.md` §4.10 pasa (incluido «si Banguat no responde, se muestra el último dato»). La paridad (`npm run rates:parity` en `etl/`) se corre después de las 7:17; si solo aparece el día de hoy en `onlyInN8n`, es desfase de horario (n8n corre cada 6 h), no una diferencia. Apagar el workflow 7 en n8n es parte del corte y lo hace una persona.
+- **Semana en sombra (30 oct–5 nov), resultados:**
+  - 30 oct, 9:32: 7,274 de 7,274 días iguales, 0 valores distintos; solo en n8n, `2026-10-30`. Pero la tabla seguía con 7,274 filas, igual que el 29: **la corrida programada de las 7:17 no dejó el día 30**. Puede ser que GitHub haya retrasado la corrida, que no haya corrido (a veces la primera corrida programada de un workflow nuevo no arranca) o que Banguat todavía no publicara el día a esa hora (la ruta tolera un día faltante). Confirmarlo en GitHub → Actions → «Tipo de cambio (Banguat)» (el agente no puede: `gh` no tiene sesión en esta máquina) y repetir la paridad.
+- **En el corte:** el cron vive en el **Vercel de staging**. Si la app nueva pasa a otro proyecto, hay que mover `CRON_SECRET`, la URL y el token de bypass de GitHub a ese proyecto; si no, el tipo de cambio de producción dependería de staging. Va en el runbook (§7 paso 9).
 - **Es el mejor primer paso:** no depende de decisiones de negocio ni del warehouse, y sirve para montar el servicio de workers.
 
 ### Grupo D: Copilot (2 workflows, en espera)
@@ -202,7 +212,7 @@ Hoy: Strapi → `dbo_stage` MySQL (push) y `dbo_stage` MySQL → Strapi (pull), 
 | Modelos `SyncRun` (`sync_run`), `SyncRunBlock` (`sync_run_block`) y enums `SyncRunStatus`, `SyncOperation`, `SyncBlockMode`, `SyncBlockOperation` | `prisma/schema.prisma` | Tablas creadas en `msp_app` (migración `init`), vacías. **Falta** el índice único parcial «una sola corrida activa» (Prisma no lo modela; agregarlo a mano en una migración, README §10). |
 | Modelo `ExchangeRate` (`exchange_rate`) | `prisma/schema.prisma` | Único `(date, currency)`. Cargada con el histórico (7,274 días desde el 30/11/2006) y actualizada a diario por el cron (workflow 7). |
 | Tipo de cambio (workflow 7) | Reglas y cliente SOAP en `lib/domain/exchange-rates/`; servicio `lib/db/exchange-rate-sync.ts`; rutas `app/api/exchange-rates/route.ts` y `app/api/cron/exchange-rates/route.ts`; `lib/cron-secret.ts`; carga y paridad en `etl/src/exchange-rates/` (`npm run rates:load`, `npm run rates:parity`); cron `.github/workflows/exchange-rates.yml` | En `main`. Corre a diario en staging; falta la semana en sombra (§7 paso 1). |
-| Contadores del bloque (workflow 6) | `lib/domain/blocks/counters.ts` (cálculo puro), `lib/db/block-counter-mapping.ts` (puente con Prisma), `lib/db/block-counters.ts` (`lockBlockForUpdate`, `recalculateBlockCounters`), `lib/domain/units/concurrency.ts` (`findStaleUnits`); paridad en `etl/src/block-counters/` (`npm run counters:parity`). Cada archivo con su `.test.ts` | Commits del usuario `12155da` y `7a34015`, en `origin/jc_migrate_workflowsn`, sin fusionar a `main`. Probado contra `msp_app` (§8, 29 oct). Nadie lo llama todavía: lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8). |
+| Contadores del bloque (workflow 6) | `lib/domain/blocks/counters.ts` (cálculo puro), `lib/db/block-counter-mapping.ts` (puente con Prisma), `lib/db/block-counters.ts` (`lockBlockForUpdate`, `recalculateBlockCounters`), `lib/domain/units/concurrency.ts` (`findStaleUnits`); paridad en `etl/src/block-counters/` (`npm run counters:parity`). Cada archivo con su `.test.ts` | En `main` desde el 29 oct ([PR #12](https://github.com/Admin-PrimeIQ/marketscanprime/pull/12), `c9158cb`; commits `12155da` y `7a34015`). Probado contra `msp_app` (§8, 29 oct). Nadie lo llama todavía, así que en producción no hace nada: lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8). |
 | Conexión de solo lectura al warehouse MySQL | `etl/src/warehouse/connection.ts`, `ping.ts` (`npm run warehouse:ping`), lista de tablas en `etl/src/db/warehouse-tables.ts` | Escrita, nunca probada: falta `DATABASE_HOST_WAREHOUSE` (README §13.3). |
 | Conexión al Postgres de staging (`dbo_stage` en solo lectura) | `etl/src/stage/connection.ts`, `ping.ts`, `describe.ts` | Funciona. **Falta** el cliente de escritura para la copia sombra: conexión aparte con lista cerrada de las 11 tablas, y que cualquier escritura fuera de ella (en especial `sec_*`) falle en el código (README §8 punto 3). |
 | Estructura del warehouse en Postgres | README §11.3 y §11.4 | Las 11 tablas del push existen vacías en `dbo_stage` y `dbo` del servidor de staging. |
@@ -233,7 +243,10 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 | **El pull:** eliminarlo o reemplazarlo por un importador con vista previa. | Workflow 5 |
 | **Quién lee cada `dbo`** y si otros proyectos escriben en las tablas de Market Scan. | Corte del push |
 | **Red:** ¿Railway llega al RDS MySQL? (IP fija o túnel). | Workers que lean el warehouse |
-| **Infraestructura de workers:** proyecto o servicio de Railway, y Redis propio. No existen. Los crea una persona; nombres que no se confundan con producción (p. ej. `marketscan-next`, `msp-*`). | Servicio de workers |
+| **Cola de los workers:** BullMQ con Redis propio (lo que dice el `ROADMAP.md`) o una cola en Postgres sobre `sync_run_block` con `FOR UPDATE SKIP LOCKED`, sin Redis (ficha del workflow 3). Con ninguna de las dos se ahorra el coordinador de la regla del 20 % y del orden por fase. | Pasos 5 y 6 |
+| **Infraestructura de workers:** proyecto o servicio de Railway, y Redis propio si se elige BullMQ. No existen. Los crea una persona; nombres que no se confundan con producción (p. ej. `marketscan-next`, `msp-*`). | Servicio de workers |
+| **Corrida programada del tipo de cambio del 30 oct:** ¿corrió en GitHub Actions y con qué resultado? (ficha del workflow 7). | Semana en sombra |
+| **Pendientes de seguridad** (no bloquean, pero siguen abiertos): borrar `DEV_LOGIN_PASSWORD` del `.env`, que tiene la clave en texto plano (bitácora del 29 oct, 9:15), y decidir si se rota el token de Strapi de producción que trae el JSON exportado de Block Edit Queue (lo decide quien administra producción). | Nada |
 | **Respaldos del push:** S3 propio o tabla con retención. | Workflow 4 en producción |
 | **Acceso a `n8n-manager`:** clonarlo en esta máquina (solo lectura). Chat Sessions API no está en ese repo: pedirle al usuario que lo exporte desde n8n, como hizo con Block Edit Queue el 29 oct (lo busca por nombre en la lista de workflows y usa *Download*). Un JSON exportado puede traer tokens de producción: leerlo, no copiar el token y no guardarlo en el repo. | Workflows 4, 8 y 9 |
 | **Regla de Interior** (README §13.2): no cambia el push (copia valores), pero sí la paridad si alguien recalcula unidades. | Paridad del push |
@@ -244,35 +257,41 @@ Preguntárselas al usuario; no suponer (README §13.4, «no supongas nada»).
 
 Cada paso se puede probar solo. Marcar la casilla al cerrarlo y anotar la fecha en la §8.
 
-> **Traspaso al 29 oct, 15:20 (UTC-6).** Para el agente que continúe esta conversación.
+> **Traspaso al 30 oct, 9:45 (UTC-6).** Para el agente que continúe este trabajo.
 >
-> **Git.** Rama `jc_migrate_workflowsn`, al día con `origin` en `fa2271e` (commit del usuario, ~15:20, con el resultado de la prueba en `CHANGELOG.md` y `README.md` §6), **sin fusionar a `main`**. El código de los contadores (v1.36.0) está en `12155da` y `7a34015`. Sin commit queda solo este archivo, con este traspaso y la §9. El commit lo hace el usuario.
+> **Git.** Todo el código de este agente está en `main` (PR #12, `c9158cb`): tipo de cambio, contadores v1.36.0 y el arreglo del build (`57a31b8`). La carpeta de trabajo está ahora en **`jc_migrate_projects`**, la rama del agente de módulos, con muchos cambios suyos sin commit. **No cambiar de rama ni tocar esos archivos** (§2, Ramas). Sin commit de este agente queda solo este archivo (actualizado el 30 oct); el usuario decide en qué rama lo commitea.
 >
 > **Dónde quedó cada paso:**
-> - Paso 1, tipo de cambio: construido y en `main`; corre a diario. Falta la semana en sombra (30 oct–5 nov): `npm run rates:parity` en `etl/` cada día después de las 7:17. El 30 oct, revisar además la primera corrida programada del workflow de GitHub.
-> - Paso 2, contadores: construido, con paridad y probado contra `msp_app` en una transacción revertida (§8). **Este agente no tiene nada más que hacer ahí**: lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8, con el orden bloquear → `findStaleUnits` → escribir unidades → `recalculateBlockCounters`). Queda una decisión del usuario para el corte: recalcular de una vez los ~580 bloques del warehouse o no.
-> - **Siguiente para este agente: paso 3, acceso al warehouse.** No necesita permiso (es solo lectura); necesita que el usuario confirme que agregó `DATABASE_HOST_WAREHOUSE` al `.env` (§6). Con eso: `npm run warehouse:ping` desde `etl/` (receta y qué hacer según el resultado en `README.md` §13.3). Si muestra permisos de escritura, detenerse y avisar; si faltan permisos, el `GRANT SELECT` lo corre un administrador, no el agente.
-> - Pasos 4 y 5 dependen del 3 y de la identidad de filas (§6). La red desde Railway (§6) solo hace falta cuando exista el worker.
+> - Paso 1, tipo de cambio: construido y en `main`. **Semana en sombra en curso (30 oct–5 nov):** cada día, después de las 7:17, `npm run rates:parity` en `etl/` (tarda ~3 min) y anotar el resultado en la ficha del workflow 7. 30 oct: valores 7,274 de 7,274 iguales, pero **el día 30 no llegó a la tabla**. Primero preguntarle al usuario qué muestra GitHub Actions de la corrida programada de hoy (el agente no puede verlo); si no corrió o falló, que la lance a mano (*Run workflow*) y repetir la paridad.
+> - Paso 2, contadores: terminado por este lado. Lo conecta el agente de módulos en `saveUnitChanges` (`ROADMAP.md` §4.8, orden: bloquear → `findStaleUnits` → escribir unidades → `recalculateBlockCounters`). Falta avisarle, por medio del usuario, que las demás rutas que escriben unidades también deben recalcular (ficha del workflow 6). En el corte queda una decisión del usuario: recalcular o no, de una vez, los ~580 bloques del warehouse.
+> - **Siguiente para este agente: paso 3, acceso al warehouse.** Es solo lectura, así que no pide permiso, pero sí un dato: que el usuario confirme que agregó `DATABASE_HOST_WAREHOUSE` al `.env` (§6). Con eso: `npm run warehouse:ping` desde `etl/` (receta y qué hacer según el resultado en `README.md` §13.3). Si muestra permisos de escritura, detenerse y avisar; si faltan permisos, el `GRANT SELECT` lo corre un administrador, no el agente.
+> - Pasos 4 y 5 dependen del 3 y de la identidad de filas (§6). **Antes del paso 5**, el usuario tiene que elegir la cola: BullMQ con Redis o Postgres con `SKIP LOCKED` (§6 y ficha del workflow 3). La red desde Railway (§6) solo hace falta cuando exista el worker.
 >
-> **Lo último que pidió el usuario** fue este traspaso. Antes había preguntado para qué hacía falta su permiso: solo para escribir (en `msp_app` o en cualquier sistema); el paso 3 pide datos, no autorización.
+> **Revisión del 29 oct** (agregada en la §2 y en las fichas): el índice parcial de corrida activa y `migrate diff` (§2); BullMQ no cubre la regla del 20 % ni el orden por fase (workflow 3); `IDENTITY ALWAYS` acepta ids explícitos (workflow 4); los permisos de `/sync` ya existen (workflow 1); otras rutas que escriben unidades (workflow 6); el cron vive en staging (workflow 7).
+>
+> **Lo último que pidió el usuario** fue este traspaso (30 oct). Antes, el 29 oct: una revisión de este documento y el arreglo de los avisos de `pnpm build` (§8).
 
 1. [ ] **Tipo de cambio** (workflow 7), sin workers. **Construido; falta solo la semana en sombra.**
    - v1.34.0 (29 oct): reglas puras, carga del histórico desde el SOAP de Banguat (7,274 días en `msp_app.exchange_rate`), paridad 7,274 de 7,274 contra el `GET` de n8n y ruta `/api/exchange-rates` leyendo la tabla en modo `prisma` (probada con sesión en `pnpm dev:staging`: 200 desde la tabla y barra lateral correcta).
    - v1.35.0 (29 oct): ruta del cron `POST /api/cron/exchange-rates`, probada a mano en el Vercel de staging (200).
    - 29 oct: workflow de GitHub [`.github/workflows/exchange-rates.yml`](../../.github/workflows/exchange-rates.yml) en `main` (PR #10), diario a las 7:17 de Guatemala; corrida manual desde GitHub con 200 en Vercel.
    - Para cerrar la casilla: semana en sombra (`npm run rates:parity` en `etl/` cada día, del 30 oct al 5 nov) sin diferencias, la lista de `ROADMAP.md` §4.10 y la casilla correspondiente marcada allí. Apagar el workflow 7 en n8n lo hace una persona en el corte.
+   - Sombra: 30 oct, valores iguales; falta confirmar la corrida programada (ficha del workflow 7).
    - Fuera de este paso: el histórico paginado que consulta el Copilot (paso 8).
-2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Construido el 29 oct (v1.36.0); falta que el agente de módulos lo llame.** Detalle en la ficha del workflow 6 (§4).
+2. [ ] **Contadores de bloque** (workflow 6, Block Edit Queue). **Construido el 29 oct (v1.36.0), en `main` (PR #12); falta que el agente de módulos lo llame.** Detalle en la ficha del workflow 6 (§4).
    - Hecho: `computeBlockCounters` (`lib/domain/blocks/counters.ts`, copia exacta de n8n), `lockBlockForUpdate` y `recalculateBlockCounters` (`lib/db/block-counters.ts`), el bloqueo optimista de unidades (`findStaleUnits` en `lib/domain/units/concurrency.ts`) y la paridad de solo lectura (`npm run counters:parity` en `etl/`).
    - Para cerrar la casilla: `saveUnitChanges` los usa (`ROADMAP.md` §4.8), y el usuario decide en el corte si se recalculan de una vez los ~580 bloques del warehouse. Apagar el workflow 6 en n8n lo hace una persona en el corte.
    - Probado contra `msp_app` el 29 oct con autorización del usuario, en una transacción revertida (bitácora del 29 oct, 15:10–15:20).
 3. [ ] **Acceso al warehouse:** `npm run warehouse:ping` en verde (README §13.3) y respuesta a la identidad de filas (§6).
 4. [ ] **Mapeador del push** (workflow 4): `lib/domain/warehouse/`, puro, con prueba de paridad celda por celda contra el `dbo_stage` de MySQL.
-5. [ ] **Cliente de escritura de la copia sombra** con lista cerrada de las 11 tablas, y worker `warehouse-push` sobre BullMQ.
-6. [ ] **Corridas y `/sync`** (workflows 1–3): las 6 rutas sobre `sync_run*`, índice único parcial de corrida activa, progreso en vivo, liberar y detener, respaldos. Una semana de push sombra junto a n8n.
+5. [ ] **Cliente de escritura de la copia sombra** con lista cerrada de las 11 tablas, y worker `warehouse-push` sobre la cola que elija el usuario (BullMQ o Postgres, §6).
+6. [ ] **Corridas y `/sync`** (workflows 1–3): las 6 rutas sobre `sync_run*` con `requireRole` (`superAdmin` / `read`), índice único parcial de corrida activa (cuidado con `migrate diff`, §2), coordinador con la regla del 20 % y el orden por fase, progreso en vivo, liberar y detener, respaldos. Una semana de push sombra junto a n8n.
 7. [ ] **Pull** (workflow 5): según lo que decida el usuario.
 8. [ ] **Endpoints de solo lectura para el Copilot** (workflow 9), antes del corte.
-9. [ ] **Runbook del corte** para la persona que lo ejecuta (`ROADMAP.md` fase 7): qué workflows se desactivan, en qué orden y cómo se revierte.
+9. [ ] **Runbook del corte** para la persona que lo ejecuta (`ROADMAP.md` fase 7): qué workflows se desactivan, en qué orden y cómo se revierte. Debe incluir, como mínimo:
+   - mover el cron del tipo de cambio fuera del Vercel de staging (ficha del workflow 7);
+   - qué pasa con la llamada de `scripts/sync-database` a `block-counter-update` cuando se apague el workflow 6;
+   - la decisión sobre recalcular los ~580 bloques del warehouse, que cambia los promedios que el push copia.
 
 Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 
@@ -281,6 +300,23 @@ Fuera de alcance por ahora: Chat Sessions API y el Copilot en sí (decisión 2).
 ## 8. Bitácora
 
 Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6), qué se hizo, qué se verificó, migraciones aplicadas en `msp_app`, commits del usuario y qué quedó pendiente o por preguntar.
+
+### 30 oct 2026, 9:30–9:45
+
+- Estado de git: `jc_migrate_workflowsn` entró a `main` con el PR #12 (`c9158cb`, 29 oct 15:27). La carpeta está en `jc_migrate_projects` (agente de módulos), con cambios suyos sin commit. No se tocaron.
+- Primer día de la semana en sombra del tipo de cambio: `npm run rates:parity` a las 9:32, con 7,274 de 7,274 días iguales y 0 valores distintos. Solo en n8n aparece `2026-10-30`, y la tabla sigue con 7,274 filas, así que la corrida programada de las 7:17 no dejó el día 30. Falta ver la corrida en GitHub (`gh` no tiene sesión en esta máquina).
+- Comprobado en el código: `lib/auth/permissions.ts` ya tiene `superAdmin`, así que `/sync` no necesita un permiso nuevo. En la revisión del 29 oct se había dicho lo contrario. El Prisma instalado (7.10) no trae el preview `partialIndexes`.
+- Se actualizaron el traspaso (§7), la §2 (ramas, índice parcial), las fichas de los workflows 1, 3, 4, 6 y 7, la §5, la §6 (cola, corrida del 30 oct, pendientes de seguridad), los pasos 5, 6 y 9 de la §7 y la §9. Sin cambios de código, sin escrituras ni migraciones.
+- Pendiente: el resultado de la corrida de GitHub del 30 oct, el paso 3 (host del warehouse) y la decisión de la cola.
+
+### 29 oct 2026, 15:20–15:30
+
+- A pedido del usuario, revisión de este documento contra el código y el grafo. Lo que salió está ahora en la §2 y en las fichas (resumen en el traspaso de la §7).
+- Arreglo de los avisos de `pnpm build`, commit del usuario `57a31b8`:
+  - `app/layout.tsx` e `i18n.ts`: sin `try/catch` alrededor de `cookies()`. Al prerenderizar, `cookies()` lanza `DYNAMIC_SERVER_USAGE` a propósito, y atraparlo imprimía «Error loading i18n» en cada ruta y podía dejar páginas fijas en español. El idioma ahora solo puede ser `en` o `es`.
+  - `lib/db/connection.ts`: `/*turbopackIgnore: true*/` en el `resolve(process.cwd(), …)` del certificado, porque Turbopack rastreaba el proyecto entero. El `.pem` sigue entrando por `outputFileTracingIncludes`.
+- Verificado: `pnpm build` sin errores ni advertencias, todas las rutas dinámicas (`ƒ`), y la prueba de `lib/db/connection.test.ts` en verde. Sin entrada en `CHANGELOG.md` ni cambio de versión (el usuario no lo pidió).
+- Después, el usuario fusionó `jc_migrate_workflowsn` a `main` (PR #12).
 
 ### 29 oct 2026, 15:10–15:20
 
@@ -358,7 +394,15 @@ Una entrada por sesión de trabajo, la más reciente arriba: fecha y hora (UTC-6
 
 ## 9. Cómo trabajar en esta máquina
 
-Lo aprendido en las sesiones del 28 y 29 oct (Windows, PowerShell 5, Node 24). Las reglas de la §0 siguen mandando.
+Lo aprendido en las sesiones del 28 al 30 oct (Windows, PowerShell 5, Node 24). Las reglas de la §0 siguen mandando.
+
+**Git y GitHub**
+- La carpeta la comparten los dos agentes: mirar `git branch --show-current` y `git status --short` antes de editar, y no cambiar de rama con cambios ajenos (§2).
+- `gh` está instalado pero sin sesión: el agente no puede ver las corridas de GitHub Actions. Preguntarle al usuario.
+
+**Build**
+- `pnpm build` funciona con el `.env` de la raíz y no escribe en ninguna base (~40 s). Desde el 29 oct sale limpio: cualquier advertencia nueva viene de un cambio reciente.
+- No envolver `cookies()`, `headers()` ni nada de `next/headers` en `try/catch` sin volver a lanzar el error: Next usa ese error para marcar la ruta como dinámica.
 
 **Pruebas y tipos**
 - Desde la raíz, `npm test` (módulos puros con `node --test`); desde `etl/`, su propio `npm test`. Al 29 oct: 191 en la raíz y 64 en `etl`.
@@ -376,6 +420,7 @@ Lo aprendido en las sesiones del 28 y 29 oct (Windows, PowerShell 5, Node 24). L
 
 **Archivos y `.env`**
 - No leer ni imprimir valores del `.env`, ni buscar nombres de variables en él: preguntarle al usuario si una variable existe.
+- `npm run rates:parity` (en `etl/`) tarda ~3 min: pagina 73 veces el `GET` de n8n. Deja su reporte en `etl/reports/`, que está en `.gitignore`. En PowerShell, redirigir la salida a un archivo de `$env:TEMP` y leer el final; termina con código 1 si hay cualquier diferencia, aunque sea solo el día de hoy.
 - `Set-Content -Encoding utf8` de PowerShell 5 agrega BOM. Para editar, usar las herramientas de edición; si hace falta PowerShell, `[System.IO.File]::WriteAllText($ruta, $texto, [System.Text.UTF8Encoding]::new($false))`.
 - `next dev` crea un `AGENTS.md` en la raíz al arrancar: borrarlo.
 - Los JSON exportados de n8n quedan fuera del repo (traen tokens de producción).

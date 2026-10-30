@@ -6,6 +6,19 @@ Timeline in reverse chronological order (newest first). Each block groups relate
 
 ---
 
+## Proyectos sobre Prisma: detalle, alta, edición y filtros avanzados (v1.37.0)
+
+_2026-10-29_
+
+Módulo de proyectos de la implementación `prisma` de `dataClient` (`docs/migration/README.md` §14.18). **Producción no cambia**: con el backend `strapi` (el de `admin.primeiqlatam.com`) nada de esto se usa, y las Server Actions siguen detrás de la guarda de `lib/db/guard.ts`. Sin migraciones.
+
+- **Filtros avanzados** [lib/db/project-filters.ts](lib/db/project-filters.ts) (puro, con pruebas): los 9 campos y 13 operadores de `components/projects/advanced-filters.tsx`, con lógica AND u OR, conectados en `buildProjectWhere`. Semántica corregida respecto de Strapi (decisión del usuario): «distinto de» y «no contiene» incluyen los vacíos; en amenidades y servicios, «en» = tiene alguna y «no en» = no tiene ninguna; «entre» con OR es una sola condición; las fechas valen el día completo. Un campo, operador o valor inválido responde «Filtros avanzados inválidos» con el detalle por filtro. El filtro de fase y el `filters` libre siguen con error.
+- **Detalle y escritura** [lib/db/project-mapping.ts](lib/db/project-mapping.ts) (puro, con pruebas): `getProjectById` devuelve lo que poblaba Strapi (NSE, tipo de seguridad, perfil con sus monedas, copiadas también a `project.currencies`). El cuerpo del formulario pasa a columnas: `undefined` no cambia, `""`/`null` vacían; al crear, `code` y `name` son obligatorios. `code` sigue sin ser único, como en Strapi.
+- **Repositorio** [lib/db/projects.ts](lib/db/projects.ts): `get`, `create` y `update` en una transacción. Las referencias que no existen dan «Hay referencias que no existen en la base nueva» con su lista y no se guarda nada. Amenidades y servicios se reemplazan conservando el orden recibido (`sortOrder`). Una fila de `audit_log` por proyecto, con los ids de sus relaciones y las listas de `publicId` de amenidades y servicios.
+- **Entrada** [lib/db/project-schemas.ts](lib/db/project-schemas.ts): filtros avanzados tipados y `projectRequestSchema` estricto con los topes de las columnas (latitud ±90, longitud ±180, `numeric(10, 2)`, enteros ≥ 0, hasta 500 amenidades o servicios). [lib/db/input.ts](lib/db/input.ts) nombra los campos no permitidos.
+- **Acciones** [lib/db/project-actions.ts](lib/db/project-actions.ts): `getProjectAction` (leer), `createProjectAction` (crear) y `updateProjectAction` (editar), conectadas en [lib/api/prisma-client.ts](lib/api/prisma-client.ts); quedan 13 `notMigrated`.
+- **Verificación**: `npm test` 212/212, `tsc` sin errores nuevos (38 previos). Lectura de humo de solo lectura contra `msp_app`: cada par de filtros opuestos suma los 1,137 proyectos; detalle con perfil y monedas. Prueba de punta a punta con autorización, dentro de una transacción revertida: crear, editar, clonar, referencia inexistente, `audit_log` y listado filtrado, 6/6; `msp_app` quedó igual.
+
 ## Contadores del bloque sin n8n y bloqueo optimista de unidades (v1.36.0)
 
 _2026-10-29_

@@ -16,14 +16,14 @@ import {
   listExchangeRateProfilesAction,
   updateExchangeRateProfileAction,
 } from "@/lib/db/exchange-rate-profile-actions"
-import { listProjectsAction } from "@/lib/db/project-actions"
+import { createProjectAction, getProjectAction, listProjectsAction, updateProjectAction } from "@/lib/db/project-actions"
 
 /**
  * Implementación `prisma` de `dataClient` (`NEXT_PUBLIC_DATA_BACKEND=prisma`).
  *
  * - Catálogos y perfiles de tipo de cambio: reales, contra `msp_app` vía Server Actions, con permiso por rol.
- * - Proyectos: solo el listado (`getProjects`) con búsqueda, orden y filtros rápidos; los filtros
- *   avanzados y el de fase responden con un error claro.
+ * - Proyectos: listado (búsqueda, orden, filtros rápidos y avanzados), detalle, alta y edición; el
+ *   filtro de fase responde con un error claro.
  * - Sesión: Better Auth (`lib/auth/server.ts`) con cookie httpOnly; nunca llama a Strapi. El
  *   navegador no ve la cookie: `getMe` la valida en el servidor.
  * - Todo lo demás falla con un error explícito hasta que se migre su módulo.
@@ -79,14 +79,14 @@ export const prismaDataClient: DataClient = {
   async getProjects(params) {
     return unwrap(await listProjectsAction(params))
   },
-  async getProjectById() {
-    notMigrated("getProjectById")
+  async getProjectById(id) {
+    return unwrap(await getProjectAction(id))
   },
-  async createProject() {
-    notMigrated("createProject")
+  async createProject(data) {
+    return unwrap(await createProjectAction(data))
   },
-  async updateProject() {
-    notMigrated("updateProject")
+  async updateProject(id, data) {
+    return unwrap(await updateProjectAction(id, data))
   },
 
   async getBlocks() {

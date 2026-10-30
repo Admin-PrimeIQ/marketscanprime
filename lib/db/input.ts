@@ -22,6 +22,8 @@ export function issueText(issue: z.ZodIssue): string {
       return `${field}: mínimo ${issue.minimum}`
     case "invalid_type":
       return issue.received === "undefined" ? `${field}: es obligatorio` : `${field}: tipo inválido`
+    case "unrecognized_keys":
+      return `${field}: campos no permitidos (${issue.keys.join(", ")})`
     default:
       return `${field}: valor inválido`
   }

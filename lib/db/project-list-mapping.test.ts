@@ -1,10 +1,11 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import {
-  ADVANCED_FILTERS_NOT_MIGRATED,
   buildProjectWhere,
+  INVALID_ADVANCED_FILTERS,
   PHASE_FILTER_UNAVAILABLE,
   ProjectError,
+  RAW_FILTERS_NOT_MIGRATED,
   toProjectListResponse,
   toStrapiProject,
   type ProjectListRow,
@@ -104,17 +105,39 @@ test("buildProjectWhere combina búsqueda, dominio, región y país con AND", ()
   })
 })
 
-test("buildProjectWhere rechaza el filtro de fase y los avanzados con un error claro", () => {
+test("buildProjectWhere rechaza el filtro de fase y el `filters` libre con un error claro", () => {
   assert.throws(() => buildProjectWhere({ availability: ["planning"] }), (error: unknown) => {
     assert.ok(error instanceof ProjectError)
     assert.equal(error.message, PHASE_FILTER_UNAVAILABLE)
     return true
   })
-  assert.throws(
-    () => buildProjectWhere({ advancedFilters: [{ field: "name", operator: "equals", value: "x" }] }),
-    new RegExp(ADVANCED_FILTERS_NOT_MIGRATED),
-  )
-  assert.throws(() => buildProjectWhere({ filters: { name: "x" } }), new RegExp(ADVANCED_FILTERS_NOT_MIGRATED))
+  assert.throws(() => buildProjectWhere({ filters: { name: "x" } }), (error: unknown) => {
+    assert.ok(error instanceof ProjectError)
+    assert.equal(error.message, RAW_FILTERS_NOT_MIGRATED)
+    return true
+  })
+})
+
+test("buildProjectWhere suma los filtros avanzados como un grupo más del AND", () => {
+  const where = buildProjectWhere({
+    search: "torre",
+    advancedFilters: [
+      { field: "name", operator: "contains", value: "norte" },
+      { field: "code", operator: "isNull" },
+    ],
+    filterLogic: "OR",
+  }) as { AND: object[] }
+  assert.equal(where.AND.length, 2)
+  assert.deepEqual(where.AND[1], { OR: [{ name: { contains: "norte", mode: "insensitive" } }, { code: null }] })
+})
+
+test("buildProjectWhere responde los filtros avanzados inválidos con ProjectError y el detalle", () => {
+  assert.throws(() => buildProjectWhere({ advancedFilters: [{ field: "phase", operator: "equals", value: "x" }] }), (error: unknown) => {
+    assert.ok(error instanceof ProjectError)
+    assert.equal(error.message, INVALID_ADVANCED_FILTERS)
+    assert.deepEqual(error.details, ['advancedFilters.0: el campo "phase" no se puede filtrar'])
+    return true
+  })
 })
 
 test("parseProjectListParams valida dominio y región", () => {

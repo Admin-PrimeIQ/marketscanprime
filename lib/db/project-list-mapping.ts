@@ -1,8 +1,8 @@
 /**
- * Reglas puras del listado de proyectos sobre Prisma (`getProjects`): búsqueda, orden y los filtros
- * rápidos (dominio, región GAM/Interior y país), y la fila con sus relaciones vuelve con la forma de
- * `StrapiProject` (`documentId` = `publicId`). Los filtros avanzados y el de fase todavía no tienen
- * equivalente en `msp_app` y responden con un error claro.
+ * Reglas puras del listado de proyectos sobre Prisma (`getProjects`): búsqueda, orden, los filtros
+ * rápidos (dominio, región GAM/Interior y país) y los avanzados (`project-filters.ts`), y la fila con
+ * sus relaciones vuelve con la forma de `StrapiProject` (`documentId` = `publicId`). El filtro de
+ * fase y el `filters` libre no tienen equivalente en `msp_app` y responden con un error claro.
  *
  * No importa nada de Prisma ni de React, así que corre bajo `node --test`.
  */
@@ -10,6 +10,7 @@
 import type { StrapiProject, StrapiProjectsResponse } from "../api/strapi.ts"
 import { PublicError } from "./action-result.ts"
 import { decimalToNumber, type DecimalLike } from "./exchange-rate-profile-mapping.ts"
+import { buildAdvancedFiltersWhere, type AdvancedFilter } from "./project-filters.ts"
 
 export const PROJECT_SORTABLE_FIELDS: ReadonlySet<string> = new Set(["id", "name", "code", "department", "createdAt", "updatedAt"])
 export const PROJECT_NULLABLE_SORT_FIELDS: ReadonlySet<string> = new Set(["code", "department"])
@@ -24,7 +25,8 @@ export const REGION_QUARTERS = {
 } as const
 export type ProjectRegion = keyof typeof REGION_QUARTERS
 
-export const ADVANCED_FILTERS_NOT_MIGRATED = "Los filtros avanzados de proyectos todavía no están migrados a la base nueva."
+export const RAW_FILTERS_NOT_MIGRATED = "El parámetro `filters` de proyectos no está migrado a la base nueva: usa los filtros avanzados."
+export const INVALID_ADVANCED_FILTERS = "Filtros avanzados inválidos"
 export const PHASE_FILTER_UNAVAILABLE = "El filtro de fase no está disponible en la base nueva: los proyectos no tienen ese campo."
 
 /** Error con el mismo contrato que los de `strapiClient`: `message` y, si hay, `details`. Llega al navegador. */
@@ -47,19 +49,18 @@ export interface ProjectListParams {
   country?: string
   availability?: string[]
   filters?: Record<string, unknown>
-  advancedFilters?: unknown[]
+  advancedFilters?: AdvancedFilter[]
   filterLogic?: "AND" | "OR"
 }
 
 /**
- * `where` de Prisma equivalente al de Strapi: búsqueda en `name`/`code`/`developer.name` y filtros
- * rápidos combinados con AND. Por dominio o región, el proyecto entra si alguno de sus bloques cumple.
+ * `where` de Prisma equivalente al de Strapi: búsqueda en `name`/`code`/`developer.name`, filtros
+ * rápidos y el grupo de filtros avanzados (combinados entre sí con `filterLogic`), todo con AND. Por
+ * dominio o región, el proyecto entra si alguno de sus bloques cumple.
  */
 export function buildProjectWhere(params: ProjectListParams = {}) {
   if ((params.availability?.length ?? 0) > 0) throw new ProjectError(PHASE_FILTER_UNAVAILABLE)
-  if ((params.advancedFilters?.length ?? 0) > 0 || Object.keys(params.filters ?? {}).length > 0) {
-    throw new ProjectError(ADVANCED_FILTERS_NOT_MIGRATED)
-  }
+  if (Object.keys(params.filters ?? {}).length > 0) throw new ProjectError(RAW_FILTERS_NOT_MIGRATED)
 
   const and: object[] = []
   const term = params.search?.trim()
@@ -76,10 +77,16 @@ export function buildProjectWhere(params: ProjectListParams = {}) {
   if (params.region) and.push({ blocks: { some: { quarter: { in: [...REGION_QUARTERS[params.region]] } } } })
   const country = params.country?.trim()
   if (country) and.push({ country: { is: { publicId: country } } })
+  const advanced = buildAdvancedFiltersWhere(
+    params.advancedFilters,
+    params.filterLogic,
+    (details) => new ProjectError(INVALID_ADVANCED_FILTERS, details),
+  )
+  if (advanced) and.push(advanced)
   return and.length > 0 ? { AND: and } : {}
 }
 
-interface RelatedRow {
+export interface RelatedRow {
   id: number
   publicId: string
   code: string | null
@@ -125,7 +132,7 @@ function withoutNulls<T extends Record<string, unknown>>(value: T): Partial<{ [K
   return out as Partial<{ [K in keyof T]: NonNullable<T[K]> }>
 }
 
-function toRelated({ id, publicId, ...rest }: RelatedRow) {
+export function toRelated({ id, publicId, ...rest }: RelatedRow) {
   return { id, documentId: publicId, ...withoutNulls(rest) }
 }
 
